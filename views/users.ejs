@@ -68,9 +68,9 @@
                       <% if (user.avatar_path) { %>
                         <img src="<%= user.avatar_path %>" alt="<%= user.username %>'s avatar" 
                              class="w-full h-full object-cover" 
-                             onerror="this.onerror=null; this.src='/images/default-avatar.jpg';">
+                             onerror="this.onerror=null; this.src='/images/default-avatar.svg';">
                       <% } else { %>
-                        <img src="/images/default-avatar.jpg" alt="Default avatar" class="w-full h-full object-cover">
+                        <img src="/images/default-avatar.svg" alt="Default avatar" class="w-full h-full object-cover">
                       <% } %>
                     </div>
                   </div>
@@ -182,7 +182,7 @@
             <label class="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
             <div class="flex items-center space-x-4">
               <div class="h-16 w-16 rounded-full overflow-hidden ring-2 ring-gray-600">
-                <img id="editUserAvatar" src="/images/default-avatar.jpg" alt="User avatar" class="w-full h-full object-cover">
+                <img id="editUserAvatar" src="/images/default-avatar.svg" alt="User avatar" class="w-full h-full object-cover">
               </div>
               <div>
                 <input type="file" id="editAvatarInput" name="avatar" accept="image/*" class="hidden">
@@ -258,7 +258,7 @@
             <label class="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
             <div class="flex items-center space-x-4">
               <div class="h-16 w-16 rounded-full overflow-hidden ring-2 ring-gray-600">
-                <img id="createUserAvatar" src="/images/default-avatar.jpg" alt="User avatar" class="w-full h-full object-cover">
+                <img id="createUserAvatar" src="/images/default-avatar.svg" alt="User avatar" class="w-full h-full object-cover">
               </div>
               <div>
                 <input type="file" id="createAvatarInput" name="avatar" accept="image/*" class="hidden">
@@ -439,7 +439,7 @@ function openEditModal(userId, username, role, status, avatar) {
   if (avatar && avatar !== 'null') {
     avatarImg.src = `/uploads/avatars/${avatar}`;
   } else {
-    avatarImg.src = '/images/default-avatar.jpg';
+    avatarImg.src = '/images/default-avatar.svg';
   }
   
   const modal = document.getElementById('editModal');
@@ -459,7 +459,7 @@ function openCreateModal() {
   document.getElementById('createRole').value = 'member';
   document.getElementById('createStatus').value = 'active';
   document.getElementById('createPassword').value = '';
-  document.getElementById('createUserAvatar').src = '/images/default-avatar.jpg';
+  document.getElementById('createUserAvatar').src = '/images/default-avatar.svg';
   document.getElementById('createAvatarInput').value = '';
   
   const modal = document.getElementById('createModal');
@@ -485,7 +485,7 @@ function closeCreateModal() {
   setTimeout(() => {
     modal.classList.add('hidden');
     document.getElementById('createUserForm').reset();
-    document.getElementById('createUserAvatar').src = '/images/default-avatar.jpg';
+    document.getElementById('createUserAvatar').src = '/images/default-avatar.svg';
   }, 200);
 }
 

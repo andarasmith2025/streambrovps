@@ -52,6 +52,9 @@ const app = express();
 app.set("trust proxy", 1);
 const port = process.env.PORT || 7575;
 
+// Increase timeout for large file uploads (30 minutes)
+const uploadTimeout = 30 * 60 * 1000;
+
 // Startup sanity log for OAuth envs (safe: only lengths)
 try {
   const cidLen = (process.env.GOOGLE_CLIENT_ID || '').length;
@@ -107,10 +110,10 @@ app.locals.helpers = {
     if (req.session && req.session.userId) {
       const avatarPath = req.session.avatar_path;
       if (avatarPath) {
-        return `<img src="${avatarPath}" alt="${req.session.username || 'User'}'s Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='/images/default-avatar.jpg';">`;
+        return `<img src="${avatarPath}" alt="${req.session.username || 'User'}'s Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='/images/default-avatar.svg';">`;
       }
     }
-    return '<img src="/images/default-avatar.jpg" alt="Default Profile" class="w-full h-full object-cover">';
+    return '<img src="/images/default-avatar.svg" alt="Default Profile" class="w-full h-full object-cover">';
   },
   getPlatformIcon: function (platform) {
     switch (platform) {
@@ -1042,7 +1045,7 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       });
     }
 
-    let avatarPath = '/uploads/avatars/default-avatar.png';
+    let avatarPath = '/uploads/avatars/default-avatar.svg';
     if (req.file) {
       avatarPath = `/uploads/avatars/${req.file.filename}`;
     }
@@ -2312,6 +2315,11 @@ app.get('/api/server-time', (req, res) => {
   });
 });
 const server = app.listen(port, '0.0.0.0', async () => {
+  // Set server timeout for large file uploads
+  server.timeout = uploadTimeout;
+  server.keepAliveTimeout = uploadTimeout;
+  server.headersTimeout = uploadTimeout + 1000;
+  
   const ipAddresses = getLocalIpAddresses();
   console.log(`StreamFlow running at:`);
   if (ipAddresses && ipAddresses.length > 0) {

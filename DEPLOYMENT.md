@@ -18,8 +18,8 @@ Jika 8labs menyediakan CLI tool, install terlebih dahulu.
 # Inisialisasi git (jika belum)
 git init
 
-# Add remote repository
-git remote add origin https://github.com/username/streambro.git
+# Add remote repository (jika belum)
+git remote add origin https://github.com/Andara2025/streambrovps.git
 
 # Commit semua perubahan
 git add .
@@ -41,7 +41,7 @@ git push -u origin main
 
 3. **Connect Repository**
    - Connect ke GitHub/GitLab repository Anda
-   - Pilih repository `streambro`
+   - Pilih repository `streambrovps`
    - Pilih branch `main`
 
 4. **Konfigurasi Build**
@@ -126,8 +126,8 @@ sudo npm install -g pm2
 #### 4. Clone & Setup Project
 ```bash
 # Clone repository
-git clone https://github.com/username/streambro.git
-cd streambro
+git clone https://github.com/Andara2025/streambrovps.git
+cd streambrovps
 
 # Install dependencies
 npm install
@@ -292,7 +292,8 @@ crontab -e
 ## Kontak Support
 
 - 8labs Support: https://cloud.8labs.id/support
-- StreamBro Issues: https://github.com/bangtutorial/streambro/issues
+- Repository Issues: https://github.com/Andara2025/streambrovps/issues
+- Original StreamBro: https://github.com/bangtutorial/streambro
 
 ---
 

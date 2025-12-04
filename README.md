@@ -30,7 +30,7 @@ StreamBro adalah aplikasi live streaming yang memungkinkan kamu melakukan live s
 Untuk instalasi otomatis, jalankan perintah berikut:
 
 ```bash
-curl -o install.sh https://raw.githubusercontent.com/bangtutorial/streambro/main/install.sh && chmod +x install.sh && ./install.sh
+curl -o install.sh https://raw.githubusercontent.com/Andara2025/streambrovps/main/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ## 🔧 Manual Installation
@@ -73,13 +73,11 @@ sudo apt install git -y
 
 Clone repository:
 ```bash
-git clone https://github.com/bangtutorial/streambro
+git clone https://github.com/Andara2025/streambrovps.git
+cd streambrovps
 ```
 
-Masuk ke direktori project:
-```bash
-cd streambro
-```
+
 
 Install Paket Node.JS:
 ```bash
@@ -192,7 +190,7 @@ Contoh: `http://88.12.34.56:7575`
 Jika lupa password atau perlu reset akun:
 
 ```bash
-cd streambro && node reset-password.js
+node reset-password.js
 ```
 
 ## ⏰ Pengaturan Timezone Server
@@ -292,12 +290,15 @@ pm2 restart streambro
 
 ## 💫 Contributors
 
-[![Contributors](https://contrib.rocks/image?repo=bangtutorial/streambro)](https://github.com/bangtutorial/streambro/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=Andara2025/streambrovps)](https://github.com/Andara2025/streambrovps/graphs/contributors)
 
 ## 📄 License
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/bangtutorial/streambro/blob/main/LICENSE)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/Andara2025/streambrovps/blob/main/LICENSE)
 
 ---
-© 2025 - [Bang Tutorial](https://youtube.com/bangtutorial)
+
+**Original Project:** [StreamBro by Bang Tutorial](https://github.com/bangtutorial/streambro)
+
+© 2025 - Modified by Andara2025
 

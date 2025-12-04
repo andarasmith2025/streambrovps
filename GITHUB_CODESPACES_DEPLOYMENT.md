@@ -277,10 +277,12 @@ Jika sudah siap untuk production, migrate ke VPS proper:
 
 ```bash
 # Backup database
-scp db/streambro.db user@your-vps:/path/to/backup/
+# Download via browser: Klik kanan file db/streamflow.db → Download
 
-# Atau download via browser
-# Klik kanan file → Download
+# Atau gunakan GitHub CLI untuk commit dan push
+git add db/streamflow.db
+git commit -m "Backup database"
+git push
 ```
 
 ---
