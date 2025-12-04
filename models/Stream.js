@@ -163,24 +163,28 @@ class Stream {
       end_time = endTimeOverride || new Date().toISOString();
     }
     return new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE streams SET 
-          status = ?, 
-          status_updated_at = ?, 
-          start_time = CASE WHEN ? IS NOT NULL THEN ? ELSE start_time END, 
-          end_time = CASE WHEN ? IS NOT NULL THEN ? ELSE end_time END,
-          updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND user_id = ?`,
-        [
-          status,
-          status_updated_at,
-          start_time,
-          start_time,
-          end_time,
-          end_time,
-          id,
-          userId
-        ],
+      // Build query based on whether userId is provided
+      const query = userId
+        ? `UPDATE streams SET 
+            status = ?, 
+            status_updated_at = ?, 
+            start_time = CASE WHEN ? IS NOT NULL THEN ? ELSE start_time END, 
+            end_time = CASE WHEN ? IS NOT NULL THEN ? ELSE end_time END,
+            updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND user_id = ?`
+        : `UPDATE streams SET 
+            status = ?, 
+            status_updated_at = ?, 
+            start_time = CASE WHEN ? IS NOT NULL THEN ? ELSE start_time END, 
+            end_time = CASE WHEN ? IS NOT NULL THEN ? ELSE end_time END,
+            updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`;
+      
+      const params = userId
+        ? [status, status_updated_at, start_time, start_time, end_time, end_time, id, userId]
+        : [status, status_updated_at, start_time, start_time, end_time, end_time, id];
+      
+      db.run(query, params,
         function (err) {
           if (err) {
             console.error('Error updating stream status:', err.message);

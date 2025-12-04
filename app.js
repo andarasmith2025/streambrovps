@@ -1783,6 +1783,13 @@ app.get('/api/streams', isAuthenticated, async (req, res) => {
   try {
     const filter = req.query.filter;
     const streams = await Stream.findAll(req.session.userId, filter);
+    
+    // Fetch schedules for each stream
+    const StreamSchedule = require('./models/StreamSchedule');
+    for (const stream of streams) {
+      stream.schedules = await StreamSchedule.findByStreamId(stream.id);
+    }
+    
     res.json({ success: true, streams });
   } catch (error) {
     console.error('Error fetching streams:', error);
@@ -1846,22 +1853,35 @@ app.post('/api/streams', isAuthenticated, [
       use_advanced_settings: req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true,
       user_id: req.session.userId
     };
-    if (req.body.scheduleTime) {
-      const scheduleDate = new Date(req.body.scheduleTime);
-
-      const serverTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      console.log(`[CREATE STREAM] Server timezone: ${serverTimezone}`);
-      console.log(`[CREATE STREAM] Input time: ${req.body.scheduleTime}`);
-      console.log(`[CREATE STREAM] Parsed time: ${scheduleDate.toISOString()}`);
-      console.log(`[CREATE STREAM] Local display: ${scheduleDate.toLocaleString('en-US', { timeZone: serverTimezone })}`);
-
-      streamData.schedule_time = scheduleDate.toISOString();
+    // Handle multiple schedules
+    const schedules = req.body.schedules;
+    const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;
+    
+    if (hasSchedules) {
+      // Set first schedule as main schedule for backward compatibility
+      const firstSchedule = schedules[0];
+      streamData.schedule_time = new Date(firstSchedule.schedule_time).toISOString();
+      streamData.duration = parseInt(firstSchedule.duration);
+      streamData.status = 'scheduled';
+    } else {
+      streamData.status = 'offline';
     }
-    if (req.body.duration) {
-      streamData.duration = parseInt(req.body.duration);
-    }
-    streamData.status = req.body.scheduleTime ? 'scheduled' : 'offline';
+    
     const stream = await Stream.create(streamData);
+    
+    // Create schedule records for each schedule
+    if (hasSchedules) {
+      const StreamSchedule = require('./models/StreamSchedule');
+      for (const schedule of schedules) {
+        await StreamSchedule.create({
+          stream_id: stream.id,
+          schedule_time: new Date(schedule.schedule_time).toISOString(),
+          duration: parseInt(schedule.duration)
+        });
+      }
+      console.log(`[CREATE STREAM] Created ${schedules.length} schedule(s) for stream ${stream.id}`);
+    }
+    
     res.json({ success: true, stream });
   } catch (error) {
     console.error('Error creating stream:', error);
@@ -1883,6 +1903,19 @@ app.get('/api/streams/:id', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch stream' });
   }
 });
+
+// Get stream schedules
+app.get('/api/streams/:id/schedules', isAuthenticated, async (req, res) => {
+  try {
+    const StreamSchedule = require('./models/StreamSchedule');
+    const schedules = await StreamSchedule.findByStreamId(req.params.id);
+    res.json({ success: true, schedules });
+  } catch (error) {
+    console.error('Error fetching schedules:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch schedules' });
+  }
+});
+
 app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);

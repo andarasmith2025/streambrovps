@@ -151,6 +151,22 @@ function createTables() {
     }
   });
 
+  // Table for multiple stream schedules
+  db.run(`CREATE TABLE IF NOT EXISTS stream_schedules (
+    id TEXT PRIMARY KEY,
+    stream_id TEXT NOT NULL,
+    schedule_time TIMESTAMP NOT NULL,
+    duration INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    executed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stream_id) REFERENCES streams(id) ON DELETE CASCADE
+  )`, (err) => {
+    if (err) {
+      console.error('Error creating stream_schedules table:', err.message);
+    }
+  });
+
   db.run(`ALTER TABLE users ADD COLUMN user_role TEXT DEFAULT 'admin'`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding user_role column:', err.message);

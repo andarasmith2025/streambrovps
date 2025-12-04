@@ -202,23 +202,17 @@
   <div id="newStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
     <div class="flex min-h-screen items-center justify-center p-4">
       <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl modal-container flex flex-col max-h-[90vh]">
-        <div class="flex-shrink-0 flex items-center justify-between p-4 sm:px-6 sm:py-6 border-b border-gray-700">
+        <div class="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-700">
           <h3 class="text-lg font-semibold">Create New Stream</h3>
-          <div class="flex items-center gap-2">
-            <button type="button" onclick="openTipsStreaming()" class="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors shadow-sm">
-              <i class="ti ti-bulb"></i>
-              <span class="text-sm">Tips</span>
-            </button>
-            <button onclick="closeNewStreamModal()" class="text-gray-400 hover:text-whifte">
-              <i class="ti ti-x text-xl"></i>
-            </button>
-          </div>
+          <button onclick="closeNewStreamModal()" class="text-gray-400 hover:text-white transition-colors">
+            <i class="ti ti-x text-xl"></i>
+          </button>
         </div>
-        <div class="p-4 sm:px-6 pt-1 pb-4 overflow-y-auto flex-grow">
-          <form id="newStreamForm" class="space-y-6">
+        <div class="px-5 py-4 overflow-y-auto flex-grow">
+          <form id="newStreamForm" class="space-y-4">
             <input type="hidden" id="selectedVideoId" name="videoId" value="">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div class="space-y-3">
                 <div class="relative">
                   <label class="text-sm font-medium text-white block mb-2">Select Video</label>
                   <div class="relative">
@@ -264,9 +258,9 @@
                     class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
                     placeholder="Enter stream title..." name="streamTitle" id="streamTitle" required>
                 </div>
-                <div class="space-y-4">
-                  <label class="text-sm font-medium text-white block">Stream Configuration</label>
-                  <div class="space-y-3">
+                <div class="space-y-3">
+                  <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
+                  <div class="space-y-2">
                     <div class="relative">
                       <input type="text" id="rtmpUrl" name="rtmpUrl"
                         class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
@@ -346,58 +340,75 @@
                 </div>
               </div>
             </div>
-            <div class="space-y-2">
-              <div class="flex flex-col sm:flex-row sm:items-center">
-                <label class="text-sm font-medium text-white">Schedule Settings</label>
-                <span id="serverTimeDisplay"
-                  class="mt-1 sm:mt-0 sm:ml-2 block sm:inline-block bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded">
-                  Server time: loading...
-                </span>
+            <div class="space-y-3 pt-2 border-t border-gray-700">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <label class="text-sm font-medium text-white">Schedule Settings</label>
+                  <span id="serverTimeDisplay" class="bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded">
+                    Server time: loading...
+                  </span>
+                </div>
+                <button type="button" onclick="addScheduleSlot()" 
+                  class="flex items-center gap-1 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 rounded-lg transition-colors text-sm">
+                  <i class="ti ti-plus text-sm"></i>
+                  <span>Add Schedule</span>
+                </button>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="h-[42px] flex items-center justify-between">
-                  <label class="text-sm text-gray-300">Loop Video</label>
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" name="loopVideo" class="sr-only peer" checked>
-                    <div class="w-11 h-6 bg-dark-700 rounded-full peer peer-checked:bg-primary"></div>
-                    <div
-                      class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5">
-                    </div>
-                  </label>
+              
+              <div class="flex items-center justify-between py-2">
+                <label class="text-sm text-gray-300">Loop Video</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" name="loopVideo" id="loopVideo" class="sr-only peer" checked>
+                  <div class="w-11 h-6 bg-dark-700 rounded-full peer peer-checked:bg-primary"></div>
+                  <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+                </label>
+              </div>
+
+              <div id="scheduleSlotsContainer" class="space-y-2">
+                <!-- Default first schedule slot -->
+                <div class="schedule-slot grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2 p-3 bg-dark-700/50 rounded-lg border border-gray-600">
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Date & Time</label>
+                    <input type="datetime-local" class="schedule-time w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 block mb-1">Duration (min)</label>
+                    <input type="number" min="1" value="60" class="schedule-duration w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
+                  </div>
+                  <div class="flex items-end">
+                    <button type="button" onclick="removeScheduleSlot(this)" 
+                      class="h-[38px] px-3 bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <i class="ti ti-trash text-sm"></i>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <input type="datetime-local"
-                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
-                </div>
-                <div class="relative">
-                  <input type="number" min="1"
-                    class="w-full h-[42px] px-4 pr-16 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
-                    placeholder="Duration">
-                  <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">minutes</span>
-                </div>
+              </div>
+              
+              <div class="text-xs text-gray-400 flex items-center gap-1">
+                <i class="ti ti-info-circle"></i>
+                <span>You can add multiple schedules for different time slots in a day</span>
               </div>
             </div>
             <div class="space-y-4">
               <div class="pt-2 border-t border-gray-700">
-                <button type="button" id="advancedSettingsToggle"
-                  class="flex items-center justify-between w-full text-left">
-                  <div class="flex items-center">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-white">Advanced Settings</span>
-                    <div class="relative ml-2 group">
-                      <i class="ti ti-info-circle text-gray-400 hover:text-primary"></i>
-                      <div
-                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-dark-600 text-xs text-gray-200 rounded-md shadow-lg z-10">
-                        <div class="text-center">Menggunakan advanced settings, proses streaming akan menjadi lebih
-                          berat karena ada proses re-encoding video</div>
-                        <div
-                          class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-dark-600">
-                        </div>
+                    <div class="relative group">
+                      <i class="ti ti-info-circle text-gray-400 hover:text-primary cursor-help"></i>
+                      <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-dark-600 text-xs text-gray-200 rounded-md shadow-lg z-10">
+                        <div class="text-center">⚠️ Mengaktifkan advanced settings akan melakukan re-encoding video yang membutuhkan resource CPU & RAM lebih besar</div>
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-dark-600"></div>
                       </div>
                     </div>
                   </div>
-                  <i class="ti ti-chevron-down text-gray-400 transition-transform"></i>
-                </button>
-                <div id="advancedSettingsContent" class="hidden space-y-6 pt-4">
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="advancedSettingsToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors"></div>
+                    <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+                  </label>
+                </div>
+                <div id="advancedSettingsContent" class="hidden space-y-3 pt-3">
                   <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3 mb-4">
                     <div class="flex items-start">
                       <i class="ti ti-alert-triangle text-yellow-500 text-sm mt-0.5 mr-2 flex-shrink-0"></i>
@@ -485,19 +496,13 @@
   <div id="editStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
     <div class="flex min-h-screen items-center justify-center p-4">
       <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl modal-container flex flex-col max-h-[90vh]">
-        <div class="flex-shrink-0 flex items-center justify-between p-4 sm:px-6 sm:py-6 border-b border-gray-700">
+        <div class="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-700">
           <h3 class="text-lg font-semibold">Edit Stream</h3>
-          <div class="flex items-center gap-2">
-            <button type="button" onclick="openTipsStreaming()" class="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors shadow-sm">
-              <i class="ti ti-bulb"></i>
-              <span class="text-sm">Tips</span>
-            </button>
-            <button onclick="closeEditStreamModal()" class="text-gray-400 hover:text-white">
-              <i class="ti ti-x text-xl"></i>
-            </button>
-          </div>
+          <button onclick="closeEditStreamModal()" class="text-gray-400 hover:text-white transition-colors">
+            <i class="ti ti-x text-xl"></i>
+          </button>
         </div>
-        <div class="p-4 sm:px-6 pt-1 pb-4 overflow-y-auto flex-grow">
+        <div class="px-5 py-4 overflow-y-auto flex-grow">
           <form id="editStreamForm" class="space-y-6">
             <input type="hidden" id="editStreamId" name="streamId" value="">
             <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
@@ -663,24 +668,23 @@
             </div>
             <div class="space-y-4">
               <div class="pt-2 border-t border-gray-700">
-                <button type="button" id="editAdvancedSettingsToggle"
-                  class="flex items-center justify-between w-full text-left">
-                  <div class="flex items-center">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-white">Advanced Settings</span>
-                    <div class="relative ml-2 group">
-                      <i class="ti ti-info-circle text-gray-400 hover:text-primary"></i>
-                      <div
-                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-dark-600 text-xs text-gray-200 rounded-md shadow-lg z-10">
-                        <div class="text-center">Menggunakan advanced settings, proses streaming akan menjadi lebih
-                          berat karena ada proses re-encoding video</div>
-                        <div
-                          class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-dark-600">
-                        </div>
+                    <div class="relative group">
+                      <i class="ti ti-info-circle text-gray-400 hover:text-primary cursor-help"></i>
+                      <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-dark-600 text-xs text-gray-200 rounded-md shadow-lg z-10">
+                        <div class="text-center">⚠️ Mengaktifkan advanced settings akan melakukan re-encoding video yang membutuhkan resource CPU & RAM lebih besar</div>
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-dark-600"></div>
                       </div>
                     </div>
                   </div>
-                  <i class="ti ti-chevron-down text-gray-400 transition-transform"></i>
-                </button>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="editAdvancedSettingsToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors"></div>
+                    <div class="absolute left-[2px] top-[2px] w-5 h-5 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+                  </label>
+                </div>
                 <div id="editAdvancedSettingsContent" class="hidden space-y-6 pt-4">
                   <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3 mb-4">
                     <div class="flex items-start">
@@ -1129,15 +1133,12 @@
         loopVideo: document.querySelector('input[name="loopVideo"]').checked,
         orientation: currentOrientation,
         resolution: document.getElementById('currentResolution').textContent.split(' ')[0],
-        useAdvancedSettings: !document.getElementById('advancedSettingsContent').classList.contains('hidden')
+        useAdvancedSettings: document.getElementById('advancedSettingsToggle').checked
       };
-      const scheduleTime = document.querySelector('input[type="datetime-local"]').value;
-      const duration = document.querySelector('input[type="number"]').value;
-      if (scheduleTime) {
-        formData.scheduleTime = scheduleTime;
-      }
-      if (duration) {
-        formData.duration = duration;
+      // Collect multiple schedules
+      const schedules = collectSchedules();
+      if (schedules.length > 0) {
+        formData.schedules = schedules;
       }
       const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
       fetch('/api/streams', {
@@ -1384,11 +1385,20 @@
           <div class="text-sm text-gray-400">${formatDate(startDate) || '--'}</div>
           ${startDate ? `<div class="text-xs text-gray-500">Started: ${formatTime(startDate)}</div>` : ''}
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          ${scheduleDate
-            ? `<div class="text-sm text-yellow-500 font-medium">${formatDate(scheduleDate)}</div>
-               <div class="text-xs text-gray-400">${formatTime(scheduleDate)}</div>`
-            : `<div class="text-sm">--</div>`}
+        <td class="px-6 py-4">
+          ${stream.schedules && stream.schedules.length > 0
+            ? stream.schedules.map(sch => {
+                const schDate = new Date(sch.schedule_time);
+                return `<div class="flex items-center gap-2 mb-1">
+                  <div class="text-sm text-yellow-500 font-medium">${formatDate(schDate)}</div>
+                  <div class="text-xs text-gray-400">${formatTime(schDate)}</div>
+                  <div class="text-xs text-gray-500">(${sch.duration}m)</div>
+                </div>`;
+              }).join('')
+            : scheduleDate
+              ? `<div class="text-sm text-yellow-500 font-medium">${formatDate(scheduleDate)}</div>
+                 <div class="text-xs text-gray-400">${formatTime(scheduleDate)}</div>`
+              : `<div class="text-sm">--</div>`}
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
@@ -1802,13 +1812,12 @@
       }
       const advancedSettingsContent = document.getElementById('editAdvancedSettingsContent');
       const advancedSettingsToggle = document.getElementById('editAdvancedSettingsToggle');
-      const icon = advancedSettingsToggle.querySelector('i');
       if (stream.use_advanced_settings) {
+        advancedSettingsToggle.checked = true;
         advancedSettingsContent.classList.remove('hidden');
-        icon.style.transform = 'rotate(180deg)';
       } else {
+        advancedSettingsToggle.checked = false;
         advancedSettingsContent.classList.add('hidden');
-        icon.style.transform = '';
       }
       const modal = document.getElementById('editStreamModal');
       document.body.style.overflow = 'hidden';
@@ -1870,9 +1879,8 @@
       const advancedSettingsContent = document.getElementById('editAdvancedSettingsContent');
       const advancedSettingsToggle = document.getElementById('editAdvancedSettingsToggle');
       if (advancedSettingsContent && advancedSettingsToggle) {
+        advancedSettingsToggle.checked = false;
         advancedSettingsContent.classList.add('hidden');
-        const icon = advancedSettingsToggle.querySelector('i');
-        if (icon) icon.style.transform = '';
       }
     }
     function toggleEditVideoSelector() {
@@ -2116,7 +2124,7 @@
             loopVideo: document.getElementById('editLoopVideo').checked,
             orientation: currentEditOrientation,
             resolution: document.getElementById('editCurrentResolution').textContent,
-            useAdvancedSettings: !document.getElementById('editAdvancedSettingsContent').classList.contains('hidden')
+            useAdvancedSettings: document.getElementById('editAdvancedSettingsToggle').checked
           };
           const scheduleTime = document.getElementById('editScheduleTime').value;
           const duration = document.getElementById('editDuration').value;
@@ -2183,16 +2191,80 @@
       const toggle = document.getElementById(toggleId);
       const content = document.getElementById(contentId);
       if (toggle && content) {
-        toggle.addEventListener('click', function () {
-          content.classList.toggle('hidden');
-          const icon = this.querySelector('i');
-          if (content.classList.contains('hidden')) {
-            icon.style.transform = '';
+        toggle.addEventListener('change', function () {
+          if (this.checked) {
+            content.classList.remove('hidden');
           } else {
-            icon.style.transform = 'rotate(180deg)';
+            content.classList.add('hidden');
           }
         });
       }
+    }
+
+    // Multiple Schedule Functions
+    function addScheduleSlot() {
+      const container = document.getElementById('scheduleSlotsContainer');
+      const slotHTML = `
+        <div class="schedule-slot grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2 p-3 bg-dark-700/50 rounded-lg border border-gray-600">
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Date & Time</label>
+            <input type="datetime-local" class="schedule-time w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Duration (min)</label>
+            <input type="number" min="1" value="60" class="schedule-duration w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
+          </div>
+          <div class="flex items-end">
+            <button type="button" onclick="removeScheduleSlot(this)" 
+              class="h-[38px] px-3 bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded-lg transition-colors">
+              <i class="ti ti-trash text-sm"></i>
+            </button>
+          </div>
+        </div>
+      `;
+      container.insertAdjacentHTML('beforeend', slotHTML);
+      updateRemoveButtons();
+    }
+
+    function removeScheduleSlot(button) {
+      const slot = button.closest('.schedule-slot');
+      const container = document.getElementById('scheduleSlotsContainer');
+      
+      // Don't allow removing if only one slot left
+      if (container.querySelectorAll('.schedule-slot').length > 1) {
+        slot.remove();
+        updateRemoveButtons();
+      }
+    }
+
+    function updateRemoveButtons() {
+      const container = document.getElementById('scheduleSlotsContainer');
+      const slots = container.querySelectorAll('.schedule-slot');
+      const buttons = container.querySelectorAll('.schedule-slot button');
+      
+      // Disable remove button if only one slot
+      buttons.forEach(btn => {
+        btn.disabled = slots.length === 1;
+      });
+    }
+
+    function collectSchedules() {
+      const slots = document.querySelectorAll('.schedule-slot');
+      const schedules = [];
+      
+      slots.forEach(slot => {
+        const time = slot.querySelector('.schedule-time').value;
+        const duration = slot.querySelector('.schedule-duration').value;
+        
+        if (time && duration) {
+          schedules.push({
+            schedule_time: time,
+            duration: parseInt(duration)
+          });
+        }
+      });
+      
+      return schedules;
     }
     function startLiveTimers() {
       setInterval(() => {
