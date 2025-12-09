@@ -1,4 +1,5 @@
 const Stream = require('../models/Stream');
+const StreamSchedule = require('../models/StreamSchedule');
 const scheduledTerminations = new Map();
 const SCHEDULE_LOOKAHEAD_SECONDS = 60;
 let streamingService = null;
@@ -29,35 +30,68 @@ async function checkScheduledStreams() {
     const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     
+    console.log(`[Scheduler] Checking schedules at ${currentTime} on ${getDayName(currentDay)} (day ${currentDay})`);
+    
     // Check stream_schedules table for schedules to start
-    const StreamSchedule = require('../models/StreamSchedule');
+    console.log('[Scheduler] Calling StreamSchedule.findPending()...');
     const allSchedules = await StreamSchedule.findPending();
+    console.log('[Scheduler] findPending() completed');
+    
+    console.log(`[Scheduler] Found ${allSchedules.length} pending schedule(s)`);
     
     const schedulesToStart = [];
     
     for (const schedule of allSchedules) {
-      const scheduleTime = new Date(schedule.schedule_time);
+      console.log(`[Scheduler] Checking schedule ${schedule.id}: stream_id=${schedule.stream_id}, is_recurring=${schedule.is_recurring}, recurring_days=${schedule.recurring_days}, schedule_time=${schedule.schedule_time}`);
       
       if (schedule.is_recurring) {
         // Recurring schedule - check if today is allowed day
         if (schedule.recurring_days) {
           const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
+          console.log(`[Scheduler] Recurring schedule allowed days: ${allowedDays.join(',')}, current day: ${currentDay}`);
           
           if (allowedDays.includes(currentDay)) {
-            // Check if time matches (within 1 minute window)
-            const scheduleHour = scheduleTime.getHours();
-            const scheduleMinute = scheduleTime.getMinutes();
+            // For recurring, schedule_time might be stored as full datetime
+            // We need to extract just the time part
+            let scheduleHour, scheduleMinute;
+            
+            // Try parsing as ISO datetime first
+            const scheduleTime = new Date(schedule.schedule_time);
+            if (!isNaN(scheduleTime.getTime())) {
+              // Valid datetime - extract local time
+              scheduleHour = scheduleTime.getHours();
+              scheduleMinute = scheduleTime.getMinutes();
+              console.log(`[Scheduler] Parsed datetime: ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+            } else if (schedule.schedule_time.includes(':')) {
+              // Time format: "HH:MM" or "HH:MM:SS"
+              const timeParts = schedule.schedule_time.split(':');
+              scheduleHour = parseInt(timeParts[0]);
+              scheduleMinute = parseInt(timeParts[1]);
+              console.log(`[Scheduler] Parsed time string: ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+            } else {
+              console.log(`[Scheduler] ✗ Could not parse schedule_time: ${schedule.schedule_time}`);
+              continue;
+            }
+            
             const nowHour = now.getHours();
             const nowMinute = now.getMinutes();
+            
+            console.log(`[Scheduler] Time comparison: schedule=${scheduleHour}:${scheduleMinute}, now=${nowHour}:${nowMinute}`);
             
             if (scheduleHour === nowHour && Math.abs(scheduleMinute - nowMinute) <= 1) {
               // Check if stream is not already live
               const stream = await Stream.findById(schedule.stream_id);
               if (stream && stream.status !== 'live') {
                 schedulesToStart.push(schedule);
-                console.log(`[Scheduler] Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime}`);
+                console.log(`[Scheduler] ✓ Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime}`);
+              } else {
+                console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live or not found`);
               }
+            } else {
+              console.log(`[Scheduler] ✗ Time does not match (difference: ${Math.abs((scheduleHour * 60 + scheduleMinute) - (nowHour * 60 + nowMinute))} minutes)`);
             }
+          } else {
+            console.log(`[Scheduler] ✗ Today (${currentDay}) is not in allowed days`);
           }
         }
       } else {
@@ -104,6 +138,7 @@ async function checkScheduledStreams() {
     }
   } catch (error) {
     console.error('[Scheduler] Error checking scheduled streams:', error);
+    console.error('[Scheduler] Error stack:', error.stack);
   }
 }
 
@@ -175,9 +210,30 @@ function cancelStreamTermination(streamId) {
 function handleStreamStopped(streamId) {
   return cancelStreamTermination(streamId);
 }
+function clearAll() {
+  console.log('[SchedulerService] Clearing all schedulers...');
+  
+  // Clear all stream termination timers
+  terminationTimers.forEach((timer, streamId) => {
+    clearTimeout(timer);
+    console.log(`[SchedulerService] Cleared termination timer for stream ${streamId}`);
+  });
+  terminationTimers.clear();
+  
+  // Clear all schedule check intervals
+  scheduleCheckIntervals.forEach((interval, streamId) => {
+    clearInterval(interval);
+    console.log(`[SchedulerService] Cleared schedule interval for stream ${streamId}`);
+  });
+  scheduleCheckIntervals.clear();
+  
+  console.log('[SchedulerService] All schedulers cleared');
+}
+
 module.exports = {
   init,
   scheduleStreamTermination,
   cancelStreamTermination,
-  handleStreamStopped
+  handleStreamStopped,
+  clearAll
 };

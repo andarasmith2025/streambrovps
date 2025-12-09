@@ -6,7 +6,12 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "generate-secret": "node generate-secret.js"
+    "generate-secret": "node generate-secret.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop streambro",
+    "pm2:restart": "pm2 restart streambro",
+    "pm2:logs": "pm2 logs streambro",
+    "pm2:status": "pm2 status"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

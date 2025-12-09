@@ -259,6 +259,11 @@ async function startStream(streamId) {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });
+    
+    // Unref the process so Node.js doesn't wait for it
+    // This allows FFmpeg to continue running even if Node.js exits
+    ffmpegProcess.unref();
+    
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     ffmpegProcess.stdout.on('data', (data) => {
@@ -565,11 +570,31 @@ async function saveStreamHistory(stream) {
     return false;
   }
 }
+async function getAllActiveStreams() {
+  try {
+    const activeStreamIds = Array.from(activeStreams.keys());
+    const streams = [];
+    
+    for (const streamId of activeStreamIds) {
+      const stream = await Stream.findById(streamId);
+      if (stream) {
+        streams.push(stream);
+      }
+    }
+    
+    return streams;
+  } catch (error) {
+    console.error('[StreamingService] Error getting all active streams:', error);
+    return [];
+  }
+}
+
 module.exports = {
   startStream,
   stopStream,
   isStreamActive,
   getActiveStreams,
+  getAllActiveStreams,
   getStreamLogs,
   syncStreamStatuses,
   saveStreamHistory

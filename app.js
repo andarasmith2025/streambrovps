@@ -37,6 +37,37 @@ ffmpeg.setFfprobePath(ffprobePath);
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
 const { getYouTubeClient } = require('./config/google');
+
+// Helper function to parse schedule time
+function parseScheduleTime(scheduleTimeStr) {
+  if (!scheduleTimeStr) {
+    throw new Error('schedule_time is required');
+  }
+  
+  // Check if it's time-only format (HH:MM or HH:MM:SS)
+  if (scheduleTimeStr.includes(':') && !scheduleTimeStr.includes('T') && !scheduleTimeStr.includes('-')) {
+    // Time only format - create datetime for today
+    const today = new Date();
+    const timeParts = scheduleTimeStr.split(':');
+    const hours = parseInt(timeParts[0]);
+    const minutes = parseInt(timeParts[1]);
+    
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      throw new Error(`Invalid time format: ${scheduleTimeStr}`);
+    }
+    
+    today.setHours(hours, minutes, 0, 0);
+    return today.toISOString();
+  } else {
+    // Full datetime format
+    const parsedDate = new Date(scheduleTimeStr);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error(`Invalid datetime format: ${scheduleTimeStr}`);
+    }
+    return parsedDate.toISOString();
+  }
+}
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('-----------------------------------');
   console.error('UNHANDLED REJECTION AT:', promise);
@@ -1870,7 +1901,7 @@ app.post('/api/streams', isAuthenticated, [
     } else if (hasSchedules) {
       // Schedule mode
       const firstSchedule = schedules[0];
-      streamData.schedule_time = new Date(firstSchedule.schedule_time).toISOString();
+      streamData.schedule_time = parseScheduleTime(firstSchedule.schedule_time);
       // Calculate total duration from all schedules
       streamData.duration = schedules.reduce((total, sch) => total + parseInt(sch.duration), 0);
       streamData.status = 'scheduled';
@@ -1886,7 +1917,7 @@ app.post('/api/streams', isAuthenticated, [
       for (const schedule of schedules) {
         const scheduleData = {
           stream_id: stream.id,
-          schedule_time: new Date(schedule.schedule_time).toISOString(),
+          schedule_time: parseScheduleTime(schedule.schedule_time),
           duration: parseInt(schedule.duration),
           is_recurring: schedule.is_recurring || false,
           recurring_days: schedule.recurring_days || null
@@ -1972,7 +2003,19 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
     if (hasSchedules) {
       // Set first schedule as main schedule for backward compatibility
       const firstSchedule = schedules[0];
-      updateData.schedule_time = new Date(firstSchedule.schedule_time).toISOString();
+      console.log('[UPDATE STREAM] Processing schedule:', JSON.stringify(firstSchedule));
+      
+      try {
+        updateData.schedule_time = parseScheduleTime(firstSchedule.schedule_time);
+        console.log('[UPDATE STREAM] Parsed schedule_time:', firstSchedule.schedule_time, '->', updateData.schedule_time);
+      } catch (parseError) {
+        console.error('[UPDATE STREAM] Error parsing schedule_time:', parseError);
+        return res.status(400).json({ 
+          success: false, 
+          error: `Invalid schedule time format: ${parseError.message}` 
+        });
+      }
+      
       // Calculate total duration from all schedules
       updateData.duration = schedules.reduce((total, sch) => total + parseInt(sch.duration), 0);
       updateData.status = 'scheduled';
@@ -1982,15 +2025,27 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
       await StreamSchedule.deleteByStreamId(req.params.id);
       
       for (const schedule of schedules) {
-        const scheduleData = {
-          stream_id: req.params.id,
-          schedule_time: new Date(schedule.schedule_time).toISOString(),
-          duration: parseInt(schedule.duration),
-          is_recurring: schedule.is_recurring || false,
-          recurring_days: schedule.recurring_days || null
-        };
-        
-        await StreamSchedule.create(scheduleData);
+        try {
+          const scheduleData = {
+            stream_id: req.params.id,
+            schedule_time: parseScheduleTime(schedule.schedule_time),
+            duration: parseInt(schedule.duration),
+            is_recurring: schedule.is_recurring || false,
+            recurring_days: schedule.recurring_days || null
+          };
+          
+          await StreamSchedule.create(scheduleData);
+          
+          if (schedule.is_recurring) {
+            console.log(`[UPDATE STREAM] Created recurring schedule for stream ${req.params.id}: ${schedule.recurring_days}`);
+          }
+        } catch (schedError) {
+          console.error('[UPDATE STREAM] Error creating schedule:', schedError);
+          return res.status(400).json({ 
+            success: false, 
+            error: `Invalid schedule format: ${schedError.message}` 
+          });
+        }
       }
       console.log(`[UPDATE STREAM] Updated ${schedules.length} schedule(s) for stream ${req.params.id}`);
     } else if ('schedules' in req.body && (!schedules || schedules.length === 0)) {
@@ -2002,10 +2057,12 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
     }
 
     const updatedStream = await Stream.update(req.params.id, updateData);
+    console.log('[UPDATE STREAM] Stream updated successfully:', req.params.id);
     res.json({ success: true, stream: updatedStream });
   } catch (error) {
-    console.error('Error updating stream:', error);
-    res.status(500).json({ success: false, error: 'Failed to update stream' });
+    console.error('[UPDATE STREAM] Error updating stream:', error);
+    console.error('[UPDATE STREAM] Error stack:', error.stack);
+    res.status(500).json({ success: false, error: `Failed to update stream: ${error.message}` });
   }
 });
 app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
@@ -2429,3 +2486,77 @@ const server = app.listen(port, '0.0.0.0', async () => {
 server.timeout = 30 * 60 * 1000;
 server.keepAliveTimeout = 30 * 60 * 1000;
 server.headersTimeout = 30 * 60 * 1000;
+
+// Graceful shutdown handlers
+async function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  try {
+    // 1. Stop accepting new connections
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+    
+    // 2. Stop all active streams
+    console.log('Stopping all active streams...');
+    const activeStreams = await streamingService.getAllActiveStreams();
+    if (activeStreams && activeStreams.length > 0) {
+      console.log(`Found ${activeStreams.length} active streams to stop`);
+      for (const stream of activeStreams) {
+        try {
+          await streamingService.stopStream(stream.id);
+          console.log(`Stopped stream: ${stream.id}`);
+        } catch (err) {
+          console.error(`Error stopping stream ${stream.id}:`, err.message);
+        }
+      }
+    }
+    
+    // 3. Clear all schedulers
+    console.log('Clearing schedulers...');
+    schedulerService.clearAll();
+    
+    // 4. Reset all live streams to offline in database
+    console.log('Resetting stream statuses in database...');
+    const liveStreams = await Stream.findAll(null, 'live');
+    if (liveStreams && liveStreams.length > 0) {
+      for (const stream of liveStreams) {
+        await Stream.updateStatus(stream.id, 'offline');
+      }
+      console.log(`Reset ${liveStreams.length} streams to offline`);
+    }
+    
+    // 5. Close database connection
+    if (db && db.close) {
+      db.close((err) => {
+        if (err) {
+          console.error('Error closing database:', err);
+        } else {
+          console.log('Database connection closed');
+        }
+      });
+    }
+    
+    console.log('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle different shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT')); // Ctrl+C
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon restart
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  gracefulShutdown('UNHANDLED_REJECTION');
+});

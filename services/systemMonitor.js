@@ -15,7 +15,16 @@ async function getSystemStats() {
     
     const cpuUsage = cpuData.currentLoad || cpuData.avg || 0;
     
-    const networkSpeed = Array.isArray(networkData) ? calculateNetworkSpeed(networkData) : { download: 0, upload: 0, downloadFormatted: '0 Mbps', uploadFormatted: '0 Mbps' };
+    // Network speed calculation (only works on Linux/Mac)
+    const networkSpeed = Array.isArray(networkData) && networkData.length > 0 
+      ? calculateNetworkSpeed(networkData) 
+      : { 
+          download: 0, 
+          upload: 0, 
+          downloadFormatted: isWin ? 'N/A' : '0 Mbps', 
+          uploadFormatted: isWin ? 'N/A' : '0 Mbps',
+          available: !isWin
+        };
     
     const formatMemory = (bytes) => {
       if (bytes >= 1073741824) {
@@ -46,7 +55,7 @@ async function getSystemStats() {
     return {
       cpu: { usage: 0, cores: 0 },
       memory: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0 },
-      network: { download: 0, upload: 0, downloadFormatted: '0 Mbps', uploadFormatted: '0 Mbps' },
+      network: { download: 0, upload: 0, downloadFormatted: 'N/A', uploadFormatted: 'N/A', available: false },
       disk: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0, drive: "N/A" },
       platform: process.platform,
       timestamp: Date.now()
@@ -64,7 +73,8 @@ function calculateNetworkSpeed(networkData) {
       download: 0,
       upload: 0,
       downloadFormatted: '0 Mbps',
-      uploadFormatted: '0 Mbps'
+      uploadFormatted: '0 Mbps',
+      available: true
     };
   }
   
@@ -97,7 +107,8 @@ function calculateNetworkSpeed(networkData) {
     download: downloadMbps,
     upload: uploadMbps,
     downloadFormatted: formatSpeed(downloadMbps),
-    uploadFormatted: formatSpeed(uploadMbps)
+    uploadFormatted: formatSpeed(uploadMbps),
+    available: true
   };
 }
 

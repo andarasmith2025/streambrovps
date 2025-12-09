@@ -25,7 +25,67 @@
     </div>
   </div>
   
-  <div class="bg-gray-800 rounded-lg shadow-md overflow-hidden">
+  <!-- Mobile Card View -->
+  <div class="block md:hidden space-y-3" id="history-mobile-view">
+    <% if (history && history.length > 0) { %>
+      <% history.forEach(function(entry) { %>
+        <div class="bg-gray-800 rounded-lg p-4 shadow-md history-card" 
+             data-id="<%= entry.id %>"
+             data-platform="<%= entry.platform %>" 
+             data-title="<%= entry.title %>">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center flex-1 min-w-0">
+              <div class="w-12 h-8 bg-dark-700 rounded flex-shrink-0 overflow-hidden mr-3">
+                <% if (entry.thumbnail_path) { %>
+                  <img src="<%= entry.thumbnail_path %>" class="w-full h-full object-cover"
+                    onerror="this.src='/images/default-thumbnail.jpg'">
+                <% } else { %>
+                  <div class="w-full h-full bg-dark-600 flex items-center justify-center">
+                    <i class="ti ti-video text-gray-400 text-xs"></i>
+                  </div>
+                <% } %>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate"><%= entry.title %></div>
+                <div class="flex items-center text-xs text-gray-400 mt-1">
+                  <i class="ti ti-brand-<%= helpers.getPlatformIcon(entry.platform) %> text-<%= helpers.getPlatformColor(entry.platform) %> mr-1"></i>
+                  <span><%= entry.platform || 'Custom' %></span>
+                </div>
+              </div>
+            </div>
+            <button onclick="deleteHistoryEntry('<%= entry.id %>', '<%= entry.title %>')"
+              class="ml-2 p-2 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0">
+              <i class="ti ti-trash text-lg"></i>
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div class="text-gray-500 mb-1">Start Time</div>
+              <div class="text-gray-300"><%= helpers.formatDateTime(entry.start_time) %></div>
+            </div>
+            <div>
+              <div class="text-gray-500 mb-1">Stop Time</div>
+              <div class="text-gray-300"><%= helpers.formatDateTime(entry.end_time) %></div>
+            </div>
+            <div>
+              <div class="text-gray-500 mb-1">Duration</div>
+              <div class="text-primary font-medium"><%= helpers.formatDuration(entry.duration) %></div>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    <% } else { %>
+      <div class="bg-gray-800 rounded-lg p-8 text-center">
+        <i class="ti ti-history text-4xl text-gray-500 mb-3"></i>
+        <p class="text-gray-400 font-medium">No stream history found</p>
+        <p class="text-xs text-gray-500 mt-1">Your completed streams will appear here</p>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Desktop Table View -->
+  <div class="hidden md:block bg-gray-800 rounded-lg shadow-md overflow-hidden">
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-700">
         <thead>
@@ -170,24 +230,47 @@
           .then(data => {
             if (data.success) {
               showToast('History entry deleted successfully');
-              const row = document.querySelector(`tr[data-id="${id}"]`);
+              
+              // Remove desktop table row
+              const row = document.querySelector(`#history-table-body tr[data-id="${id}"]`);
               if (row) {
                 row.classList.add('animate-fade-out');
                 setTimeout(() => {
                   row.remove();
                   const tableBody = document.getElementById('history-table-body');
-                  if (tableBody.children.length === 0) {
+                  const remainingRows = tableBody.querySelectorAll('tr:not([id])');
+                  if (remainingRows.length === 0) {
                     tableBody.innerHTML = `
-                  <tr>
-                    <td colspan="6" class="px-6 py-10 text-center text-gray-400">
-                      <div class="flex flex-col items-center">
-                        <i class="ti ti-history text-3xl mb-2"></i>
-                        <p>No stream history found</p>
-                        <p class="text-xs mt-1">Your completed streams will appear here</p>
+                      <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-gray-400">
+                          <div class="flex flex-col items-center">
+                            <i class="ti ti-history text-3xl mb-2"></i>
+                            <p>No stream history found</p>
+                            <p class="text-xs mt-1">Your completed streams will appear here</p>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }
+                }, 300);
+              }
+              
+              // Remove mobile card
+              const card = document.querySelector(`.history-card[data-id="${id}"]`);
+              if (card) {
+                card.classList.add('animate-fade-out');
+                setTimeout(() => {
+                  card.remove();
+                  const mobileView = document.getElementById('history-mobile-view');
+                  const remainingCards = mobileView.querySelectorAll('.history-card');
+                  if (remainingCards.length === 0) {
+                    mobileView.innerHTML = `
+                      <div class="bg-gray-800 rounded-lg p-8 text-center">
+                        <i class="ti ti-history text-4xl text-gray-500 mb-3"></i>
+                        <p class="text-gray-400 font-medium">No stream history found</p>
+                        <p class="text-xs text-gray-500 mt-1">Your completed streams will appear here</p>
                       </div>
-                    </td>
-                  </tr>
-                `;
+                    `;
                   }
                 }, 300);
               }
@@ -204,40 +287,91 @@
     document.addEventListener('DOMContentLoaded', function () {
       const searchInput = document.getElementById('history-search');
       const platformFilter = document.getElementById('platform-filter');
-      function filterTable() {
+      
+      function filterHistory() {
         const searchTerm = searchInput.value.toLowerCase();
         const platform = platformFilter.value;
+        
+        // Filter desktop table rows
         const rows = document.querySelectorAll('#history-table-body tr');
+        let visibleRowCount = 0;
+        
         rows.forEach(row => {
           if (row.querySelector('td[colspan]')) return;
-          const title = row.getAttribute('data-title').toLowerCase();
+          const title = row.getAttribute('data-title')?.toLowerCase() || '';
           const rowPlatform = row.getAttribute('data-platform');
           const matchesSearch = !searchTerm || title.includes(searchTerm);
           const matchesPlatform = platform === 'all' || rowPlatform === platform;
-          row.style.display = matchesSearch && matchesPlatform ? '' : 'none';
+          
+          if (matchesSearch && matchesPlatform) {
+            row.style.display = '';
+            visibleRowCount++;
+          } else {
+            row.style.display = 'none';
+          }
         });
-        const visibleRows = document.querySelectorAll('#history-table-body tr:not([style*="display: none"])');
+        
+        // Filter mobile cards
+        const cards = document.querySelectorAll('.history-card');
+        let visibleCardCount = 0;
+        
+        cards.forEach(card => {
+          const title = card.getAttribute('data-title')?.toLowerCase() || '';
+          const cardPlatform = card.getAttribute('data-platform');
+          const matchesSearch = !searchTerm || title.includes(searchTerm);
+          const matchesPlatform = platform === 'all' || cardPlatform === platform;
+          
+          if (matchesSearch && matchesPlatform) {
+            card.style.display = '';
+            visibleCardCount++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+        
+        // Show empty state for desktop
         const emptyStateRow = document.querySelector('#history-table-body tr td[colspan]')?.parentElement;
-        if (visibleRows.length === 0 && !emptyStateRow) {
+        if (visibleRowCount === 0 && !emptyStateRow && rows.length > 0) {
           const tableBody = document.getElementById('history-table-body');
           const newEmptyRow = document.createElement('tr');
           newEmptyRow.id = 'empty-search-results';
           newEmptyRow.innerHTML = `
-          <td colspan="6" class="px-6 py-10 text-center text-gray-400">
-            <div class="flex flex-col items-center">
-              <i class="ti ti-search text-3xl mb-2"></i>
-              <p>No matching results found</p>
-              <p class="text-xs mt-1">Try adjusting your search or filter</p>
-            </div>
-          </td>
-        `;
+            <td colspan="6" class="px-6 py-10 text-center text-gray-400">
+              <div class="flex flex-col items-center">
+                <i class="ti ti-search text-3xl mb-2"></i>
+                <p>No matching results found</p>
+                <p class="text-xs mt-1">Try adjusting your search or filter</p>
+              </div>
+            </td>
+          `;
           tableBody.appendChild(newEmptyRow);
-        } else if (visibleRows.length > 0 && document.getElementById('empty-search-results')) {
+        } else if (visibleRowCount > 0 && document.getElementById('empty-search-results')) {
           document.getElementById('empty-search-results').remove();
         }
+        
+        // Show empty state for mobile
+        const mobileView = document.getElementById('history-mobile-view');
+        let mobileEmptyState = document.getElementById('mobile-empty-search');
+        
+        if (visibleCardCount === 0 && cards.length > 0) {
+          if (!mobileEmptyState) {
+            mobileEmptyState = document.createElement('div');
+            mobileEmptyState.id = 'mobile-empty-search';
+            mobileEmptyState.className = 'bg-gray-800 rounded-lg p-8 text-center';
+            mobileEmptyState.innerHTML = `
+              <i class="ti ti-search text-4xl text-gray-500 mb-3"></i>
+              <p class="text-gray-400 font-medium">No matching results found</p>
+              <p class="text-xs text-gray-500 mt-1">Try adjusting your search or filter</p>
+            `;
+            mobileView.appendChild(mobileEmptyState);
+          }
+        } else if (mobileEmptyState) {
+          mobileEmptyState.remove();
+        }
       }
-      searchInput.addEventListener('input', filterTable);
-      platformFilter.addEventListener('change', filterTable);
+      
+      searchInput.addEventListener('input', filterHistory);
+      platformFilter.addEventListener('change', filterHistory);
     });
     function showToast(message) {
       const toast = document.createElement('div');
