@@ -1712,7 +1712,7 @@
             <span>${startDate || 'Not started'}</span>
           </div>`}
           <div class="flex justify-between items-center">
-            ${getActionButtonHTML(stream.status, stream.id, 'mobile')}
+            ${getActionButtonHTML(stream.status, stream.id, 'mobile', stream)}
             <div class="flex items-center gap-3 text-gray-400">
               <button class="hover:text-white transition-colors" onclick="editStream('${stream.id}')">
                 <i class="ti ti-edit"></i>
@@ -1904,7 +1904,7 @@
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-right">
           <div class="flex items-center justify-end space-x-2">
-            ${getActionButtonHTML(stream.status, stream.id, 'desktop')}
+            ${getActionButtonHTML(stream.status, stream.id, 'desktop', stream)}
             <div class="ml-2 flex items-center gap-1">
               <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" onclick="editStream('${stream.id}')">
                 <i class="ti ti-edit text-gray-400 hover:text-white"></i>
@@ -2064,10 +2064,14 @@
           `;
             }
           }
-          function getActionButtonHTML(status, streamId, view = 'desktop') {
+          function getActionButtonHTML(status, streamId, view = 'desktop', stream = null) {
             const btnClass = view === 'mobile'
               ? 'px-4 py-1.5 text-white text-xs font-medium rounded transition-colors'
               : 'inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors';
+            
+            // Check if stream has active schedule
+            const hasSchedule = stream && stream.schedules && stream.schedules.length > 0;
+            
             switch (status) {
               case 'live':
                 return `
@@ -2087,6 +2091,21 @@
           `;
               case 'offline':
               default:
+                // If has schedule, show info instead of Start button
+                if (hasSchedule) {
+                  const schedule = stream.schedules[0];
+                  const scheduleTime = new Date(schedule.schedule_time);
+                  const timeStr = scheduleTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  
+                  return `
+            <div class="flex items-center gap-2 text-xs">
+              <i class="ti ti-clock text-blue-400"></i>
+              <span class="text-gray-400">Auto-start at ${timeStr}</span>
+            </div>
+          `;
+                }
+                
+                // No schedule, show Start button
                 return `
             <button
               onclick="startStream('${streamId}')"

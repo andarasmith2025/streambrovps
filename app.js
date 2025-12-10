@@ -2131,13 +2131,17 @@ app.post('/api/streams/:id/status', isAuthenticated, [
         
         // For recurring schedules, only compare time (HH:MM), not date
         if (activeSchedule.is_recurring) {
+          // Convert both to local timezone for comparison
           const nowHour = now.getHours();
           const nowMinute = now.getMinutes();
-          const scheduleHour = scheduleTime.getHours();
-          const scheduleMinute = scheduleTime.getMinutes();
+          
+          // Convert UTC schedule time to local timezone
+          const scheduleLocalTime = new Date(scheduleTime.toLocaleString('en-US', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }));
+          const scheduleHour = scheduleLocalTime.getHours();
+          const scheduleMinute = scheduleLocalTime.getMinutes();
           
           console.log(`[API] - Current time (HH:MM): ${nowHour}:${nowMinute}`);
-          console.log(`[API] - Schedule time (HH:MM): ${scheduleHour}:${scheduleMinute}`);
+          console.log(`[API] - Schedule time local (HH:MM): ${scheduleHour}:${scheduleMinute}`);
           
           // Check if current time is before schedule time (today)
           const nowTimeInMinutes = nowHour * 60 + nowMinute;
