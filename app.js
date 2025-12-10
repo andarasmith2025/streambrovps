@@ -2113,6 +2113,103 @@ app.post('/api/streams/:id/status', isAuthenticated, [
           stream
         });
       }
+      
+      // Check if stream has schedule (from stream_schedules table)
+      const StreamSchedule = require('./models/StreamSchedule');
+      const schedules = await StreamSchedule.findByStreamId(streamId);
+      const activeSchedule = schedules && schedules.length > 0 ? schedules[0] : null;
+      
+      if (activeSchedule && activeSchedule.schedule_time) {
+        const now = new Date();
+        const scheduleTime = new Date(activeSchedule.schedule_time);
+        
+        console.log(`[API] Start stream validation:`);
+        console.log(`[API] - Stream ID: ${streamId}`);
+        console.log(`[API] - Is recurring: ${activeSchedule.is_recurring}`);
+        console.log(`[API] - Current time: ${now.toISOString()} (${now.toLocaleString()})`);
+        console.log(`[API] - Schedule time: ${scheduleTime.toISOString()} (${scheduleTime.toLocaleString()})`);
+        
+        // For recurring schedules, only compare time (HH:MM), not date
+        if (activeSchedule.is_recurring) {
+          const nowHour = now.getHours();
+          const nowMinute = now.getMinutes();
+          const scheduleHour = scheduleTime.getHours();
+          const scheduleMinute = scheduleTime.getMinutes();
+          
+          console.log(`[API] - Current time (HH:MM): ${nowHour}:${nowMinute}`);
+          console.log(`[API] - Schedule time (HH:MM): ${scheduleHour}:${scheduleMinute}`);
+          
+          // Check if current time is before schedule time (today)
+          const nowTimeInMinutes = nowHour * 60 + nowMinute;
+          const scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+          
+          if (nowTimeInMinutes < scheduleTimeInMinutes) {
+            console.log(`[API] ✓ Schedule time hasn't arrived yet today, setting status to 'scheduled'`);
+            await Stream.updateStatus(streamId, 'scheduled', req.session.userId);
+            return res.json({
+              success: true,
+              message: `Stream scheduled for ${scheduleHour.toString().padStart(2, '0')}:${scheduleMinute.toString().padStart(2, '0')} today. It will start automatically.`,
+              stream: await Stream.getStreamWithVideo(streamId),
+              scheduled: true
+            });
+          }
+          
+          // Check if we're past the end time (schedule + duration)
+          if (activeSchedule.duration) {
+            const endTimeInMinutes = scheduleTimeInMinutes + activeSchedule.duration;
+            console.log(`[API] - End time (HH:MM): ${Math.floor(endTimeInMinutes / 60)}:${endTimeInMinutes % 60}`);
+            console.log(`[API] - Already ended today? ${nowTimeInMinutes >= endTimeInMinutes}`);
+            
+            if (nowTimeInMinutes >= endTimeInMinutes) {
+              console.log(`[API] ✗ Stream schedule has already ended today`);
+              return res.json({
+                success: false,
+                error: 'Stream schedule has already ended for today. It will run again tomorrow.',
+                stream
+              });
+            }
+          }
+          
+          console.log(`[API] ✓ Starting stream now (within today's schedule window)`);
+        } else {
+          // One-time schedule - compare full datetime
+          console.log(`[API] - Schedule in future? ${scheduleTime > now}`);
+          
+          if (scheduleTime > now) {
+            console.log(`[API] ✓ Schedule is in future, setting status to 'scheduled'`);
+            await Stream.updateStatus(streamId, 'scheduled', req.session.userId);
+            return res.json({
+              success: true,
+              message: 'Stream scheduled successfully. It will start automatically at the scheduled time.',
+              stream: await Stream.getStreamWithVideo(streamId),
+              scheduled: true
+            });
+          }
+          
+          console.log(`[API] Schedule time has arrived or passed`);
+          
+          // Check end time for one-time schedule
+          if (activeSchedule.duration) {
+            const endTime = new Date(scheduleTime.getTime() + (activeSchedule.duration * 60 * 1000));
+            console.log(`[API] - End time: ${endTime.toISOString()} (${endTime.toLocaleString()})`);
+            console.log(`[API] - Already ended? ${now >= endTime}`);
+            
+            if (now >= endTime) {
+              console.log(`[API] ✗ Stream schedule has already ended`);
+              return res.json({
+                success: false,
+                error: 'Stream schedule has already ended',
+                stream
+              });
+            }
+          }
+          
+          console.log(`[API] ✓ Starting stream now (within schedule window)`);
+        }
+      } else {
+        console.log(`[API] No schedule found, starting stream immediately`);
+      }
+      
       const result = await streamingService.startStream(streamId);
       if (result.success) {
         const updatedStream = await Stream.getStreamWithVideo(streamId);

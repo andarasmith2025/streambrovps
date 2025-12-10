@@ -2046,8 +2046,14 @@
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                const streamMode = data.isAdvancedMode ? "Advanced mode" : "Simple mode";
-                showNotification('Success!', `Stream started successfully! (${streamMode})`, 'success');
+                if (data.scheduled) {
+                  // Stream is scheduled for future
+                  showNotification('Scheduled!', 'Stream scheduled successfully. It will start automatically at the scheduled time.', 'success');
+                } else {
+                  // Stream started immediately
+                  const streamMode = data.isAdvancedMode ? "Advanced mode" : "Simple mode";
+                  showNotification('Success!', `Stream started successfully! (${streamMode})`, 'success');
+                }
                 setTimeout(() => window.location.reload(), 1000);
               } else {
                 showNotification('Error', data.error || 'Failed to start stream', 'error');
