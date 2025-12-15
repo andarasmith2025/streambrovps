@@ -9,17 +9,17 @@ function loadQuota() {
         const streams = data.quota.streams;
         const storage = data.quota.storage;
         
-        // Streams - Desktop & Mobile
-        document.getElementById('quota-stream-used').textContent = streams.used;
-        document.getElementById('quota-stream-limit').textContent = streams.limit;
-        document.getElementById('quota-stream-used-mobile').textContent = streams.used;
-        document.getElementById('quota-stream-limit-mobile').textContent = streams.limit;
-
-        // Storage - Desktop & Mobile
-        document.getElementById('quota-storage-used').textContent = storage.used.toFixed(1);
-        document.getElementById('quota-storage-limit').textContent = storage.limit;
-        document.getElementById('quota-storage-used-mobile').textContent = storage.used.toFixed(1);
-        document.getElementById('quota-storage-limit-mobile').textContent = storage.limit;
+        // Compact Indicators
+        const quotaStreamsEl = document.getElementById('quota-streams');
+        const quotaStorageEl = document.getElementById('quota-storage');
+        
+        if (quotaStreamsEl) {
+          quotaStreamsEl.textContent = `${streams.used} / ${streams.limit}`;
+        }
+        
+        if (quotaStorageEl) {
+          quotaStorageEl.textContent = `${storage.used.toFixed(1)} / ${storage.limit} GB`;
+        }
       }
     })
     .catch(error => {
