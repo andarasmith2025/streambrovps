@@ -146,13 +146,15 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   fs.writeFileSync(concatFile, concatContent);
   
   if (!stream.use_advanced_settings) {
-    // Stream copy mode for playlist with keyframe injection
+    // Stream copy mode for playlist - optimized for low memory
     return [
       '-hwaccel', 'auto',
       '-loglevel', 'error',
       '-re',
-      '-fflags', '+genpts+igndts',
+      '-fflags', '+genpts+igndts+discardcorrupt',
       '-avoid_negative_ts', 'make_zero',
+      '-probesize', '5M',           // Limit probe size
+      '-analyzeduration', '5M',     // Limit analyze duration
       '-f', 'concat',
       '-safe', '0',
       '-i', concatFile,
@@ -160,8 +162,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-c:a', 'copy',
       '-bsf:v', 'h264_mp4toannexb,dump_extra',
       '-flags', '+global_header',
-      '-bufsize', '2M',
-      '-max_muxing_queue_size', '1024',
+      '-bufsize', '1M',              // Reduce to 1MB
+      '-max_muxing_queue_size', '512', // Reduce queue
       '-f', 'flv',
       rtmpUrl
     ];

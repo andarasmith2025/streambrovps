@@ -1,304 +1,331 @@
-![logo](https://github.com/user-attachments/assets/50231124-d546-43cb-9cf4-7a06a1dad5bd)
+# 🎥 StreamBro - Multi-Platform Live Streaming Manager
 
-# StreamBro v2.1: Fresh From The Oven 🔥
+StreamBro adalah aplikasi web untuk mengelola dan menjadwalkan live streaming ke berbagai platform (YouTube, Facebook, Twitch, dll) dengan mudah.
 
-StreamBro adalah aplikasi live streaming yang memungkinkan kamu melakukan live streaming ke berbagai platform seperti YouTube, Facebook, dan platform lainnya menggunakan protokol RTMP. Aplikasi ini dapat berjalan di VPS (Virtual Private Server) dan mendukung streaming ke banyak platform secara bersamaan.
+![StreamBro Dashboard](https://img.shields.io/badge/Node.js-20.x-green) ![License](https://img.shields.io/badge/license-MIT-blue)
 
-![Untitled-2](https://github.com/user-attachments/assets/3d7bb367-a1b2-43a5-839b-b6aa8dd5de90)
+---
 
-## ✨ Fitur Utama
+## ✨ Features
 
-- **Multi-Platform Streaming** - Streaming ke berbagai platform populer secara bersamaan
-- **Video Gallery** - Kelola koleksi video dengan antarmuka yang intuitif
-- **Upload Video** - Upload dari local storage atau import langsung dari Google Drive
-- **Scheduled Streaming** - Jadwalkan streaming dengan pengaturan waktu yang fleksibel
-- **Advanced Settings** - Kontrol penuh untuk bitrate, resolusi, FPS, dan orientasi video
-- **Real-time Monitoring** - Monitor status streaming dengan dashboard real-time
-- **Video Analytics** - Pantau statistik dan performa video langsung dari aplikasi
-- **Responsive UI** - Antarmuka modern yang responsif di semua perangkat
+### Core Features
+- 🎬 **Multi-Video Streaming** - Upload dan stream multiple videos
+- 📅 **Stream Scheduling** - Jadwalkan stream otomatis dengan repeat options
+- 🔄 **Auto-Recovery** - Stream otomatis restart setelah server reboot
+- 📊 **Real-time Monitoring** - Monitor CPU, RAM, Network, dan Capacity
+- 👥 **Multi-User Support** - User management dengan quota system
+- 🎨 **Modern UI** - Responsive dashboard dengan Tailwind CSS
 
-## 🛠️ System Requirements
+### Advanced Features
+- ⚡ **Hardware Encoding** - Support NVIDIA NVENC, Intel QSV
+- 🎵 **Playlist Support** - Stream multiple videos in sequence
+- 🔁 **Loop Mode** - Repeat video/playlist infinitely
+- 📝 **Stream Templates** - Save dan reuse stream configurations
+- 🎯 **Video Quality Detection** - Auto-detect bitrate, GOP, resolution
+- 💾 **Low Memory Mode** - Optimized for streamcopy (30MB per stream)
 
-- **Node.js** v20 atau versi terbaru
-- **FFmpeg** untuk video processing
-- **SQLite3** (sudah termasuk dalam package)
-- **VPS/Server** dengan minimal 1 Core CPU & 1GB RAM
-- **Port** 7575 (dapat disesuaikan di file [.env](.env))
+### Platform Support
+- ✅ YouTube Live
+- ✅ Facebook Live
+- ✅ Twitch
+- ✅ Custom RTMP servers
 
-## ⚡ Quick Installation
+---
 
-Untuk instalasi otomatis, jalankan perintah berikut:
+## 📋 Requirements
 
+### Minimum Specs
+- **OS**: Ubuntu 22.04 LTS (or Windows 10/11 for development)
+- **CPU**: 2 cores
+- **RAM**: 4 GB
+- **Storage**: 60 GB SSD
+- **Network**: 100 Mbps upload
+
+### Software
+- Node.js 20.x
+- FFmpeg 4.x or higher
+- PM2 (for production)
+- SQLite3 (included)
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone Repository
 ```bash
-curl -o install.sh https://raw.githubusercontent.com/Andara2025/streambrovps/main/install.sh && chmod +x install.sh && ./install.sh
+git clone https://github.com/yourusername/streambro.git
+cd streambro
 ```
 
-## 🔧 Manual Installation
-
-### 1. Persiapan Server
-
-Update sistem operasi:
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-Install Node.js:
-```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-
-Verifikasi instalasi Node.js:
-```bash
-node --version
-npm --version
-```
-
-Install FFmpeg:
-```bash
-sudo apt install ffmpeg -y
-```
-
-Verifikasi instalasi FFmpeg:
-```bash
-ffmpeg -version
-```
-
-Install Git:
-```bash
-sudo apt install git -y
-```
-
-### 2. Setup Project StreamBro
-
-Clone repository:
-```bash
-git clone https://github.com/Andara2025/streambrovps.git
-cd streambrovps
-```
-
-
-
-Install Paket Node.JS:
+### 2. Install Dependencies
 ```bash
 npm install
 ```
 
-Generate Secret Key:
+### 3. Configure Environment
+```bash
+cp .env.example .env
+nano .env
+```
+
+Generate session secret:
 ```bash
 node generate-secret.js
 ```
 
-Konfigurasi port (opsional):
+### 4. Create Admin Account
 ```bash
-nano .env
+node create-admin.js
 ```
 
-Jalankan aplikasi:
+### 5. Run Application
+
+**Development:**
 ```bash
-npm run dev
+npm start
 ```
 
-### 3. Konfigurasi Firewall
-
-**PENTING: Buka port SSH terlebih dahulu untuk menghindari terputusnya koneksi!**
-
-Buka port SSH (biasanya port 22):
-```bash
-sudo ufw allow ssh
-# atau jika menggunakan port custom SSH
-# sudo ufw allow [PORT_SSH_ANDA]
-```
-
-Buka port aplikasi (default: 7575):
-```bash
-sudo ufw allow 7575
-```
-
-Verifikasi aturan firewall sebelum mengaktifkan:
-```bash
-sudo ufw status verbose
-```
-
-Aktifkan firewall:
-```bash
-sudo ufw enable
-```
-
-Verifikasi status firewall setelah aktif:
-```bash
-sudo ufw status
-```
-
-### 4. Install Process Manager
-
-Install PM2 untuk mengelola aplikasi:
-```bash
-sudo npm install -g pm2
-```
-
-### 5. Menjalankan Aplikasi
-
-Jalankan aplikasi dengan PM2:
+**Production (with PM2):**
 ```bash
 pm2 start app.js --name streambro
-```
-
-**Setup Auto-Restart saat Server Reboot:**
-```bash
-# Simpan konfigurasi PM2 saat ini
 pm2 save
-
-# Setup PM2 untuk auto-start saat server restart
 pm2 startup
-
-# Ikuti instruksi yang muncul, biasanya berupa command yang harus dijalankan dengan sudo
-# Contoh output: sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u username --hp /home/username
-
-# Setelah menjalankan command startup, save kembali
-pm2 save
 ```
 
-**Perintah PM2 Berguna:**
-```bash
-# Lihat status aplikasi
-pm2 status
-
-# Restart aplikasi
-pm2 restart streambro
-
-# Stop aplikasi
-pm2 stop streambro
-
-# Lihat logs aplikasi
-pm2 logs streambro
-
-# Monitor resource usage
-pm2 monit
+### 6. Access Dashboard
+```
+http://localhost:7575
 ```
 
-Akses aplikasi melalui browser:
-```
-http://IP_SERVER:PORT
-```
-
-Contoh: `http://88.12.34.56:7575`
-
-
-## 🔐 Reset Password
-
-Jika lupa password atau perlu reset akun:
-
-```bash
-node reset-password.js
-```
-
-## ⏰ Pengaturan Timezone Server
-
-Untuk memastikan scheduled streaming berjalan dengan waktu yang akurat:
-
-### Cek timezone saat ini:
-```bash
-timedatectl status
-```
-
-### Lihat daftar timezone tersedia:
-```bash
-timedatectl list-timezones | grep Asia
-```
-
-### Set timezone ke WIB (Jakarta):
-```bash
-sudo timedatectl set-timezone Asia/Jakarta
-```
-
-### Restart aplikasi setelah mengubah timezone:
-```bash
-pm2 restart streambro
-```
-
-## 🐳 Docker Deployment
-
-### 1. Persiapan Environment
-
-Buat file `.env` di root project:
-```env
-PORT=7575
-SESSION_SECRET=your_random_secret_here
-NODE_ENV=development
-```
-
-### 2. Build dan Jalankan
-
-```bash
-docker-compose up --build
-```
-
-Akses aplikasi: [http://localhost:7575](http://localhost:7575)
-
-### 3. Data Persistence
-
-Data akan tersimpan secara otomatis di:
-- Database: `db/`
-- Logs: `logs/`
-- Upload files: `public/uploads/`
-
-### 4. Reset Password (Docker)
-
-```bash
-docker-compose exec app node reset-password.js
-```
-
-## 🔫 Troubleshooting
-
-### Permission Error
-```bash
-chmod -R 755 public/uploads/
-```
-
-### Port Already in Use
-```bash
-# Cek proses yang menggunakan port
-sudo lsof -i :7575
-
-# Kill proses jika diperlukan
-sudo kill -9 <PID>
-```
-
-### Database Error
-```bash
-# Reset database (PERINGATAN: akan menghapus semua data)
-rm db/*.db
-
-# Restart aplikasi untuk membuat database baru
-pm2 restart streambro
-```
-
-### Docker Troubleshooting
-
-**Tidak bisa login:**
-- Pastikan `NODE_ENV=development` untuk akses HTTP
-- Periksa permission folder:
-  ```bash
-  sudo chmod -R 777 db/ logs/ public/uploads/
-  ```
-- Pastikan `SESSION_SECRET` tidak berubah
-
-**Production (HTTPS):**
-- Set `NODE_ENV=production`
-- Akses melalui HTTPS untuk cookie session
-
-## 💫 Contributors
-
-[![Contributors](https://contrib.rocks/image?repo=Andara2025/streambrovps)](https://github.com/Andara2025/streambrovps/graphs/contributors)
-
-## 📄 License
-
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/Andara2025/streambrovps/blob/main/LICENSE)
+Login with admin credentials you created.
 
 ---
 
-**Original Project:** [StreamBro by Bang Tutorial](https://github.com/bangtutorial/streambro)
+## 📚 Documentation
 
-© 2025 - Modified by Andara2025
+### Installation & Setup
+- **[Complete Installation Guide](INSTALLATION_GUIDE.md)** - Step-by-step VPS setup
+- **[User Management](USER_MANAGEMENT.md)** - Create users, reset passwords, manage quota
 
+### Technical Guides
+- **[RAM Calculation Guide](RAM_CALCULATION_GUIDE.md)** - Understanding memory usage
+- **[Auto Recovery](AUTO_RECOVERY.md)** - How auto-recovery works
+- **[Video Quality Detection](VIDEO_QUALITY_DETECTION.md)** - Video analysis features
+- **[Memory Optimization](MEMORY_OPTIMIZATION.md)** - Optimize RAM usage
+- **[Hardware Encoder](HARDWARE_ENCODER_IMPLEMENTATION.md)** - GPU acceleration setup
+
+### Features
+- **[Stream Templates](STREAM_TEMPLATES.md)** - Save and reuse configurations
+- **[Video Bitrate Analysis](VIDEO_BITRATE_ANALYSIS.md)** - Bitrate recommendations
+
+---
+
+## 🎯 Usage Examples
+
+### Create a Stream
+1. Upload video via dashboard
+2. Click "New Stream"
+3. Select video, enter RTMP URL and Stream Key
+4. Choose schedule or "Stream Now"
+5. Click "Create Stream"
+
+### Schedule Recurring Stream
+1. Create stream as above
+2. Select "Schedule" mode
+3. Add schedule: Day, Time, Duration
+4. Enable "Repeat Weekly"
+5. Stream will auto-start every week
+
+### Monitor System
+Dashboard shows real-time:
+- Active streams count
+- CPU usage
+- RAM usage (Used / Total)
+- Network speed (Upload/Download)
+- Stream capacity
+
+---
+
+## 🛠️ Common Commands
+
+### User Management
+```bash
+# Check users
+node check-users.js
+
+# Reset password
+node reset-password.js Username NewPassword
+
+# Activate user
+node activate-user.js Username
+```
+
+### Stream Management
+```bash
+# Check active streams
+node check-streams.js
+
+# Check schedules
+node check-schedules.js
+
+# Fix stream status
+node fix-stream-status.js
+```
+
+### PM2 Management
+```bash
+# Status
+pm2 status
+
+# Logs
+pm2 logs streambro
+
+# Restart
+pm2 restart streambro
+
+# Monitor
+pm2 monit
+```
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables (.env)
+```env
+# Server
+PORT=7575
+NODE_ENV=production
+
+# Session
+SESSION_SECRET=your_generated_secret
+
+# Database
+DB_PATH=./db/streambro.db
+
+# FFmpeg
+FFMPEG_PATH=/usr/bin/ffmpeg
+
+# Limits
+MAX_CONCURRENT_STREAMS_PER_USER=5
+MAX_CONCURRENT_STREAMS_GLOBAL=20
+
+# Hardware Encoding
+PREFER_HARDWARE_ENCODING=true
+HARDWARE_ENCODER_FALLBACK=true
+```
+
+### User Quota (Admin can set)
+- **Streams**: Max concurrent streams per user
+- **Storage**: Max video storage in GB
+- **Role**: `admin` or `member`
+
+---
+
+## 📊 Performance
+
+### Streamcopy Mode (Recommended)
+- **RAM per stream**: ~30 MB
+- **CPU per stream**: ~5%
+- **Max streams (4GB RAM)**: ~125 streams (limited by CPU/Network)
+
+### Re-encode Mode (Advanced Settings ON)
+- **RAM per stream**: ~150 MB
+- **CPU per stream**: ~50%
+- **Max streams (4GB RAM)**: ~2-3 streams (limited by CPU)
+
+**Recommendation**: Use streamcopy mode and pre-encode videos with proper bitrate.
+
+---
+
+## 🐛 Troubleshooting
+
+### Cannot Login
+```bash
+# Check server status
+pm2 status
+
+# Check logs
+pm2 logs streambro --err
+
+# Reset admin password
+node reset-password.js Admin NewPassword123
+```
+
+### Stream Not Starting
+```bash
+# Check logs
+pm2 logs streambro --lines 100
+
+# Common issues:
+# - Invalid RTMP URL/Key
+# - Video file not found
+# - FFmpeg error
+# - Network issue
+```
+
+### High RAM Usage
+```bash
+# Check memory
+free -h
+
+# Check FFmpeg processes
+ps aux | grep ffmpeg
+
+# Restart to clear
+pm2 restart streambro
+```
+
+See [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) for more troubleshooting tips.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE.md](LICENSE.md) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **FFmpeg** - Video processing
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **Tailwind CSS** - UI styling
+- **PM2** - Process management
+- **systeminformation** - System monitoring
+
+---
+
+## 📞 Support
+
+- **Documentation**: See `/docs` folder
+- **Issues**: Open an issue on GitHub
+- **Email**: support@streambro.com (if available)
+
+---
+
+## 🎉 Success Stories
+
+StreamBro is used by:
+- Content creators for 24/7 streaming
+- Churches for live worship streaming
+- Schools for online classes
+- Businesses for product launches
+
+**Join the community and start streaming!** 🚀
+
+---
+
+Made with ❤️ by StreamBro Team
