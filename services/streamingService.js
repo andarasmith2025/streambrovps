@@ -347,22 +347,32 @@ async function buildFFmpegArgs(stream) {
   
   return args;
 }
-async function startStream(streamId) {
+async function startStream(streamId, options = {}) {
   try {
+    const { isRecovery = false, skipStatusCheck = false, duration = null } = options;
+    
     streamRetryCount.set(streamId, 0);
-    if (activeStreams.has(streamId)) {
+    
+    // Skip active check if this is a recovery
+    if (!skipStatusCheck && activeStreams.has(streamId)) {
       return { success: false, error: 'Stream is already active' };
     }
+    
     const stream = await Stream.findById(streamId);
     if (!stream) {
       return { success: false, error: 'Stream not found' };
     }
     
-    // Check stream limits
-    const limitCheck = await streamLimiter.canStartStream(stream.user_id);
-    if (!limitCheck.allowed) {
-      console.log(`[StreamingService] Stream ${streamId} rejected: ${limitCheck.reason}`);
-      return { success: false, error: limitCheck.reason };
+    // Skip limit check for recovery
+    if (!isRecovery) {
+      // Check stream limits
+      const limitCheck = await streamLimiter.canStartStream(stream.user_id);
+      if (!limitCheck.allowed) {
+        console.log(`[StreamingService] Stream ${streamId} rejected: ${limitCheck.reason}`);
+        return { success: false, error: limitCheck.reason };
+      }
+    } else {
+      console.log(`[StreamingService] Recovery mode - skipping limit check for stream ${streamId}`);
     }
     const startTimeIso = new Date().toISOString();
     const streamStartTime = new Date(startTimeIso);
@@ -951,9 +961,60 @@ async function recoverActiveStreams() {
   
   try {
     const StreamSchedule = require('../models/StreamSchedule');
-    
-    // Find all schedules that should be active right now
     const now = new Date();
+    
+    // Step 1: Recover manual streams (Stream Now mode)
+    console.log('[Recovery] Checking for manual streams to recover...');
+    const manualStreams = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT * FROM streams 
+         WHERE status = 'live' 
+         AND start_time IS NOT NULL
+         ORDER BY start_time DESC`,
+        [],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+    
+    let manualRecoveredCount = 0;
+    for (const stream of manualStreams) {
+      try {
+        const startTime = new Date(stream.start_time);
+        const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+        
+        // If stream was started less than 24 hours ago, try to recover
+        if (elapsedMinutes < 1440) { // 24 hours
+          console.log(`[Recovery] Recovering manual stream ${stream.id} (${stream.title}), elapsed: ${elapsedMinutes} minutes`);
+          
+          // Restart stream
+          await startStream(stream.id, {
+            isRecovery: true,
+            skipStatusCheck: true
+          });
+          
+          manualRecoveredCount++;
+          console.log(`[Recovery] ✓ Successfully recovered manual stream ${stream.id}`);
+        } else {
+          // Stream too old, mark as offline
+          console.log(`[Recovery] Stream ${stream.id} too old (${elapsedMinutes} minutes), marking as offline`);
+          await Stream.updateStatus(stream.id, 'offline');
+        }
+      } catch (err) {
+        console.error(`[Recovery] Failed to recover manual stream ${stream.id}:`, err.message);
+        // Mark as offline if recovery fails
+        await Stream.updateStatus(stream.id, 'offline').catch(() => {});
+      }
+    }
+    
+    if (manualRecoveredCount > 0) {
+      console.log(`[Recovery] ✓ Recovered ${manualRecoveredCount} manual stream(s)`);
+    }
+    
+    // Step 2: Recover scheduled streams
+    console.log('[Recovery] Checking for scheduled streams to recover...');
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const currentDay = now.getDay();
     

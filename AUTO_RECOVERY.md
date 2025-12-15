@@ -1,197 +1,257 @@
 # Auto-Recovery System
 
 ## Overview
-StreamBro memiliki sistem **Auto-Recovery** yang secara otomatis me-restart stream yang masih aktif setelah server restart atau VPS down.
 
-## Cara Kerja
+StreamBro memiliki sistem auto-recovery yang otomatis me-restart stream yang masih aktif setelah server restart/crash.
 
-### 1. Saat Server Shutdown (Graceful)
-- Semua stream yang sedang live akan di-stop dengan benar
-- Status di database direset ke 'offline'
-- FFmpeg process di-terminate dengan clean
-- Ini mencegah "ghost streams" (status live tapi FFmpeg sudah mati)
+## Kapan Auto-Recovery Berjalan?
 
-### 2. Saat Server Startup (Auto-Recovery)
-Server akan otomatis:
-1. **Reset semua status** stream yang tertinggal ke 'offline'
-2. **Cek database** untuk schedule yang seharusnya masih aktif
-3. **Auto-restart stream** yang masih dalam jadwal aktif
-4. **Hitung sisa durasi** dan lanjutkan streaming
+Auto-recovery berjalan **3 detik** setelah server start, untuk memberi waktu sistem initialize.
 
-### 3. Kondisi Recovery
+## Apa yang Di-Recovery?
 
-Stream akan di-recover jika:
+### 1. **Manual Streams (Stream Now)** ✅
 
-#### Recurring Schedule (Harian)
-- Hari ini termasuk dalam `recurring_days`
-- Waktu sekarang berada dalam window jadwal (start time - end time)
-- Status schedule: `pending` atau `active`
+**Kondisi:**
+- Stream dengan status `live`
+- Memiliki `start_time`
+- Dimulai kurang dari 24 jam yang lalu
+
+**Proses:**
+```javascript
+1. Cek semua stream dengan status 'live'
+2. Hitung elapsed time sejak start
+3. Jika < 24 jam → Restart stream
+4. Jika > 24 jam → Mark as offline (stream terlalu lama)
+```
 
 **Contoh:**
-- Schedule: 18:35 - 23:00 (setiap hari)
-- Server restart jam 20:00
-- ✅ Stream akan auto-restart dengan sisa durasi 3 jam
+```
+Stream A: Started 19:00, Server restart 19:30
+→ Elapsed: 30 minutes
+→ ✅ Auto-recover
 
-#### One-Time Schedule
-- Waktu sekarang berada antara start time dan end time
-- Status schedule: `pending` atau `active`
+Stream B: Started yesterday 10:00, Server restart today 11:00
+→ Elapsed: 25 hours
+→ ❌ Too old, mark as offline
+```
+
+### 2. **Scheduled Streams** ✅
+
+**Kondisi:**
+- Schedule dengan status `pending` atau `active`
+- Masih dalam time window (start_time - end_time)
+- Recurring atau one-time schedule
+
+**Proses:**
+```javascript
+1. Cek semua schedule yang pending/active
+2. Cek apakah sekarang masih dalam jadwal
+3. Hitung sisa durasi
+4. Restart stream dengan sisa durasi
+```
 
 **Contoh:**
-- Schedule: 2024-12-10 18:35 - 23:00
-- Server restart jam 20:00 (masih di tanggal yang sama)
-- ✅ Stream akan auto-restart dengan sisa durasi 3 jam
-
-## Skenario Penggunaan
-
-### Skenario 1: VPS Restart Mendadak
 ```
-1. Stream sedang live (18:35 - 23:00)
-2. VPS restart jam 20:00
-3. Server startup otomatis (via PM2/systemd)
-4. Auto-recovery detect schedule masih aktif
-5. Stream auto-restart dengan sisa 3 jam
+Schedule: 18:00-20:00 (duration: 120 minutes)
+Server restart: 19:00
+→ Elapsed: 60 minutes
+→ Remaining: 60 minutes
+→ ✅ Auto-recover dengan durasi 60 menit
 ```
 
-### Skenario 2: Update Code (Manual Restart)
-```
-1. Stream sedang live
-2. Developer restart server untuk update
-3. Auto-recovery detect schedule masih aktif
-4. Stream auto-restart otomatis
-```
+## Logs
 
-### Skenario 3: Server Crash
-```
-1. Stream sedang live
-2. Server crash/error
-3. PM2 auto-restart server
-4. Auto-recovery detect dan restart stream
-```
-
-## Log Output
-
-Saat server startup, Anda akan melihat log seperti ini:
+### Successful Recovery
 
 ```
 [Recovery] Starting auto-recovery for active streams...
+[Recovery] Checking for manual streams to recover...
+[Recovery] Recovering manual stream abc123 (My Stream), elapsed: 30 minutes
+[Recovery] ✓ Successfully recovered manual stream abc123
+[Recovery] ✓ Recovered 1 manual stream(s)
+
+[Recovery] Checking for scheduled streams to recover...
 [Recovery] Found 2 schedule(s) to check
-[Recovery] Recurring schedule abc-123 should be active now (18:35 - 23:00)
-[Recovery] Recovering stream xyz-456 (Melayu 1)
-Starting stream: ffmpeg -hwaccel auto -loglevel error ...
-[Recovery] ✓ Successfully recovered stream xyz-456, remaining: 180 minutes
+[Recovery] Recurring schedule xyz789 should be active now (18:00 - 20:00)
+[Recovery] Recovering stream xyz789 (Scheduled Stream)
+[Recovery] ✓ Successfully recovered stream xyz789, remaining: 60 minutes
 [Recovery] ✓ Successfully recovered 1 stream(s)
 ```
 
-## Konfigurasi
+### No Recovery Needed
 
-### Delay Recovery
-Default: 3 detik setelah server start
-```javascript
-setTimeout(async () => {
-  await streamingService.recoverActiveStreams();
-}, 3000); // 3 seconds
+```
+[Recovery] Starting auto-recovery for active streams...
+[Recovery] Checking for manual streams to recover...
+[Recovery] Checking for scheduled streams to recover...
+[Recovery] No active schedules found to recover
 ```
 
-Anda bisa ubah delay ini di `app.js` jika perlu waktu lebih lama untuk inisialisasi.
+### Recovery Failed
 
-## Production Setup
-
-### Dengan PM2 (Recommended)
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start dengan PM2
-pm2 start ecosystem.config.js
-
-# Auto-start on boot
-pm2 startup
-pm2 save
 ```
-
-PM2 akan:
-- Auto-restart server jika crash
-- Keep server running setelah VPS reboot
-- Auto-recovery akan handle stream restart
-
-### Dengan Systemd (Linux)
-```bash
-# Create service file
-sudo nano /etc/systemd/system/streambro.service
-
-# Enable auto-start
-sudo systemctl enable streambro
-sudo systemctl start streambro
+[Recovery] Failed to recover manual stream abc123: Stream not found
+[Recovery] Failed to recover schedule xyz789: FFmpeg error
 ```
 
 ## Limitasi
 
-### Yang TIDAK Bisa Di-Recovery:
-1. **Stream manual** (tanpa schedule) - Tidak ada informasi kapan harus stop
-2. **Schedule yang sudah selesai** - End time sudah lewat
-3. **Schedule di hari yang berbeda** (untuk recurring) - Bukan hari yang diizinkan
+### ❌ **Tidak Di-Recovery:**
 
-### Yang Bisa Di-Recovery:
-1. ✅ Recurring schedule yang masih dalam window waktu
-2. ✅ One-time schedule yang masih dalam window waktu
-3. ✅ Stream dengan durasi tersisa minimal 1 menit
+1. **Stream yang sudah selesai**
+   - Schedule yang sudah lewat end_time
+   - Manual stream > 24 jam
+
+2. **Stream dengan error**
+   - Video file tidak ditemukan
+   - RTMP URL invalid
+   - FFmpeg error
+
+3. **Stream yang di-stop manual**
+   - User klik "Stop" sebelum restart
+   - Status sudah 'offline'
+
+### ✅ **Di-Recovery:**
+
+1. **Manual streams** (< 24 jam)
+2. **Scheduled streams** (masih dalam jadwal)
+3. **Recurring streams** (hari dan jam sesuai)
+
+## Configuration
+
+### Timeout Recovery
+
+```javascript
+// app.js
+setTimeout(async () => {
+  await streamingService.recoverActiveStreams();
+}, 3000); // 3 seconds delay
+```
+
+### Max Age untuk Manual Stream
+
+```javascript
+// services/streamingService.js
+if (elapsedMinutes < 1440) { // 24 hours = 1440 minutes
+  // Recover stream
+}
+```
+
+## Testing Auto-Recovery
+
+### Test 1: Manual Stream Recovery
+
+```bash
+# 1. Start manual stream di dashboard
+# 2. Di SSH, restart server
+pm2 restart streambro
+
+# 3. Lihat logs
+pm2 logs streambro | grep Recovery
+
+# Expected:
+# [Recovery] Recovering manual stream...
+# [Recovery] ✓ Successfully recovered manual stream
+```
+
+### Test 2: Scheduled Stream Recovery
+
+```bash
+# 1. Buat schedule: 18:00-20:00
+# 2. Start stream (jam 18:00)
+# 3. Restart server (jam 19:00)
+pm2 restart streambro
+
+# 4. Lihat logs
+pm2 logs streambro | grep Recovery
+
+# Expected:
+# [Recovery] Recovering stream..., remaining: 60 minutes
+# [Recovery] ✓ Successfully recovered stream
+```
+
+### Test 3: No Recovery (Stream Selesai)
+
+```bash
+# 1. Buat schedule: 18:00-19:00
+# 2. Start stream
+# 3. Restart server (jam 19:30) - sudah lewat jadwal
+pm2 restart streambro
+
+# 4. Lihat logs
+pm2 logs streambro | grep Recovery
+
+# Expected:
+# [Recovery] No active schedules found to recover
+```
+
+## Benefits
+
+✅ **Zero manual intervention** - Stream otomatis restart
+✅ **Preserve duration** - Scheduled stream lanjut dengan sisa waktu
+✅ **Robust** - Handle server crash/restart
+✅ **Smart** - Tidak restart stream yang sudah selesai
+
+## Monitoring
+
+### Check Recovery Status
+
+```bash
+# Lihat logs recovery
+pm2 logs streambro --lines 100 | grep Recovery
+
+# Lihat stream aktif
+pm2 logs streambro | grep "Active streams"
+
+# Monitor real-time
+pm2 logs streambro
+```
+
+### Dashboard
+
+Setelah recovery, cek dashboard:
+- Stream status harus `live`
+- Timer harus jalan
+- Stats harus update
 
 ## Troubleshooting
 
 ### Stream Tidak Auto-Recover
 
-**Cek log server:**
-```bash
-# Jika pakai PM2
-pm2 logs
-
-# Jika manual
-# Lihat console output
-```
-
 **Kemungkinan penyebab:**
-1. Schedule sudah expired (end time lewat)
-2. Recurring schedule tapi bukan hari yang diizinkan
-3. Status schedule bukan 'pending' atau 'active'
-4. Error saat start stream (cek RTMP URL/key)
+1. Stream sudah lewat jadwal
+2. Video file tidak ditemukan
+3. RTMP URL/key invalid
+4. Resource limit tercapai
 
-### Recovery Terlalu Cepat/Lambat
+**Solusi:**
+```bash
+# Cek logs error
+pm2 logs streambro --err
 
-Edit delay di `app.js`:
-```javascript
-setTimeout(async () => {
-  await streamingService.recoverActiveStreams();
-}, 5000); // Ubah ke 5 detik
+# Cek database
+sqlite3 db/streambro.db "SELECT id, title, status, start_time FROM streams WHERE status='live';"
+
+# Manual restart stream di dashboard
 ```
 
-## Best Practices
+### Recovery Terlalu Lama
 
-1. **Gunakan PM2** untuk production - Auto-restart otomatis
-2. **Monitor logs** - Pastikan recovery berjalan dengan benar
-3. **Test recovery** - Restart server saat ada schedule aktif
-4. **Backup database** - Jaga data schedule tetap aman
-5. **Set proper duration** - Jangan terlalu pendek (minimal 5 menit)
+Jika recovery > 10 detik:
+1. Terlalu banyak stream aktif
+2. Video file besar
+3. Server resource terbatas
 
-## FAQ
+**Solusi:**
+- Batasi jumlah concurrent streams
+- Optimize video files
+- Upgrade server resources
 
-**Q: Apakah stream akan restart dari awal video?**
-A: Ya, stream akan restart dari awal video dengan sisa durasi yang tersisa.
+## Future Enhancements
 
-**Q: Bagaimana jika VPS down lebih lama dari durasi schedule?**
-A: Stream tidak akan di-recover karena end time sudah lewat.
-
-**Q: Apakah bisa disable auto-recovery?**
-A: Ya, comment out bagian recovery di `app.js` (baris `setTimeout(async () => { await streamingService.recoverActiveStreams(); ...`).
-
-**Q: Apakah auto-recovery memakan RAM?**
-A: Minimal, hanya berjalan sekali saat startup (3 detik setelah server start).
-
-## Summary
-
-Auto-Recovery System memastikan stream Anda tetap berjalan meskipun terjadi:
-- ✅ VPS restart
-- ✅ Server crash
-- ✅ Manual restart untuk update
-- ✅ Network issue yang menyebabkan restart
-
-Sistem ini sangat penting untuk production environment dimana uptime adalah prioritas!
+- [ ] Configurable recovery timeout
+- [ ] Recovery retry mechanism
+- [ ] Recovery notification (email/webhook)
+- [ ] Recovery statistics dashboard
+- [ ] Selective recovery (by user/priority)
