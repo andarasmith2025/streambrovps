@@ -253,7 +253,7 @@
         <i class="ti ti-settings mr-3"></i>
         <span>Settings</span>
       </a>
-      <a href="https://github.com/bangtutorial/streamflow/issues"
+      <a href="https://github.com/andarasmith2025/streambrovps/issues"
         class="flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-dark-700 hover:text-white transition-colors" target="_blank">
         <i class="ti ti-help mr-3"></i>
         <span>Help & Support</span>
@@ -323,13 +323,13 @@
     </div>
   </div>
   
-  <div id="streamflowUpdateModal" class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 overflow-y-auto">
+  <div id="streambroUpdateModal" class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 overflow-y-auto">
     <div class="bg-dark-800 rounded-xl shadow-xl w-full max-w-2xl m-auto flex flex-col max-h-[90vh] border border-gray-700/50">
       <div class="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-gray-700/50">
         <h3 class="text-lg font-medium text-white flex items-center gap-2">
-          <span class="text-base">🎉 Update Streambro Light v2</span>
+          <span class="text-base">🎉 Update StreamBro v2</span>
         </h3>
-        <button onclick="closeStreamflowUpdateModal()" class="text-gray-400 hover:text-white hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-colors">
+        <button onclick="closeStreambroUpdateModal()" class="text-gray-400 hover:text-white hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-colors">
           <i class="ti ti-x text-lg"></i>
         </button>
       </div>
@@ -596,8 +596,8 @@
     }
   });
 
-  function openStreamflowUpdateModal() {
-    const modal = document.getElementById('streamflowUpdateModal');
+  function openStreambroUpdateModal() {
+    const modal = document.getElementById('streambroUpdateModal');
     if (modal) {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -605,8 +605,8 @@
     }
   }
 
-  function closeStreamflowUpdateModal() {
-    const modal = document.getElementById('streamflowUpdateModal');
+  function closeStreambroUpdateModal() {
+    const modal = document.getElementById('streambroUpdateModal');
     if (modal) {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
@@ -615,16 +615,16 @@
   }
 
   document.addEventListener('keydown', (e) => {
-    const updateModal = document.getElementById('streamflowUpdateModal');
+    const updateModal = document.getElementById('streambroUpdateModal');
     if (e.key === 'Escape' && updateModal && !updateModal.classList.contains('hidden')) {
-      closeStreamflowUpdateModal();
+      closeStreambroUpdateModal();
     }
   });
 
   document.addEventListener('click', (e) => {
-    const updateModal = document.getElementById('streamflowUpdateModal');
+    const updateModal = document.getElementById('streambroUpdateModal');
     if (updateModal && e.target === updateModal) { 
-      closeStreamflowUpdateModal();
+      closeStreambroUpdateModal();
     }
   });
 
