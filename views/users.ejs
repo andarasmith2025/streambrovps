@@ -50,6 +50,7 @@
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Video</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Streaming</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Quota Limits</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Created</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
         </tr>
@@ -123,18 +124,61 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-center gap-2">
+                    <i class="ti ti-broadcast text-blue-400"></i>
+                    <span class="text-white font-medium"><%= user.max_concurrent_streams || 5 %></span>
+                    <span class="text-gray-500 text-xs">streams</span>
+                    <button 
+                      data-user-id="<%= user.id %>" 
+                      data-username="<%= user.username %>" 
+                      data-current-limit="<%= user.max_concurrent_streams || 5 %>"
+                      onclick="editStreamLimit(this)" 
+                      class="text-blue-400 hover:text-blue-300 transition-colors" 
+                      title="Edit Stream Limit">
+                      <i class="ti ti-edit text-xs"></i>
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="ti ti-database text-green-400"></i>
+                    <span class="text-white font-medium"><%= user.max_storage_gb || 10 %></span>
+                    <span class="text-gray-500 text-xs">GB</span>
+                    <button 
+                      data-user-id="<%= user.id %>" 
+                      data-username="<%= user.username %>" 
+                      data-current-storage="<%= user.max_storage_gb || 10 %>"
+                      onclick="editStorageLimit(this)" 
+                      class="text-green-400 hover:text-green-300 transition-colors" 
+                      title="Edit Storage Limit">
+                      <i class="ti ti-edit text-xs"></i>
+                    </button>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                 <%= new Date(user.created_at).toLocaleDateString() %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>')" 
-                    class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
+                  <button 
+                    data-user-id="<%= user.id %>" 
+                    data-username="<%= user.username %>" 
+                    data-role="<%= user.user_role %>" 
+                    data-status="<%= user.status %>" 
+                    data-avatar="<%= user.avatar_path || '' %>"
+                    onclick="editUser(this)" 
+                    class="text-blue-400 hover:text-blue-300 transition-colors" 
+                    title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
                   
                   <% if (user.id !== req.session.userId) { %>
-                    <button onclick="deleteUser('<%= user.id %>', '<%= user.username %>')" 
-                      class="text-red-400 hover:text-red-300 transition-colors" title="Delete User">
+                    <button 
+                      data-user-id="<%= user.id %>" 
+                      data-username="<%= user.username %>"
+                      onclick="deleteUser(this)" 
+                      class="text-red-400 hover:text-red-300 transition-colors" 
+                      title="Delete User">
                       <i class="ti ti-trash"></i>
                     </button>
                   <% } %>
@@ -144,14 +188,14 @@
           <% }); %>
         <% } else { %>
           <tr id="defaultEmptyState">
-            <td colspan="7" class="px-6 py-8 text-center text-gray-400">
+            <td colspan="8" class="px-6 py-8 text-center text-gray-400">
               <i class="ti ti-users text-4xl mb-2"></i>
               <p>No users found</p>
             </td>
           </tr>
         <% } %>
         <tr id="searchEmptyState" class="hidden">
-          <td colspan="7" class="px-6 py-8 text-center text-gray-400">
+          <td colspan="8" class="px-6 py-8 text-center text-gray-400">
             <i class="ti ti-search-off text-4xl mb-2"></i>
             <p>No users match your search criteria</p>
             <p class="text-sm mt-1">Try adjusting your filters or search terms</p>
@@ -489,7 +533,12 @@ function closeCreateModal() {
   }, 200);
 }
 
-function editUser(userId, username, role, status, avatarPath) {
+function editUser(button) {
+  const userId = button.dataset.userId;
+  const username = button.dataset.username;
+  const role = button.dataset.role;
+  const status = button.dataset.status;
+  const avatarPath = button.dataset.avatar;
   openEditModal(userId, username, role, status, avatarPath);
 }
 
@@ -579,7 +628,80 @@ document.getElementById('createUserForm').addEventListener('submit', function(e)
   });
 });
 
-function deleteUser(userId, username) {
+function editStreamLimit(button) {
+  const userId = button.dataset.userId;
+  const username = button.dataset.username;
+  const currentLimit = button.dataset.currentLimit;
+  
+  const newLimit = prompt(`Set concurrent stream limit for ${username}:\n\n(Current: ${currentLimit} streams)\n(Enter 0 for unlimited, or any positive number)`, currentLimit);
+  
+  if (newLimit === null) return; // User cancelled
+  
+  const limit = parseInt(newLimit);
+  if (isNaN(limit) || limit < 0) {
+    showToast('Please enter a valid number (0 or positive)', 'error');
+    return;
+  }
+  
+  fetch('/api/users/stream-limit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, maxStreams: limit })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showToast(data.message, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast('Error: ' + data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showToast('An error occurred while updating stream limit', 'error');
+  });
+}
+
+function editStorageLimit(button) {
+  const userId = button.dataset.userId;
+  const username = button.dataset.username;
+  const currentStorage = button.dataset.currentStorage;
+  
+  const newStorage = prompt(`Set storage limit for ${username}:\n\n(Current: ${currentStorage} GB)\n(Enter storage limit in GB, e.g., 10, 50, 100)`, currentStorage);
+  
+  if (newStorage === null) return; // User cancelled
+  
+  const storage = parseFloat(newStorage);
+  if (isNaN(storage) || storage < 0) {
+    showToast('Please enter a valid number (0 or positive)', 'error');
+    return;
+  }
+  
+  fetch('/api/users/storage-limit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, maxStorageGB: storage })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showToast(data.message, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast('Error: ' + data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showToast('An error occurred while updating storage limit', 'error');
+  });
+}
+
+function deleteUser(button) {
+  const userId = button.dataset.userId;
+  const username = button.dataset.username;
+  
   const title = 'Delete User';
   const message = `Are you sure you want to delete user "${username}"? This action cannot be undone.`;
   

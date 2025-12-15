@@ -1,0 +1,107 @@
+<!-- Storage Indicator (Responsive) -->
+<div class="bg-gray-800 rounded-lg p-3 sm:p-4 shadow-md mb-4 sm:mb-6">
+  <!-- Mobile Layout (Vertical) -->
+  <div class="md:hidden space-y-3">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 bg-dark-700 rounded-lg flex items-center justify-center">
+          <i class="ti ti-database text-sm text-white"></i>
+        </div>
+        <span class="text-sm font-semibold">Storage</span>
+      </div>
+      <span class="text-xs text-gray-400">
+        <span id="storage-usage-percent-mobile">0</span>% used
+      </span>
+    </div>
+    
+    <!-- Progress Bar -->
+    <div class="w-full bg-gray-700 rounded-full h-1.5">
+      <div id="storage-bar-mobile" class="bg-primary h-1.5 rounded-full transition-colors duration-300" style="width: 0%"></div>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-3 gap-2 text-xs">
+      <!-- Disk Usage -->
+      <div class="flex flex-col items-center p-2 bg-dark-700 rounded-lg">
+        <i class="ti ti-device-sd-card text-blue-400 text-base mb-1"></i>
+        <span class="text-gray-400 mb-0.5">Disk</span>
+        <span class="font-semibold text-white">
+          <span id="storage-used-mobile">0</span>
+        </span>
+        <span class="text-gray-500 text-[10px]">
+          / <span id="storage-total-mobile">0 GB</span>
+        </span>
+      </div>
+      
+      <!-- Videos -->
+      <div class="flex flex-col items-center p-2 bg-dark-700 rounded-lg">
+        <i class="ti ti-video text-purple-400 text-base mb-1"></i>
+        <span class="text-gray-400 mb-0.5">Videos</span>
+        <span class="font-semibold text-purple-400">
+          <span id="videos-size-mobile">0 GB</span>
+        </span>
+        <span class="text-gray-500 text-[10px]">
+          <span id="videos-count-mobile">0</span> files
+        </span>
+      </div>
+      
+      <!-- Free Space -->
+      <div class="flex flex-col items-center p-2 bg-dark-700 rounded-lg">
+        <i class="ti ti-folder text-green-400 text-base mb-1"></i>
+        <span class="text-gray-400 mb-0.5">Free</span>
+        <span class="font-semibold text-green-400">
+          <span id="storage-free-mobile">0 GB</span>
+        </span>
+        <span class="text-gray-500 text-[10px]">
+          <span id="storage-free-percent-mobile">0</span>%
+        </span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Desktop Layout (Horizontal) -->
+  <div class="hidden md:flex items-center justify-between gap-4">
+    <!-- Storage Icon & Title -->
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="w-8 h-8 bg-dark-700 rounded-lg flex items-center justify-center">
+        <i class="ti ti-database text-base text-white"></i>
+      </div>
+      <span class="text-sm font-semibold">Storage</span>
+    </div>
+    
+    <!-- Storage Stats -->
+    <div class="flex items-center gap-4 lg:gap-6 flex-wrap text-sm">
+      <!-- Disk Usage -->
+      <div class="flex items-center gap-1.5">
+        <i class="ti ti-device-sd-card text-blue-400"></i>
+        <span class="text-gray-400">Disk:</span>
+        <span class="font-semibold"><span id="storage-used">0 GB</span> / <span id="storage-total">0 GB</span></span>
+        <span class="text-gray-500">(<span id="storage-usage-percent">0</span>%)</span>
+      </div>
+      
+      <!-- Videos -->
+      <div class="flex items-center gap-1.5">
+        <i class="ti ti-video text-purple-400"></i>
+        <span class="text-gray-400">Videos:</span>
+        <span class="font-semibold text-purple-400"><span id="videos-size">0 GB</span></span>
+        <span class="text-gray-500">(<span id="videos-count">0</span> files)</span>
+      </div>
+      
+      <!-- Free Space -->
+      <div class="flex items-center gap-1.5">
+        <i class="ti ti-folder text-green-400"></i>
+        <span class="text-gray-400">Free:</span>
+        <span class="font-semibold text-green-400"><span id="storage-free">0 GB</span></span>
+        <span class="text-gray-500">(<span id="storage-free-percent">0</span>%)</span>
+      </div>
+    </div>
+    
+    <!-- Progress Bar -->
+    <div class="hidden lg:flex items-center gap-2 min-w-[120px]">
+      <div class="w-full bg-gray-700 rounded-full h-2">
+        <div id="storage-bar" class="bg-primary h-2 rounded-full transition-colors duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+</div>

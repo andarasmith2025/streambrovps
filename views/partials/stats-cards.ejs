@@ -1,0 +1,121 @@
+<% if (user && user.user_role === 'admin') { %>
+<!-- Stats Cards - Admin Only -->
+
+<!-- Mobile Layout - 4 Column Grid -->
+<div class="grid grid-cols-4 md:hidden gap-2 mb-3 sm:mb-4">
+  <!-- Active Streams -->
+  <div class="bg-gray-800 rounded-lg p-2 shadow-md">
+    <div class="flex flex-col items-center">
+      <i class="ti ti-broadcast text-primary text-base mb-1"></i>
+      <span class="text-[10px] text-gray-400 mb-1">Streams</span>
+      <span class="text-lg font-bold" id="active-streams-mobile">0</span>
+    </div>
+  </div>
+  
+  <!-- CPU -->
+  <div class="bg-gray-800 rounded-lg p-2 shadow-md">
+    <div class="flex flex-col items-center">
+      <i class="ti ti-cpu text-blue-400 text-base mb-1"></i>
+      <span class="text-[10px] text-gray-400 mb-1">CPU</span>
+      <span class="text-lg font-bold"><span id="cpu-usage-mobile">0</span>%</span>
+    </div>
+  </div>
+  
+  <!-- Memory -->
+  <div class="bg-gray-800 rounded-lg p-2 shadow-md">
+    <div class="flex flex-col items-center">
+      <i class="ti ti-device-sd-card text-green-400 text-base mb-1"></i>
+      <span class="text-[10px] text-gray-400 mb-1">Memory</span>
+      <span class="text-xs font-bold" id="memory-usage-mobile">0 MB</span>
+    </div>
+  </div>
+  
+  <!-- Network/Disk Toggle -->
+  <div class="bg-gray-800 rounded-lg p-2 shadow-md">
+    <div class="flex flex-col items-center">
+      <i class="ti ti-wifi text-purple-400 text-base mb-1 cursor-pointer" id="toggle-icon-mobile" onclick="toggleNetworkDiskDisplay('mobile')" title="Toggle Network/Disk"></i>
+      <span class="text-[10px] text-gray-400 mb-1" id="network-disk-label-mobile">Network</span>
+      
+      <!-- Network Content -->
+      <div id="network-content-mobile" class="text-center">
+        <div class="text-[9px] text-blue-400">↑<span id="upload-speed-mobile">0</span></div>
+        <div class="text-[9px] text-green-400">↓<span id="download-speed-mobile">0</span></div>
+      </div>
+      
+      <!-- Disk Content -->
+      <div id="disk-content-mobile" class="hidden text-center">
+        <span class="text-xs font-bold" id="disk-used-mobile">0 GB</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Desktop Layout - Single Row with Dividers -->
+<div class="hidden md:flex items-center justify-center gap-6 lg:gap-8 bg-gray-800 rounded-lg p-4 shadow-md border border-gray-700/50 mb-4">
+  <!-- Active Streams -->
+  <div class="flex items-center gap-3">
+    <i class="ti ti-broadcast text-primary text-xl"></i>
+    <div class="flex flex-col">
+      <span class="text-xs text-gray-400 mb-1">Active Streams</span>
+      <span class="text-2xl font-bold" id="active-streams">0</span>
+    </div>
+  </div>
+  
+  <!-- Divider -->
+  <div class="h-12 w-px bg-gray-700"></div>
+  
+  <!-- CPU -->
+  <div class="flex items-center gap-3">
+    <i class="ti ti-cpu text-blue-400 text-xl"></i>
+    <div class="flex flex-col">
+      <span class="text-xs text-gray-400 mb-1">CPU</span>
+      <div class="flex items-baseline gap-1">
+        <span class="text-2xl font-bold" id="cpu-usage">0</span>
+        <span class="text-lg text-gray-400">%</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Divider -->
+  <div class="h-12 w-px bg-gray-700"></div>
+  
+  <!-- Memory -->
+  <div class="flex items-center gap-3">
+    <i class="ti ti-device-sd-card text-green-400 text-xl"></i>
+    <div class="flex flex-col">
+      <span class="text-xs text-gray-400 mb-1">Memory</span>
+      <span class="text-lg font-bold" id="memory-usage">0 MB</span>
+    </div>
+  </div>
+  
+  <!-- Divider -->
+  <div class="h-12 w-px bg-gray-700"></div>
+  
+  <!-- Network/Disk Toggle -->
+  <div class="flex items-center gap-3">
+    <i class="ti ti-wifi text-purple-400 text-xl cursor-pointer" id="toggle-icon-desktop" onclick="toggleNetworkDiskDisplay('desktop')" title="Toggle Network/Disk"></i>
+    <div class="flex flex-col min-w-[120px]">
+      <span class="text-xs text-gray-400 mb-1" id="network-disk-label-desktop">Network</span>
+      
+      <!-- Network Content -->
+      <div id="network-content-desktop">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-blue-400">↑ <span id="upload-speed">0 Mbps</span></span>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-green-400">↓ <span id="download-speed">0 Mbps</span></span>
+        </div>
+      </div>
+      
+      <!-- Disk Content -->
+      <div id="disk-content-desktop" class="hidden">
+        <div class="flex items-baseline gap-1">
+          <span class="text-lg font-bold" id="disk-used">0 GB</span>
+          <span class="text-sm text-gray-500">/</span>
+          <span class="text-sm text-gray-300" id="disk-total">0 GB</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>

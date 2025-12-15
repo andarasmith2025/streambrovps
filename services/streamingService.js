@@ -7,6 +7,9 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('../db/database');
 const Stream = require('../models/Stream');
 const Playlist = require('../models/Playlist');
+const StreamLimiter = require('../utils/StreamLimiter');
+const ResourceMonitor = require('../utils/ResourceMonitor');
+const HardwareDetector = require('../utils/HardwareDetector');
 let ffmpegPath;
 if (fs.existsSync('/usr/bin/ffmpeg')) {
   ffmpegPath = '/usr/bin/ffmpeg';
@@ -22,6 +25,42 @@ const streamRetryCount = new Map();
 const MAX_RETRY_ATTEMPTS = 3;
 const manuallyStoppingStreams = new Set();
 const MAX_LOG_LINES = 100;
+const FORCE_KILL_TIMEOUT_MS = parseInt(process.env.FORCE_KILL_TIMEOUT_MS) || 5000;
+
+// Map to store force kill timeouts
+const forceKillTimeouts = new Map();
+
+// Initialize StreamLimiter with configuration
+const MAX_CONCURRENT_STREAMS_PER_USER = parseInt(process.env.MAX_CONCURRENT_STREAMS_PER_USER) || 5;
+const MAX_CONCURRENT_STREAMS_GLOBAL = parseInt(process.env.MAX_CONCURRENT_STREAMS_GLOBAL) || 20;
+const streamLimiter = new StreamLimiter(MAX_CONCURRENT_STREAMS_PER_USER, MAX_CONCURRENT_STREAMS_GLOBAL);
+
+// Initialize ResourceMonitor with configuration
+const RESOURCE_WARNING_CPU_PERCENT = parseInt(process.env.RESOURCE_WARNING_CPU_PERCENT) || 80;
+const RESOURCE_WARNING_MEMORY_MB = parseInt(process.env.RESOURCE_WARNING_MEMORY_MB) || 500;
+const RESOURCE_MONITOR_INTERVAL_MS = parseInt(process.env.RESOURCE_MONITOR_INTERVAL_MS) || 30000;
+const resourceMonitor = new ResourceMonitor(RESOURCE_WARNING_CPU_PERCENT, RESOURCE_WARNING_MEMORY_MB, RESOURCE_MONITOR_INTERVAL_MS);
+
+// Hardware encoding configuration
+const PREFER_HARDWARE_ENCODING = process.env.PREFER_HARDWARE_ENCODING !== 'false'; // Default true
+const HARDWARE_ENCODER_FALLBACK = process.env.HARDWARE_ENCODER_FALLBACK !== 'false'; // Default true
+
+// Detect hardware encoders on startup
+let hardwareEncoderInfo = null;
+(async () => {
+  try {
+    hardwareEncoderInfo = await HardwareDetector.detectEncoders(ffmpegPath);
+    console.log('[StreamingService] Hardware encoder detection complete');
+  } catch (error) {
+    console.error('[StreamingService] Failed to detect hardware encoders:', error.message);
+    hardwareEncoderInfo = {
+      nvidia: false,
+      intelQSV: false,
+      appleVT: false,
+      preferred: null
+    };
+  }
+})();
 function normalizeRtmpUrl(stream) {
   if (!stream || !stream.rtmp_url || !stream.stream_key) {
     throw new Error('RTMP URL or stream key is missing');
@@ -132,7 +171,19 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   const bitrate = stream.bitrate || 2500;
   const fps = stream.fps || 30;
   
-  return [
+  // Determine encoder to use
+  let encoder = 'libx264';
+  let preset = 'ultrafast';
+  
+  if (PREFER_HARDWARE_ENCODING && hardwareEncoderInfo && hardwareEncoderInfo.preferred) {
+    encoder = hardwareEncoderInfo.preferred;
+    preset = HardwareDetector.getPreset(encoder);
+    console.log(`[StreamingService] Using hardware encoder: ${encoder} with preset: ${preset || 'default'}`);
+  } else {
+    console.log(`[StreamingService] Using software encoder: ${encoder} with preset: ${preset}`);
+  }
+  
+  const args = [
     '-hwaccel', 'auto',
     '-loglevel', 'error',
     '-re',
@@ -141,9 +192,21 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-f', 'concat',
     '-safe', '0',
     '-i', concatFile,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-tune', 'zerolatency',
+    '-c:v', encoder
+  ];
+  
+  // Add preset if available
+  if (preset) {
+    args.push('-preset', preset);
+  }
+  
+  // Add encoder-specific options
+  if (encoder === 'libx264') {
+    args.push('-tune', 'zerolatency');
+  }
+  
+  // Common encoding options
+  args.push(
     '-b:v', `${bitrate}k`,
     '-maxrate', `${bitrate}k`,
     '-bufsize', `${bitrate * 2}k`,
@@ -161,7 +224,9 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-muxpreload', '0',
     '-f', 'flv',
     rtmpUrl
-  ];
+  );
+  
+  return args;
 }
 
 async function buildFFmpegArgs(stream) {
@@ -198,7 +263,6 @@ async function buildFFmpegArgs(stream) {
   }
   
   const rtmpUrl = normalizeRtmpUrl(stream);
-  const loopOption = stream.loop_video ? '-stream_loop' : '-stream_loop 0';
   const loopValue = stream.loop_video ? '-1' : '0';
   if (!stream.use_advanced_settings) {
     // Stream copy mode - video must be pre-encoded with proper bitrate
@@ -224,7 +288,20 @@ async function buildFFmpegArgs(stream) {
   const resolution = stream.resolution || '1280x720';
   const bitrate = stream.bitrate || 2500;
   const fps = stream.fps || 30;
-  return [
+  
+  // Determine encoder to use
+  let encoder = 'libx264';
+  let preset = 'ultrafast';
+  
+  if (PREFER_HARDWARE_ENCODING && hardwareEncoderInfo && hardwareEncoderInfo.preferred) {
+    encoder = hardwareEncoderInfo.preferred;
+    preset = HardwareDetector.getPreset(encoder);
+    console.log(`[StreamingService] Using hardware encoder: ${encoder} with preset: ${preset || 'default'}`);
+  } else {
+    console.log(`[StreamingService] Using software encoder: ${encoder} with preset: ${preset}`);
+  }
+  
+  const args = [
     '-hwaccel', 'auto',
     '-loglevel', 'error',
     '-re',  // Read input at native frame rate
@@ -232,9 +309,21 @@ async function buildFFmpegArgs(stream) {
     '-fflags', '+genpts',
     '-avoid_negative_ts', 'make_zero',
     '-i', videoPath,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-tune', 'zerolatency',
+    '-c:v', encoder
+  ];
+  
+  // Add preset if available
+  if (preset) {
+    args.push('-preset', preset);
+  }
+  
+  // Add encoder-specific options
+  if (encoder === 'libx264') {
+    args.push('-tune', 'zerolatency');
+  }
+  
+  // Common encoding options
+  args.push(
     '-b:v', `${bitrate}k`,
     '-maxrate', `${bitrate}k`,  // Match bitrate to prevent bursts
     '-bufsize', `${bitrate * 2}k`,
@@ -252,7 +341,9 @@ async function buildFFmpegArgs(stream) {
     '-muxpreload', '0',
     '-f', 'flv',
     rtmpUrl
-  ];
+  );
+  
+  return args;
 }
 async function startStream(streamId) {
   try {
@@ -263,6 +354,13 @@ async function startStream(streamId) {
     const stream = await Stream.findById(streamId);
     if (!stream) {
       return { success: false, error: 'Stream not found' };
+    }
+    
+    // Check stream limits
+    const limitCheck = await streamLimiter.canStartStream(stream.user_id);
+    if (!limitCheck.allowed) {
+      console.log(`[StreamingService] Stream ${streamId} rejected: ${limitCheck.reason}`);
+      return { success: false, error: limitCheck.reason };
     }
     const startTimeIso = new Date().toISOString();
     const streamStartTime = new Date(startTimeIso);
@@ -281,6 +379,13 @@ async function startStream(streamId) {
     
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
+    
+    // Register stream in limiter
+    streamLimiter.registerStream(streamId, stream.user_id);
+    
+    // Start resource monitoring
+    resourceMonitor.startMonitoring(streamId, ffmpegProcess.pid);
+    
     ffmpegProcess.stdout.on('data', (data) => {
       const message = data.toString().trim();
       if (message) {
@@ -300,6 +405,14 @@ async function startStream(streamId) {
     ffmpegProcess.on('exit', async (code, signal) => {
       addStreamLog(streamId, `Stream ended with code ${code}, signal: ${signal}`);
       console.log(`[FFMPEG_EXIT] ${streamId}: Code=${code}, Signal=${signal}`);
+      
+      // Clear force kill timeout if exists
+      if (forceKillTimeouts.has(streamId)) {
+        clearTimeout(forceKillTimeouts.get(streamId));
+        forceKillTimeouts.delete(streamId);
+        console.log(`[StreamingService] Cleared force kill timeout for stream ${streamId}`);
+      }
+      
       const wasActive = activeStreams.delete(streamId);
       const isManualStop = manuallyStoppingStreams.has(streamId);
       if (isManualStop) {
@@ -315,6 +428,23 @@ async function startStream(streamId) {
             console.error(`[StreamingService] Error updating stream status after manual stop: ${error.message}`);
           }
         }
+        // Cleanup memory
+        const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
+        const hadRetryCount = streamRetryCount.has(streamId);
+        
+        streamLogs.delete(streamId);
+        streamRetryCount.delete(streamId);
+        streamLimiter.unregisterStream(streamId);
+        
+        // Stop resource monitoring
+        resourceMonitor.stopMonitoring(streamId);
+        
+        // Log detailed cleanup information
+        console.log(`[StreamingService] Memory cleanup completed for manually stopped stream ${streamId}:`);
+        console.log(`  - Removed ${logCount} log entries from streamLogs`);
+        console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
+        console.log(`  - Unregistered from stream limiter`);
+        console.log(`  - Stopped resource monitoring`);
         return;
       }
       if (signal === 'SIGSEGV') {
@@ -356,26 +486,69 @@ async function startStream(streamId) {
           errorMessage = `FFmpeg process exited with error code ${code}`;
           addStreamLog(streamId, errorMessage);
           console.error(`[StreamingService] ${errorMessage} for stream ${streamId}`);
-          const retryCount = streamRetryCount.get(streamId) || 0;
-          if (retryCount < MAX_RETRY_ATTEMPTS) {
-            streamRetryCount.set(streamId, retryCount + 1);
-            console.log(`[StreamingService] FFmpeg exited with code ${code}. Attempting restart #${retryCount + 1} for stream ${streamId}`);
-            setTimeout(async () => {
-              try {
-                const streamInfo = await Stream.findById(streamId);
-                if (streamInfo) {
-                  const result = await startStream(streamId);
-                  if (!result.success) {
-                    console.error(`[StreamingService] Failed to restart stream: ${result.error}`);
-                    await Stream.updateStatus(streamId, 'offline');
+          
+          // Check if this might be a hardware encoder failure (common error codes: 1, 255)
+          const logs = streamLogs.get(streamId) || [];
+          const recentLogs = logs.slice(-10).map(l => l.message).join(' ');
+          const isEncoderError = recentLogs.includes('encoder') || 
+                                 recentLogs.includes('codec') || 
+                                 recentLogs.includes('nvenc') ||
+                                 recentLogs.includes('qsv') ||
+                                 recentLogs.includes('videotoolbox');
+          
+          if (isEncoderError && HARDWARE_ENCODER_FALLBACK && hardwareEncoderInfo && hardwareEncoderInfo.preferred) {
+            console.warn(`[StreamingService] Hardware encoder failure detected for stream ${streamId}, falling back to software encoding`);
+            addStreamLog(streamId, 'Hardware encoder failed, falling back to software encoding');
+            // Temporarily disable hardware encoding for this retry
+            const originalPreferred = hardwareEncoderInfo.preferred;
+            hardwareEncoderInfo.preferred = null;
+            
+            const retryCount = streamRetryCount.get(streamId) || 0;
+            if (retryCount < MAX_RETRY_ATTEMPTS) {
+              streamRetryCount.set(streamId, retryCount + 1);
+              console.log(`[StreamingService] Attempting restart with software encoding #${retryCount + 1} for stream ${streamId}`);
+              setTimeout(async () => {
+                try {
+                  const streamInfo = await Stream.findById(streamId);
+                  if (streamInfo) {
+                    const result = await startStream(streamId);
+                    if (!result.success) {
+                      console.error(`[StreamingService] Failed to restart stream: ${result.error}`);
+                      await Stream.updateStatus(streamId, 'offline');
+                    }
                   }
+                } catch (error) {
+                  console.error(`[StreamingService] Error during stream restart: ${error.message}`);
+                  await Stream.updateStatus(streamId, 'offline');
+                } finally {
+                  // Restore hardware encoder preference
+                  hardwareEncoderInfo.preferred = originalPreferred;
                 }
-              } catch (error) {
-                console.error(`[StreamingService] Error during stream restart: ${error.message}`);
-                await Stream.updateStatus(streamId, 'offline');
-              }
-            }, 3000);
-            return;
+              }, 3000);
+              return;
+            }
+          } else {
+            const retryCount = streamRetryCount.get(streamId) || 0;
+            if (retryCount < MAX_RETRY_ATTEMPTS) {
+              streamRetryCount.set(streamId, retryCount + 1);
+              console.log(`[StreamingService] FFmpeg exited with code ${code}. Attempting restart #${retryCount + 1} for stream ${streamId}`);
+              setTimeout(async () => {
+                try {
+                  const streamInfo = await Stream.findById(streamId);
+                  if (streamInfo) {
+                    const result = await startStream(streamId);
+                    if (!result.success) {
+                      console.error(`[StreamingService] Failed to restart stream: ${result.error}`);
+                      await Stream.updateStatus(streamId, 'offline');
+                    }
+                  }
+                } catch (error) {
+                  console.error(`[StreamingService] Error during stream restart: ${error.message}`);
+                  await Stream.updateStatus(streamId, 'offline');
+                }
+              }, 3000);
+              return;
+            }
           }
         }
         if (wasActive) {
@@ -388,12 +561,39 @@ async function startStream(streamId) {
           } catch (error) {
             console.error(`[StreamingService] Error updating stream status after exit: ${error.message}`);
           }
+          // Cleanup memory
+          const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
+          const hadRetryCount = streamRetryCount.has(streamId);
+          
+          streamLogs.delete(streamId);
+          streamRetryCount.delete(streamId);
+          streamLimiter.unregisterStream(streamId);
+          
+          // Stop resource monitoring
+          resourceMonitor.stopMonitoring(streamId);
+          
+          // Log detailed cleanup information
+          console.log(`[StreamingService] Memory cleanup completed for stream ${streamId} after FFmpeg exit:`);
+          console.log(`  - Removed ${logCount} log entries from streamLogs`);
+          console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
+          console.log(`  - Unregistered from stream limiter`);
+          console.log(`  - Stopped resource monitoring`);
         }
       }
     });
     ffmpegProcess.on('error', async (err) => {
       addStreamLog(streamId, `Error in stream process: ${err.message}`);
       console.error(`[FFMPEG_PROCESS_ERROR] ${streamId}: ${err.message}`);
+      
+      // Check if this might be a hardware encoder failure
+      if (HARDWARE_ENCODER_FALLBACK && 
+          hardwareEncoderInfo && 
+          hardwareEncoderInfo.preferred &&
+          (err.message.includes('encoder') || err.message.includes('codec'))) {
+        console.warn(`[StreamingService] Possible hardware encoder failure for stream ${streamId}, will use software fallback on retry`);
+        addStreamLog(streamId, 'Hardware encoder may have failed, will try software encoding on retry');
+      }
+      
       activeStreams.delete(streamId);
       try {
         await Stream.updateStatus(streamId, 'offline');
@@ -401,7 +601,6 @@ async function startStream(streamId) {
         console.error(`Error updating stream status: ${error.message}`);
       }
     });
-    ffmpegProcess.unref();
     if (typeof schedulerService !== 'undefined') {
       const durationMinutes = Number(stream.duration);
       if (Number.isFinite(durationMinutes) && durationMinutes > 0) {
@@ -443,11 +642,32 @@ async function stopStream(streamId) {
     addStreamLog(streamId, 'Stopping stream...');
     console.log(`[StreamingService] Stopping active stream ${streamId}`);
     manuallyStoppingStreams.add(streamId);
+    
     try {
       ffmpegProcess.kill('SIGTERM');
+      console.log(`[StreamingService] Sent SIGTERM to stream ${streamId}`);
+      
+      // Set up force kill timeout
+      const forceKillTimeout = setTimeout(() => {
+        if (activeStreams.has(streamId)) {
+          console.warn(`[StreamingService] Stream ${streamId} did not respond to SIGTERM after ${FORCE_KILL_TIMEOUT_MS}ms, force killing with SIGKILL`);
+          addStreamLog(streamId, `Force killing stream after ${FORCE_KILL_TIMEOUT_MS}ms timeout`);
+          
+          try {
+            ffmpegProcess.kill('SIGKILL');
+            console.log(`[StreamingService] Sent SIGKILL to stream ${streamId}`);
+          } catch (forceKillError) {
+            console.error(`[StreamingService] Error force killing stream ${streamId}: ${forceKillError.message}`);
+          }
+        }
+        forceKillTimeouts.delete(streamId);
+      }, FORCE_KILL_TIMEOUT_MS);
+      
+      forceKillTimeouts.set(streamId, forceKillTimeout);
+      
     } catch (killError) {
       console.error(`[StreamingService] Error killing FFmpeg process: ${killError.message}`);
-      manuallyStoppingStreams.delete(streamId);
+      // Keep in manuallyStoppingStreams to prevent restart attempts
     }
     const stream = await Stream.findById(streamId);
     activeStreams.delete(streamId);
@@ -470,9 +690,66 @@ async function stopStream(streamId) {
     if (typeof schedulerService !== 'undefined' && schedulerService.cancelStreamTermination) {
       schedulerService.handleStreamStopped(streamId);
     }
+    
+    // Cleanup memory: logs, retry counts, and manual stop flag
+    const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
+    const hadRetryCount = streamRetryCount.has(streamId);
+    const hadForceKillTimeout = forceKillTimeouts.has(streamId);
+    
+    streamLogs.delete(streamId);
+    streamRetryCount.delete(streamId);
+    manuallyStoppingStreams.delete(streamId);
+    
+    // Clear force kill timeout if exists
+    if (forceKillTimeouts.has(streamId)) {
+      clearTimeout(forceKillTimeouts.get(streamId));
+      forceKillTimeouts.delete(streamId);
+    }
+    
+    // Unregister from limiter
+    streamLimiter.unregisterStream(streamId);
+    
+    // Stop resource monitoring
+    resourceMonitor.stopMonitoring(streamId);
+    
+    // Log detailed cleanup information
+    console.log(`[StreamingService] Memory cleanup completed for stream ${streamId}:`);
+    console.log(`  - Removed ${logCount} log entries from streamLogs`);
+    console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
+    console.log(`  - Cleared force kill timeout: ${hadForceKillTimeout ? 'yes' : 'no'}`);
+    console.log(`  - Unregistered from stream limiter`);
+    console.log(`  - Stopped resource monitoring`);
+    
     return { success: true, message: 'Stream stopped successfully' };
   } catch (error) {
+    // Ensure cleanup even on error
+    const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
+    const hadRetryCount = streamRetryCount.has(streamId);
+    const hadForceKillTimeout = forceKillTimeouts.has(streamId);
+    
+    streamLogs.delete(streamId);
+    streamRetryCount.delete(streamId);
     manuallyStoppingStreams.delete(streamId);
+    
+    // Clear force kill timeout if exists
+    if (forceKillTimeouts.has(streamId)) {
+      clearTimeout(forceKillTimeouts.get(streamId));
+      forceKillTimeouts.delete(streamId);
+    }
+    
+    streamLimiter.unregisterStream(streamId);
+    
+    // Stop resource monitoring
+    resourceMonitor.stopMonitoring(streamId);
+    
+    // Log detailed cleanup information even on error
+    console.log(`[StreamingService] Memory cleanup completed (after error) for stream ${streamId}:`);
+    console.log(`  - Removed ${logCount} log entries from streamLogs`);
+    console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
+    console.log(`  - Cleared force kill timeout: ${hadForceKillTimeout ? 'yes' : 'no'}`);
+    console.log(`  - Unregistered from stream limiter`);
+    console.log(`  - Stopped resource monitoring`);
+    
     console.error(`[StreamingService] Error stopping stream ${streamId}:`, error);
     return { success: false, error: error.message };
   }
@@ -604,6 +881,69 @@ async function getAllActiveStreams() {
   }
 }
 
+/**
+ * Cleanup orphaned temporary playlist files from previous sessions
+ * @returns {Promise<number>} Number of files cleaned up
+ */
+async function cleanupOrphanedTempFiles() {
+  const timestamp = new Date().toISOString();
+  console.log(`[Cleanup] ${timestamp} - Starting cleanup of orphaned temporary files...`);
+  
+  try {
+    const tempDir = path.join(__dirname, '..', 'temp');
+    
+    // Create temp directory if it doesn't exist
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+      console.log(`[Cleanup] ${timestamp} - Created temp directory at ${tempDir}`);
+      return 0;
+    }
+    
+    const files = fs.readdirSync(tempDir);
+    const playlistFiles = files.filter(f => f.startsWith('playlist_') && f.endsWith('.txt'));
+    let cleanedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
+    console.log(`[Cleanup] Found ${playlistFiles.length} playlist file(s) in temp directory`);
+    console.log(`[Cleanup] Currently ${activeStreams.size} active stream(s)`);
+    
+    for (const file of playlistFiles) {
+      // Extract stream ID from filename
+      const streamId = file.replace('playlist_', '').replace('.txt', '');
+      
+      // Check if stream is currently active
+      if (!activeStreams.has(streamId)) {
+        const filePath = path.join(tempDir, file);
+        try {
+          const stats = fs.statSync(filePath);
+          const fileSizeKB = (stats.size / 1024).toFixed(2);
+          fs.unlinkSync(filePath);
+          cleanedCount++;
+          console.log(`[Cleanup] Removed orphaned temp file: ${file} (${fileSizeKB} KB, stream ID: ${streamId})`);
+        } catch (err) {
+          errorCount++;
+          console.error(`[Cleanup] Failed to remove ${file}: ${err.message}`);
+        }
+      } else {
+        skippedCount++;
+        console.log(`[Cleanup] Skipped active stream file: ${file} (stream ID: ${streamId})`);
+      }
+    }
+    
+    console.log(`[Cleanup] ${timestamp} - Cleanup complete:`);
+    console.log(`  - Total playlist files found: ${playlistFiles.length}`);
+    console.log(`  - Orphaned files removed: ${cleanedCount}`);
+    console.log(`  - Active stream files skipped: ${skippedCount}`);
+    console.log(`  - Errors encountered: ${errorCount}`);
+    
+    return cleanedCount;
+  } catch (error) {
+    console.error(`[Cleanup] ${timestamp} - Error during orphaned file cleanup:`, error);
+    return 0;
+  }
+}
+
 async function recoverActiveStreams() {
   console.log('[Recovery] Starting auto-recovery for active streams...');
   
@@ -724,6 +1064,14 @@ async function recoverActiveStreams() {
   }
 }
 
+/**
+ * Get stream limiter statistics
+ * @returns {object} Statistics about stream limits and usage
+ */
+function getStreamLimiterStats() {
+  return streamLimiter.getStats();
+}
+
 module.exports = {
   startStream,
   stopStream,
@@ -733,5 +1081,7 @@ module.exports = {
   getStreamLogs,
   syncStreamStatuses,
   saveStreamHistory,
-  recoverActiveStreams
+  recoverActiveStreams,
+  cleanupOrphanedTempFiles,
+  getStreamLimiterStats
 };

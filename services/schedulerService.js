@@ -214,18 +214,24 @@ function clearAll() {
   console.log('[SchedulerService] Clearing all schedulers...');
   
   // Clear all stream termination timers
-  terminationTimers.forEach((timer, streamId) => {
+  scheduledTerminations.forEach((timer, streamId) => {
     clearTimeout(timer);
     console.log(`[SchedulerService] Cleared termination timer for stream ${streamId}`);
   });
-  terminationTimers.clear();
+  scheduledTerminations.clear();
   
-  // Clear all schedule check intervals
-  scheduleCheckIntervals.forEach((interval, streamId) => {
-    clearInterval(interval);
-    console.log(`[SchedulerService] Cleared schedule interval for stream ${streamId}`);
-  });
-  scheduleCheckIntervals.clear();
+  // Clear schedule check intervals
+  if (scheduleIntervalId) {
+    clearInterval(scheduleIntervalId);
+    console.log('[SchedulerService] Cleared schedule check interval');
+    scheduleIntervalId = null;
+  }
+  
+  if (durationIntervalId) {
+    clearInterval(durationIntervalId);
+    console.log('[SchedulerService] Cleared duration check interval');
+    durationIntervalId = null;
+  }
   
   console.log('[SchedulerService] All schedulers cleared');
 }

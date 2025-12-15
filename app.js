@@ -37,6 +37,7 @@ ffmpeg.setFfprobePath(ffprobePath);
 const streamingService = require('./services/streamingService');
 const schedulerService = require('./services/schedulerService');
 const { getYouTubeClient } = require('./config/google');
+const GracefulShutdown = require('./utils/GracefulShutdown');
 
 // Helper function to parse schedule time
 function parseScheduleTime(scheduleTimeStr) {
@@ -559,19 +560,27 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       avatarPath = `/uploads/avatars/${req.file.filename}`;
     }
 
+    // Auto-activate member accounts, admin accounts need approval
+    const finalRole = user_role || 'member';
+    const finalStatus = finalRole === 'member' ? 'active' : (status || 'inactive');
+    
     const newUser = await User.create({
       username,
       password,
       avatar_path: avatarPath,
-      user_role: user_role || 'member',
-      status: status || 'inactive'
+      user_role: finalRole,
+      status: finalStatus
     });
 
     if (newUser) {
+      const successMessage = finalRole === 'member' 
+        ? 'Account created successfully! You can now login.'
+        : 'Account created successfully! Please wait for admin approval to activate your account.';
+      
       return res.render('signup', {
         title: 'Sign Up',
         error: null,
-        success: 'Account created successfully! Please wait for admin approval to activate your account.'
+        success: successMessage
       });
     } else {
       return res.render('signup', {
@@ -969,9 +978,149 @@ app.post('/api/users/role', isAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/users/stream-limit', isAdmin, async (req, res) => {
+  try {
+    const { userId, maxStreams } = req.body;
+
+    if (!userId || maxStreams === undefined || maxStreams === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID or stream limit'
+      });
+    }
+
+    const streamLimit = parseInt(maxStreams);
+    if (isNaN(streamLimit) || streamLimit < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stream limit must be a positive number'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await User.updateStreamLimit(userId, streamLimit);
+
+    res.json({
+      success: true,
+      message: `Stream limit updated to ${streamLimit} for user ${user.username}`
+    });
+  } catch (error) {
+    console.error('Error updating stream limit:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update stream limit'
+    });
+  }
+});
+
+app.post('/api/users/storage-limit', isAdmin, async (req, res) => {
+  try {
+    const { userId, maxStorageGB } = req.body;
+
+    if (!userId || maxStorageGB === undefined || maxStorageGB === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID or storage limit'
+      });
+    }
+
+    const storageLimit = parseFloat(maxStorageGB);
+    if (isNaN(storageLimit) || storageLimit < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Storage limit must be a positive number'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await User.updateStorageLimit(userId, storageLimit);
+
+    res.json({
+      success: true,
+      message: `Storage limit updated to ${storageLimit}GB for user ${user.username}`
+    });
+  } catch (error) {
+    console.error('Error updating storage limit:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update storage limit'
+    });
+  }
+});
+
+app.get('/api/users/quota', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get active streams count
+    const Stream = require('./models/Stream');
+    const activeStreams = await Stream.findAll(userId, 'live');
+    const activeStreamCount = activeStreams ? activeStreams.length : 0;
+
+    // Get total storage used
+    const Video = require('./models/Video');
+    const videos = await Video.findAll(userId);
+    let totalStorageBytes = 0;
+    if (videos && videos.length > 0) {
+      totalStorageBytes = videos.reduce((sum, video) => sum + (video.file_size || 0), 0);
+    }
+    const totalStorageGB = totalStorageBytes / (1024 * 1024 * 1024);
+
+    res.json({
+      success: true,
+      quota: {
+        streams: {
+          used: activeStreamCount,
+          limit: user.max_concurrent_streams || 5,
+          percentage: Math.round((activeStreamCount / (user.max_concurrent_streams || 5)) * 100)
+        },
+        storage: {
+          used: totalStorageGB,
+          limit: user.max_storage_gb || 10,
+          percentage: Math.round((totalStorageGB / (user.max_storage_gb || 10)) * 100)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user quota:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch quota'
+    });
+  }
+});
+
 app.post('/api/users/delete', isAdmin, async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId} = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -1326,6 +1475,39 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
     if (!req.file) {
       return res.status(400).json({ error: 'No video file provided' });
     }
+
+    // Check storage limit
+    const userId = req.session.userId;
+    const user = await User.findById(userId);
+    
+    if (user) {
+      // Get current storage usage
+      const videos = await Video.findAll(userId);
+      let totalStorageBytes = 0;
+      if (videos && videos.length > 0) {
+        totalStorageBytes = videos.reduce((sum, video) => sum + (video.file_size || 0), 0);
+      }
+      
+      const newFileSize = req.file.size;
+      const totalAfterUpload = totalStorageBytes + newFileSize;
+      const maxStorageBytes = (user.max_storage_gb || 10) * 1024 * 1024 * 1024;
+      
+      if (totalAfterUpload > maxStorageBytes) {
+        // Delete the uploaded file since we're rejecting it
+        const uploadedFilePath = req.file.path;
+        if (fs.existsSync(uploadedFilePath)) {
+          fs.unlinkSync(uploadedFilePath);
+        }
+        
+        const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
+        const maxGB = user.max_storage_gb || 10;
+        const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
+        
+        return res.status(413).json({
+          error: `Storage limit exceeded. You have used ${currentGB}/${maxGB} GB. This file (${newFileGB} GB) would exceed your limit. Please delete some videos to free up space.`
+        });
+      }
+    }
     const { filename, originalname, path: videoPath, mimetype, size } = req.file;
     const thumbnailName = path.basename(filename, path.extname(filename)) + '.jpg';
     const videoInfo = await getVideoInfo(videoPath);
@@ -1396,6 +1578,40 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
         success: false,
         error: 'No video file provided'
       });
+    }
+
+    // Check storage limit
+    const userId = req.session.userId;
+    const user = await User.findById(userId);
+    
+    if (user) {
+      // Get current storage usage
+      const videos = await Video.findAll(userId);
+      let totalStorageBytes = 0;
+      if (videos && videos.length > 0) {
+        totalStorageBytes = videos.reduce((sum, video) => sum + (video.file_size || 0), 0);
+      }
+      
+      const newFileSize = req.file.size;
+      const totalAfterUpload = totalStorageBytes + newFileSize;
+      const maxStorageBytes = (user.max_storage_gb || 10) * 1024 * 1024 * 1024;
+      
+      if (totalAfterUpload > maxStorageBytes) {
+        // Delete the uploaded file since we're rejecting it
+        const uploadedFilePath = path.join(__dirname, 'public', 'uploads', 'videos', req.file.filename);
+        if (fs.existsSync(uploadedFilePath)) {
+          fs.unlinkSync(uploadedFilePath);
+        }
+        
+        const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
+        const maxGB = user.max_storage_gb || 10;
+        const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
+        
+        return res.status(413).json({
+          success: false,
+          error: `Storage limit exceeded. You have used ${currentGB}/${maxGB} GB. This file (${newFileGB} GB) would exceed your limit. Please delete some videos to free up space.`
+        });
+      }
     }
     let title = path.parse(req.file.originalname).name;
     const filePath = `/uploads/videos/${req.file.filename}`;
@@ -2577,6 +2793,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.error('Error resetting stream statuses:', error);
   }
   
+  // Cleanup orphaned temporary files from previous sessions
+  try {
+    await streamingService.cleanupOrphanedTempFiles();
+  } catch (error) {
+    console.error('Failed to cleanup orphaned files:', error);
+  }
+  
   // Initialize scheduler
   schedulerService.init(streamingService);
   
@@ -2595,82 +2818,21 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.error('Failed to recover active streams:', error);
     }
   }, 3000); // Wait 3 seconds after server start to allow everything to initialize
+  
+  // Initialize GracefulShutdown after services are ready
+  const gracefulShutdown = new GracefulShutdown({
+    streamingService,
+    schedulerService,
+    server,
+    db,
+    shutdownTimeout: 30000 // 30 seconds timeout
+  });
+  
+  // Register signal handlers
+  gracefulShutdown.registerHandlers();
+  console.log('[App] GracefulShutdown initialized and signal handlers registered');
 });
 
 server.timeout = 30 * 60 * 1000;
 server.keepAliveTimeout = 30 * 60 * 1000;
 server.headersTimeout = 30 * 60 * 1000;
-
-// Graceful shutdown handlers
-async function gracefulShutdown(signal) {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
-  
-  try {
-    // 1. Stop accepting new connections
-    server.close(() => {
-      console.log('HTTP server closed');
-    });
-    
-    // 2. Stop all active streams
-    console.log('Stopping all active streams...');
-    const activeStreams = await streamingService.getAllActiveStreams();
-    if (activeStreams && activeStreams.length > 0) {
-      console.log(`Found ${activeStreams.length} active streams to stop`);
-      for (const stream of activeStreams) {
-        try {
-          await streamingService.stopStream(stream.id);
-          console.log(`Stopped stream: ${stream.id}`);
-        } catch (err) {
-          console.error(`Error stopping stream ${stream.id}:`, err.message);
-        }
-      }
-    }
-    
-    // 3. Clear all schedulers
-    console.log('Clearing schedulers...');
-    schedulerService.clearAll();
-    
-    // 4. Reset all live streams to offline in database
-    console.log('Resetting stream statuses in database...');
-    const liveStreams = await Stream.findAll(null, 'live');
-    if (liveStreams && liveStreams.length > 0) {
-      for (const stream of liveStreams) {
-        await Stream.updateStatus(stream.id, 'offline');
-      }
-      console.log(`Reset ${liveStreams.length} streams to offline`);
-    }
-    
-    // 5. Close database connection
-    if (db && db.close) {
-      db.close((err) => {
-        if (err) {
-          console.error('Error closing database:', err);
-        } else {
-          console.log('Database connection closed');
-        }
-      });
-    }
-    
-    console.log('Graceful shutdown completed');
-    process.exit(0);
-  } catch (error) {
-    console.error('Error during graceful shutdown:', error);
-    process.exit(1);
-  }
-}
-
-// Handle different shutdown signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT')); // Ctrl+C
-process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon restart
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('UNHANDLED_REJECTION');
-});

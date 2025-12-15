@@ -197,6 +197,11 @@ class User {
         values.push(updateData.password);
       }
       
+      if (updateData.max_concurrent_streams !== undefined) {
+        fields.push('max_concurrent_streams = ?');
+        values.push(updateData.max_concurrent_streams);
+      }
+      
       if (fields.length === 0) {
         return resolve({ id: userId, message: 'No fields to update' });
       }
@@ -213,6 +218,38 @@ class User {
         }
         resolve({ id: userId, changes: this.changes });
       });
+    });
+  }
+
+  static updateStreamLimit(userId, maxStreams) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE users SET max_concurrent_streams = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [maxStreams, userId],
+        function (err) {
+          if (err) {
+            console.error('Database error in updateStreamLimit:', err);
+            return reject(err);
+          }
+          resolve({ id: userId, max_concurrent_streams: maxStreams });
+        }
+      );
+    });
+  }
+
+  static updateStorageLimit(userId, maxStorageGB) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE users SET max_storage_gb = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [maxStorageGB, userId],
+        function (err) {
+          if (err) {
+            console.error('Database error in updateStorageLimit:', err);
+            return reject(err);
+          }
+          resolve({ id: userId, max_storage_gb: maxStorageGB });
+        }
+      );
     });
   }
 }

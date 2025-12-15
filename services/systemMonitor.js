@@ -1,4 +1,5 @@
 const si = require('systeminformation');
+const { db } = require('../db/database');
 
 let previousNetworkData = null;
 let previousTimestamp = null;
@@ -6,11 +7,12 @@ let previousTimestamp = null;
 async function getSystemStats() {
   try {
     const isWin = process.platform === 'win32';
-    const [cpuData, memData, networkData, diskData] = await Promise.all([
+    const [cpuData, memData, networkData, diskData, activeStreamsCount] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       isWin ? Promise.resolve([]) : si.networkStats(),
-      getDiskUsage()
+      getDiskUsage(),
+      getActiveStreamsCount()
     ]);
     
     const cpuUsage = cpuData.currentLoad || cpuData.avg || 0;
@@ -51,6 +53,7 @@ async function getSystemStats() {
       network: networkSpeed,
       disk: diskData,
       storage: storageData,
+      activeStreams: activeStreamsCount || 0,
       platform: process.platform,
       timestamp: Date.now()
     };
@@ -61,9 +64,25 @@ async function getSystemStats() {
       memory: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0 },
       network: { download: 0, upload: 0, downloadFormatted: 'N/A', uploadFormatted: 'N/A', available: false },
       disk: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0, drive: "N/A" },
+      activeStreams: 0,
       platform: process.platform,
       timestamp: Date.now()
     };
+  }
+}
+
+async function getActiveStreamsCount() {
+  try {
+    const result = await new Promise((resolve, reject) => {
+      db.get("SELECT COUNT(*) as count FROM streams WHERE status = 'live'", (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    return result.count || 0;
+  } catch (error) {
+    console.error('Error getting active streams count:', error);
+    return 0;
   }
 }
 

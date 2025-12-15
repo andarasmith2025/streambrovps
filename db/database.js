@@ -195,6 +195,24 @@ function createTables() {
     }
   });
 
+  // Add max_concurrent_streams column for per-user stream limiting
+  db.run(`ALTER TABLE users ADD COLUMN max_concurrent_streams INTEGER DEFAULT 5`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding max_concurrent_streams column:', err.message);
+    } else if (!err) {
+      console.log('Added max_concurrent_streams column to users table');
+    }
+  });
+
+  // Add max_storage_gb column for per-user storage limiting
+  db.run(`ALTER TABLE users ADD COLUMN max_storage_gb REAL DEFAULT 10.0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding max_storage_gb column:', err.message);
+    } else if (!err) {
+      console.log('Added max_storage_gb column to users table (default: 10GB)');
+    }
+  });
+
   // Add recurring columns to stream_schedules
   db.run(`ALTER TABLE stream_schedules ADD COLUMN is_recurring BOOLEAN DEFAULT 0`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {

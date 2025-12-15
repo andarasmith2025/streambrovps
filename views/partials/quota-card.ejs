@@ -1,0 +1,111 @@
+<!-- Quota & Storage - Unified Card -->
+<div class="bg-gray-800 rounded-lg p-3 sm:p-4 shadow-md border border-gray-700/50 mb-3 sm:mb-4">
+  <!-- Mobile Layout -->
+  <div class="md:hidden">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <i class="ti ti-chart-pie text-primary text-base"></i>
+        <span class="text-sm font-semibold">My Resources</span>
+      </div>
+      <button onclick="refreshQuota()" class="text-gray-400 hover:text-white transition-colors" title="Refresh">
+        <i class="ti ti-refresh text-sm"></i>
+      </button>
+    </div>
+    
+    <!-- Resources Grid -->
+    <div class="grid <%= user && user.user_role === 'admin' ? 'grid-cols-3' : 'grid-cols-2' %> gap-3">
+      <!-- Streams -->
+      <div class="flex flex-col items-center p-3 bg-dark-700 rounded-lg">
+        <i class="ti ti-broadcast text-blue-400 text-lg mb-2"></i>
+        <span class="text-xs text-gray-400 mb-2">Streams</span>
+        <div class="text-center">
+          <span class="text-xl font-bold text-white" id="quota-stream-used-mobile">-</span>
+          <span class="text-sm text-gray-500 mx-1">/</span>
+          <span class="text-sm text-gray-300" id="quota-stream-limit-mobile">-</span>
+        </div>
+      </div>
+      
+      <!-- Storage (User Quota) -->
+      <div class="flex flex-col items-center p-3 bg-dark-700 rounded-lg">
+        <i class="ti ti-database text-green-400 text-lg mb-2"></i>
+        <span class="text-xs text-gray-400 mb-2">Storage</span>
+        <div class="text-center">
+          <span class="text-xl font-bold text-white" id="quota-storage-used-mobile">-</span>
+          <span class="text-sm text-gray-500 mx-1">/</span>
+          <span class="text-sm text-gray-300" id="quota-storage-limit-mobile">-</span>
+          <span class="text-xs text-gray-400 ml-0.5">GB</span>
+        </div>
+      </div>
+      
+      <!-- Disk (System - Admin Only) -->
+      <% if (user && user.user_role === 'admin') { %>
+      <div class="flex flex-col items-center p-3 bg-dark-700 rounded-lg">
+        <i class="ti ti-device-sd-card text-purple-400 text-lg mb-2"></i>
+        <span class="text-xs text-gray-400 mb-2">Disk</span>
+        <div class="text-center">
+          <div class="text-xl font-bold text-white" id="storage-used-mobile">-</div>
+          <div class="text-[10px] text-gray-500" id="storage-total-mobile-label">/ - GB</div>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+  
+  <!-- Desktop Layout -->
+  <div class="hidden md:flex items-center justify-center gap-8 lg:gap-12">
+    <!-- Streams -->
+    <div class="flex items-center gap-3">
+      <i class="ti ti-broadcast text-blue-400 text-xl"></i>
+      <div class="flex flex-col">
+        <span class="text-xs text-gray-400 mb-1">Streams</span>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-white" id="quota-stream-used">-</span>
+          <span class="text-sm text-gray-500">/</span>
+          <span class="text-lg text-gray-300" id="quota-stream-limit">-</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Divider -->
+    <div class="h-12 w-px bg-gray-700"></div>
+    
+    <!-- Storage (User Quota) -->
+    <div class="flex items-center gap-3">
+      <i class="ti ti-database text-green-400 text-xl"></i>
+      <div class="flex flex-col">
+        <span class="text-xs text-gray-400 mb-1">Storage</span>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-white" id="quota-storage-used">-</span>
+          <span class="text-sm text-gray-500">/</span>
+          <span class="text-lg text-gray-300" id="quota-storage-limit">-</span>
+          <span class="text-sm text-gray-400 ml-1">GB</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Disk (System - Admin Only) -->
+    <% if (user && user.user_role === 'admin') { %>
+    <!-- Divider -->
+    <div class="h-12 w-px bg-gray-700"></div>
+    
+    <div class="flex items-center gap-3">
+      <i class="ti ti-device-sd-card text-purple-400 text-xl"></i>
+      <div class="flex flex-col">
+        <span class="text-xs text-gray-400 mb-1">Disk</span>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-white" id="storage-used">-</span>
+          <span class="text-sm text-gray-500">/</span>
+          <span class="text-lg text-gray-300" id="storage-total">-</span>
+          <span class="text-sm text-gray-400 ml-1">GB</span>
+        </div>
+      </div>
+    </div>
+    <% } %>
+    
+    <!-- Refresh Button -->
+    <button onclick="refreshQuota()" class="ml-4 text-gray-400 hover:text-white transition-colors" title="Refresh">
+      <i class="ti ti-refresh text-lg"></i>
+    </button>
+  </div>
+</div>
