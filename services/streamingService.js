@@ -160,8 +160,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-c:a', 'copy',
       '-bsf:v', 'h264_mp4toannexb,dump_extra',
       '-flags', '+global_header',
-      '-bufsize', '6M',
-      '-max_muxing_queue_size', '9999',
+      '-bufsize', '2M',
+      '-max_muxing_queue_size', '1024',
       '-f', 'flv',
       rtmpUrl
     ];
@@ -220,7 +220,7 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
-    '-max_muxing_queue_size', '9999',
+    '-max_muxing_queue_size', '1024',
     '-muxdelay', '0',
     '-muxpreload', '0',
     '-f', 'flv',
@@ -280,8 +280,8 @@ async function buildFFmpegArgs(stream) {
       '-c:a', 'copy',
       '-bsf:v', 'h264_mp4toannexb,dump_extra',
       '-flags', '+global_header',
-      '-bufsize', '6M',
-      '-max_muxing_queue_size', '9999',
+      '-bufsize', '2M',
+      '-max_muxing_queue_size', '1024',
       '-f', 'flv',
       rtmpUrl
     ];
@@ -338,7 +338,7 @@ async function buildFFmpegArgs(stream) {
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ar', '44100',
-    '-max_muxing_queue_size', '9999',
+    '-max_muxing_queue_size', '1024',
     '-muxdelay', '0',
     '-muxpreload', '0',
     '-f', 'flv',
