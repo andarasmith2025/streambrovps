@@ -206,11 +206,13 @@ app.use(session({
   rolling: true,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000
+    secure: false, // Set to false for HTTP connections
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax'
   }
 }));
 app.use(async (req, res, next) => {
+  console.log('Session check - Path:', req.path, 'SessionID:', req.sessionID, 'UserID:', req.session?.userId);
   if (req.session && req.session.userId) {
     try {
       const user = await User.findById(req.session.userId);
@@ -222,7 +224,8 @@ app.use(async (req, res, next) => {
           id: user.id,
           username: user.username,
           avatar_path: user.avatar_path,
-          email: user.email
+          email: user.email,
+          user_role: user.user_role
         };
       }
     } catch (error) {
@@ -480,7 +483,20 @@ app.post('/login', loginDelayMiddleware, loginLimiter, async (req, res) => {
     req.session.username = user.username;
     req.session.avatar_path = user.avatar_path;
     req.session.user_role = user.user_role;
-    res.redirect('/dashboard');
+    
+    // Save session explicitly before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.render('login', {
+          title: 'Login',
+          error: 'Session error. Please try again.'
+        });
+      }
+      console.log('Login successful for user:', user.username);
+      console.log('Session ID:', req.sessionID);
+      res.redirect('/dashboard');
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.render('login', {
