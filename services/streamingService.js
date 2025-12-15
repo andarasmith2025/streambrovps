@@ -146,7 +146,7 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   fs.writeFileSync(concatFile, concatContent);
   
   if (!stream.use_advanced_settings) {
-    // Stream copy mode for playlist
+    // Stream copy mode for playlist with keyframe injection
     return [
       '-hwaccel', 'auto',
       '-loglevel', 'error',
@@ -158,8 +158,8 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-i', concatFile,
       '-c:v', 'copy',
       '-c:a', 'copy',
+      '-bsf:v', 'h264_mp4toannexb,dump_extra',
       '-flags', '+global_header',
-      '-bsf:v', 'h264_mp4toannexb',
       '-bufsize', '6M',
       '-max_muxing_queue_size', '9999',
       '-f', 'flv',
@@ -214,6 +214,7 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-g', `${fps * 2}`,
     '-keyint_min', fps.toString(),
     '-sc_threshold', '0',
+    '-force_key_frames', `expr:gte(t,n_forced*2)`, // Force keyframe every 2 seconds
     '-s', resolution,
     '-r', fps.toString(),
     '-c:a', 'aac',
@@ -277,8 +278,8 @@ async function buildFFmpegArgs(stream) {
       '-i', videoPath,
       '-c:v', 'copy',
       '-c:a', 'copy',
+      '-bsf:v', 'h264_mp4toannexb,dump_extra',
       '-flags', '+global_header',
-      '-bsf:v', 'h264_mp4toannexb',
       '-bufsize', '6M',
       '-max_muxing_queue_size', '9999',
       '-f', 'flv',
@@ -331,6 +332,7 @@ async function buildFFmpegArgs(stream) {
     '-g', `${fps * 2}`,
     '-keyint_min', fps.toString(),  // Minimum keyframe interval
     '-sc_threshold', '0',  // Disable scene change detection
+    '-force_key_frames', `expr:gte(t,n_forced*2)`, // Force keyframe every 2 seconds
     '-s', resolution,
     '-r', fps.toString(),
     '-c:a', 'aac',

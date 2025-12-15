@@ -1530,6 +1530,10 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
     const thumbnailRelativePath = await generateThumbnail(videoPath, thumbnailName)
       .then(() => `/uploads/thumbnails/${thumbnailName}`)
       .catch(() => null);
+    
+    // Analyze video quality and streaming compatibility
+    const { analyzeVideo } = require('./utils/videoAnalyzer');
+    const analysis = await analyzeVideo(videoPath);
     let format = 'unknown';
     if (mimetype === 'video/mp4') format = 'mp4';
     else if (mimetype === 'video/avi') format = 'avi';
@@ -1555,7 +1559,14 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
         duration: video.duration,
         file_size: video.file_size,
         format: video.format
-      }
+      },
+      analysis: analysis.success ? {
+        quality: analysis.video,
+        compatibility: analysis.compatibility,
+        issues: analysis.issues,
+        warnings: analysis.warnings,
+        recommendations: analysis.recommendations
+      } : null
     });
   } catch (error) {
     console.error('Upload error details:', error);
