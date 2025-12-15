@@ -65,7 +65,7 @@
           <div class="flex items-center gap-1.5">
             <i class="ti ti-device-sd-card text-green-400 text-base"></i>
             <span class="text-gray-400">RAM:</span>
-            <span class="font-semibold" id="memory-usage">0 MB</span>
+            <span class="font-semibold"><span id="memory-used">0</span> / <span id="memory-total">0</span> MB</span>
           </div>
           
           <div class="hidden sm:block h-4 w-px bg-gray-700"></div>
@@ -1136,12 +1136,32 @@
           fetch('/api/system-stats')
             .then(response => response.json())
             .then(data => {
-              // Compact Indicators - CPU & Memory
+              // Compact Indicators - CPU
               const cpuUsage = document.getElementById('cpu-usage');
-              const memoryUsage = document.getElementById('memory-usage');
-              
               if (cpuUsage) cpuUsage.textContent = data.cpu.usage;
-              if (memoryUsage) memoryUsage.textContent = formatMemory(data.memory.used);
+
+              // Memory - show Used / Total format
+              const memoryUsed = document.getElementById('memory-used');
+              const memoryTotal = document.getElementById('memory-total');
+              
+              if (memoryUsed && data.memory.used) {
+                // Extract number from "119.45 MB" format
+                const usedMatch = data.memory.used.match(/[\d.]+/);
+                memoryUsed.textContent = usedMatch ? parseFloat(usedMatch[0]).toFixed(0) : '0';
+              }
+              
+              if (memoryTotal && data.memory.total) {
+                // Extract number from "4096.00 MB" format
+                const totalMatch = data.memory.total.match(/[\d.]+/);
+                const totalValue = totalMatch ? parseFloat(totalMatch[0]) : 0;
+                
+                // Check if it's in GB
+                if (data.memory.total.includes('GB')) {
+                  memoryTotal.textContent = (totalValue * 1024).toFixed(0);
+                } else {
+                  memoryTotal.textContent = totalValue.toFixed(0);
+                }
+              }
 
               // Active Streams counter
               const activeStreams = document.getElementById('active-streams');
