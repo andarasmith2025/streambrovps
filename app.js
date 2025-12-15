@@ -1299,7 +1299,15 @@ app.get('/api/users/:id/streams', isAdmin, async (req, res) => {
 app.get('/api/system-stats', isAuthenticated, async (req, res) => {
   try {
     const stats = await systemMonitor.getSystemStats();
-    res.json(stats);
+    
+    // Add stream capacity calculation
+    const { getStreamCapacityInfo } = require('./utils/streamCapacityCalculator');
+    const capacityInfo = getStreamCapacityInfo(stats);
+    
+    res.json({
+      ...stats,
+      capacity: capacityInfo
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

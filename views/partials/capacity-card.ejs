@@ -1,0 +1,150 @@
+<% if (user && user.user_role === 'admin') { %>
+<!-- Stream Capacity Card - Admin Only -->
+<div class="bg-gray-800 rounded-lg p-4 shadow-md border border-gray-700/50 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <i class="ti ti-server text-primary text-xl"></i>
+      <span class="text-sm font-semibold">Server Capacity</span>
+    </div>
+    <span class="text-xs text-gray-400" id="capacity-mode">Streamcopy Mode</span>
+  </div>
+  
+  <!-- Capacity Bar -->
+  <div class="mb-3">
+    <div class="flex items-center justify-between text-xs mb-1">
+      <span class="text-gray-400">Streams</span>
+      <span class="font-semibold">
+        <span id="capacity-current">0</span> / <span id="capacity-max">0</span>
+      </span>
+    </div>
+    <div class="w-full bg-gray-700 rounded-full h-2">
+      <div id="capacity-bar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+    </div>
+  </div>
+  
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-3 gap-3 mb-3">
+    <!-- Available Slots -->
+    <div class="text-center p-2 bg-dark-700 rounded">
+      <div class="text-xs text-gray-400 mb-1">Available</div>
+      <div class="text-lg font-bold text-green-400" id="capacity-available">0</div>
+    </div>
+    
+    <!-- Bottleneck -->
+    <div class="text-center p-2 bg-dark-700 rounded">
+      <div class="text-xs text-gray-400 mb-1">Bottleneck</div>
+      <div class="text-sm font-bold" id="capacity-bottleneck">-</div>
+    </div>
+    
+    <!-- Per Stream -->
+    <div class="text-center p-2 bg-dark-700 rounded">
+      <div class="text-xs text-gray-400 mb-1">Per Stream</div>
+      <div class="text-xs font-bold" id="capacity-per-stream">-</div>
+    </div>
+  </div>
+  
+  <!-- Recommendations -->
+  <div id="capacity-recommendations" class="space-y-2">
+    <!-- Recommendations will be inserted here -->
+  </div>
+</div>
+
+<script>
+// Update capacity info
+function updateCapacityInfo(capacityData) {
+  if (!capacityData) return;
+  
+  const mode = capacityData.streamcopy; // Default to streamcopy mode
+  
+  // Update mode
+  document.getElementById('capacity-mode').textContent = 
+    mode.mode === 'streamcopy' ? 'Streamcopy Mode' : 'Re-encode Mode';
+  
+  // Update current/max
+  document.getElementById('capacity-current').textContent = mode.current.streams;
+  document.getElementById('capacity-max').textContent = mode.capacity.maxStreams;
+  
+  // Update capacity bar
+  const percentage = mode.capacity.maxStreams > 0 
+    ? (mode.current.streams / mode.capacity.maxStreams) * 100 
+    : 0;
+  const capacityBar = document.getElementById('capacity-bar');
+  capacityBar.style.width = percentage + '%';
+  
+  // Change color based on usage
+  capacityBar.classList.remove('bg-primary', 'bg-yellow-500', 'bg-red-500');
+  if (percentage >= 90) {
+    capacityBar.classList.add('bg-red-500');
+  } else if (percentage >= 70) {
+    capacityBar.classList.add('bg-yellow-500');
+  } else {
+    capacityBar.classList.add('bg-primary');
+  }
+  
+  // Update available slots
+  const availableEl = document.getElementById('capacity-available');
+  availableEl.textContent = mode.capacity.availableSlots;
+  availableEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+  if (mode.capacity.availableSlots === 0) {
+    availableEl.classList.add('text-red-400');
+  } else if (mode.capacity.availableSlots <= 2) {
+    availableEl.classList.add('text-yellow-400');
+  } else {
+    availableEl.classList.add('text-green-400');
+  }
+  
+  // Update bottleneck
+  const bottleneckEl = document.getElementById('capacity-bottleneck');
+  const bottleneckText = mode.bottleneck === 'none' ? 'None' : mode.bottleneck.toUpperCase();
+  bottleneckEl.textContent = bottleneckText;
+  bottleneckEl.classList.remove('text-gray-400', 'text-yellow-400', 'text-red-400');
+  if (mode.bottleneck === 'none') {
+    bottleneckEl.classList.add('text-gray-400');
+  } else if (mode.capacity.availableSlots <= 2) {
+    bottleneckEl.classList.add('text-red-400');
+  } else {
+    bottleneckEl.classList.add('text-yellow-400');
+  }
+  
+  // Update per stream
+  document.getElementById('capacity-per-stream').textContent = 
+    `${mode.perStream.memory}MB`;
+  
+  // Update recommendations
+  const recsContainer = document.getElementById('capacity-recommendations');
+  recsContainer.innerHTML = '';
+  
+  if (mode.recommendations && mode.recommendations.length > 0) {
+    mode.recommendations.forEach(rec => {
+      const recEl = document.createElement('div');
+      recEl.className = `text-xs p-2 rounded ${getRecClass(rec.type)}`;
+      recEl.innerHTML = `
+        <div class="font-semibold mb-1">${getRecIcon(rec.type)} ${rec.message}</div>
+        <div class="text-gray-400">${rec.action}</div>
+      `;
+      recsContainer.appendChild(recEl);
+    });
+  }
+}
+
+function getRecClass(type) {
+  switch(type) {
+    case 'success': return 'bg-green-500/10 border border-green-500/30 text-green-300';
+    case 'warning': return 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-300';
+    case 'info': return 'bg-blue-500/10 border border-blue-500/30 text-blue-300';
+    case 'tip': return 'bg-purple-500/10 border border-purple-500/30 text-purple-300';
+    default: return 'bg-gray-500/10 border border-gray-500/30 text-gray-300';
+  }
+}
+
+function getRecIcon(type) {
+  switch(type) {
+    case 'success': return '✅';
+    case 'warning': return '⚠️';
+    case 'info': return 'ℹ️';
+    case 'tip': return '💡';
+    default: return '•';
+  }
+}
+</script>
+<% } %>
