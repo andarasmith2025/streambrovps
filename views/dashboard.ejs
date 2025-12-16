@@ -1433,6 +1433,42 @@
         let createMobileStreamCard = null;
         let createStreamTableRow = null;
         
+        // Time format preference (stored in localStorage) - MUST BE GLOBAL
+        let timeFormat24h = localStorage.getItem('timeFormat24h') !== 'false'; // default to 24h
+        
+        // Format time based on user preference - MUST BE GLOBAL
+        function formatTimeDisplay(date) {
+          if (!date) return '--:--';
+          
+          const hours = date.getHours();
+          const minutes = date.getMinutes();
+          
+          if (timeFormat24h) {
+            // 24-hour format: 16:30
+            const h = String(hours).padStart(2, '0');
+            const m = String(minutes).padStart(2, '0');
+            return `${h}:${m}`;
+          } else {
+            // 12-hour format: 04:30 PM
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const h12 = hours % 12 || 12; // Convert 0 to 12
+            const h = String(h12).padStart(2, '0');
+            const m = String(minutes).padStart(2, '0');
+            return `${h}:${m} ${period}`;
+          }
+        }
+        
+        // Toggle between 12h and 24h format - MUST BE GLOBAL
+        function toggleTimeFormat() {
+          timeFormat24h = !timeFormat24h;
+          localStorage.setItem('timeFormat24h', timeFormat24h);
+          const label = document.getElementById('timeFormatLabel');
+          if (label) {
+            label.textContent = timeFormat24h ? '24h' : '12h';
+          }
+          loadStreams(); // Reload table with new format
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function () {
           // Define createMobileStreamCard in this scope
@@ -1755,8 +1791,11 @@
           // Assign to global scope
           createStreamTableRow = _createStreamTableRow;
           
-          // Initialize time format toggle
-          initTimeFormatToggle();
+          // Initialize time format toggle button label
+          const timeFormatLabel = document.getElementById('timeFormatLabel');
+          if (timeFormatLabel) {
+            timeFormatLabel.textContent = timeFormat24h ? '24h' : '12h';
+          }
           
           // Now load streams after functions are assigned
           loadStreams();
@@ -1764,50 +1803,6 @@
           function formatDate(date) {
             if (!date) return '';
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-          }
-          // Time format preference (stored in localStorage)
-          let timeFormat24h = localStorage.getItem('timeFormat24h') !== 'false'; // default to 24h
-          
-          // Format time based on user preference
-          function formatTimeDisplay(date) {
-            if (!date) return '--:--';
-            
-            if (timeFormat24h) {
-              // 24-hour format: 16:30
-              return date.toLocaleTimeString('en-GB', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              });
-            } else {
-              // 12-hour format: 04:30 PM
-              return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              });
-            }
-          }
-          
-          // Initialize time format toggle on page load
-          function initTimeFormatToggle() {
-            updateTimeFormatLabel();
-          }
-          
-          // Toggle between 12h and 24h format
-          function toggleTimeFormat() {
-            timeFormat24h = !timeFormat24h;
-            localStorage.setItem('timeFormat24h', timeFormat24h);
-            updateTimeFormatLabel();
-            loadStreams(); // Reload table with new format
-          }
-          
-          // Update toggle button label
-          function updateTimeFormatLabel() {
-            const label = document.getElementById('timeFormatLabel');
-            if (label) {
-              label.textContent = timeFormat24h ? '24h' : '12h';
-            }
           }
           
           function formatTime(date) {
