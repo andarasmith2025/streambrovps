@@ -196,11 +196,11 @@ function createTables() {
   });
 
   // Add max_concurrent_streams column for per-user stream limiting
-  db.run(`ALTER TABLE users ADD COLUMN max_concurrent_streams INTEGER DEFAULT 5`, (err) => {
+  db.run(`ALTER TABLE users ADD COLUMN max_concurrent_streams INTEGER DEFAULT 1`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding max_concurrent_streams column:', err.message);
     } else if (!err) {
-      console.log('Added max_concurrent_streams column to users table');
+      console.log('Added max_concurrent_streams column to users table (default: 1 stream)');
     }
   });
 
@@ -223,6 +223,15 @@ function createTables() {
   db.run(`ALTER TABLE stream_schedules ADD COLUMN recurring_days TEXT`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding recurring_days column:', err.message);
+    }
+  });
+
+  // Add user_timezone column for timezone-aware scheduling
+  db.run(`ALTER TABLE stream_schedules ADD COLUMN user_timezone TEXT DEFAULT 'UTC'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding user_timezone column:', err.message);
+    } else if (!err) {
+      console.log('Added user_timezone column to stream_schedules table');
     }
   });
 

@@ -9,8 +9,8 @@ class StreamSchedule {
       
       db.run(
         `INSERT INTO stream_schedules (
-          id, stream_id, schedule_time, duration, status, is_recurring, recurring_days, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, stream_id, schedule_time, duration, status, is_recurring, recurring_days, user_timezone, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, 
           data.stream_id, 
@@ -19,6 +19,7 @@ class StreamSchedule {
           'pending',
           data.is_recurring ? 1 : 0,
           data.recurring_days || null,
+          data.user_timezone || 'UTC',
           now
         ],
         function (err) {
