@@ -1,0 +1,75 @@
+# Commands untuk Install SSL di VPS
+# Copy-paste commands ini satu per satu ke terminal VPS
+
+# ========================================
+# STEP 1: SSH ke VPS
+# ========================================
+ssh root@94.237.3.164
+
+# ========================================
+# STEP 2: Masuk ke folder project
+# ========================================
+cd /root/streambrovps
+
+# ========================================
+# STEP 3: Pull latest code
+# ========================================
+git pull origin main
+
+# ========================================
+# STEP 4: Buat script executable
+# ========================================
+chmod +x setup-ssl.sh
+
+# ========================================
+# STEP 5: Jalankan script SSL setup
+# ========================================
+./setup-ssl.sh
+
+# Script akan otomatis:
+# - Install Nginx
+# - Install Certbot
+# - Obtain SSL certificate
+# - Configure reverse proxy
+# - Setup auto-renewal
+# - Configure firewall
+
+# ========================================
+# STEP 6: Test HTTPS (setelah script selesai)
+# ========================================
+curl -I https://streambro.nivarastudio.site
+
+# ========================================
+# STEP 7: Test di browser
+# ========================================
+# Buka browser dan akses:
+# https://nivarastudio.site
+# https://streambro.nivarastudio.site
+
+# ========================================
+# TROUBLESHOOTING (jika ada error)
+# ========================================
+
+# Check Nginx status
+systemctl status nginx
+
+# Check SSL certificate
+certbot certificates
+
+# Check Nginx config
+nginx -t
+
+# Check StreamBro status
+pm2 status
+
+# View Nginx logs
+tail -f /var/log/nginx/error.log
+
+# View StreamBro logs
+pm2 logs streambro
+
+# Restart Nginx
+systemctl restart nginx
+
+# Restart StreamBro
+pm2 restart streambro

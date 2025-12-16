@@ -149,11 +149,16 @@ async function checkScheduledStreams() {
         const stream = await Stream.findById(schedule.stream_id);
         if (!stream) continue;
         
-        console.log(`[Scheduler] Starting stream: ${stream.id} - ${stream.title}`);
+        console.log(`[Scheduler] Starting stream: ${stream.id} - ${stream.title} with duration ${schedule.duration} minutes`);
+        
+        // Update stream duration to match this specific schedule
+        // This ensures auto-stop uses the correct duration for this schedule slot
+        await Stream.update(schedule.stream_id, { duration: schedule.duration });
+        
         const result = await streamingService.startStream(stream.id);
         
         if (result.success) {
-          console.log(`[Scheduler] Successfully started: ${stream.id}`);
+          console.log(`[Scheduler] Successfully started: ${stream.id} (will auto-stop after ${schedule.duration} minutes)`);
           
           // Update schedule status (only for one-time schedules)
           if (!schedule.is_recurring) {
