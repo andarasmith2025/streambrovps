@@ -221,14 +221,6 @@
               <form id="newStreamForm" class="space-y-3">
                 <input type="hidden" id="selectedVideoId" name="videoId" value="">
 
-                <!-- Video Thumbnail Preview (Lightweight) -->
-                <div class="bg-dark-900 rounded-lg overflow-hidden h-[120px]">
-                  <div id="videoThumbnailPreview" class="w-full h-full flex flex-col items-center justify-center">
-                    <i class="ti ti-video text-3xl text-gray-600 mb-2"></i>
-                    <p class="text-xs text-gray-500">Select a video</p>
-                  </div>
-                </div>
-
                 <!-- Form Fields (Single Column) -->
                 <div class="space-y-3">
                   <div class="relative">
@@ -612,14 +604,6 @@
               <form id="editStreamForm" class="space-y-3">
                 <input type="hidden" id="editStreamId" name="streamId" value="">
                 <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
-
-                <!-- Video Thumbnail Preview (Lightweight) -->
-                <div class="bg-dark-900 rounded-lg overflow-hidden h-[120px]">
-                  <div id="editVideoThumbnailPreview" class="w-full h-full flex flex-col items-center justify-center">
-                    <i class="ti ti-video text-3xl text-gray-600 mb-2"></i>
-                    <p class="text-xs text-gray-500">Select a video</p>
-                  </div>
-                </div>
 
                 <!-- Form Fields (Single Column) -->
                 <div class="space-y-3">
@@ -2602,16 +2586,6 @@
             <p class="text-sm text-gray-300 font-medium">${video.name}</p>
             <p class="text-xs text-blue-300 mt-1">Playlist selected • ${video.duration || 'Unknown duration'}</p>
           `;
-            }
-          } else {
-            // Show video info without preview (save RAM)
-            const thumbnailPreview = document.getElementById('editVideoThumbnailPreview');
-            if (thumbnailPreview) {
-              thumbnailPreview.innerHTML = `
-                <i class="ti ti-video text-3xl text-green-500 mb-2"></i>
-                <p class="text-xs text-green-400 font-medium">${video.name}</p>
-                <p class="text-xs text-gray-500 mt-1">${video.duration || 'Unknown duration'}</p>
-              `;
             }
           }
 
