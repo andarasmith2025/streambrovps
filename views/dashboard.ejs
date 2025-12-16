@@ -2993,9 +2993,17 @@
           slots.forEach(slot => {
             const time = slot.querySelector('.schedule-time').value;
             const duration = slot.querySelector('.schedule-duration').value;
-            const isRecurring = slot.querySelector('.schedule-recurring').checked;
 
             if (time && duration) {
+              // Check if any recurring days are selected
+              const selectedDays = [];
+              slot.querySelectorAll('.recurring-day').forEach(btn => {
+                if (btn.classList.contains('bg-primary')) {
+                  selectedDays.push(btn.dataset.day);
+                }
+              });
+              const isRecurring = selectedDays.length > 0;
+              
               // Create datetime in user's local timezone
               const now = new Date();
               const [hours, minutes] = time.split(':').map(Number);
@@ -3026,20 +3034,11 @@
               const scheduleData = {
                 schedule_time: localTimeString, // Local time format (no Z)
                 user_timezone: userTimezone, // Store user's timezone for reference
-                duration: parseInt(duration),
-                is_recurring: isRecurring
+                duration: parseInt(duration)
               };
 
-              // Collect recurring days from selected buttons
-              const selectedDays = [];
-              slot.querySelectorAll('.recurring-day').forEach(btn => {
-                if (btn.classList.contains('bg-primary')) {
-                  selectedDays.push(btn.dataset.day);
-                }
-              });
-              
-              // If any days are selected, mark as recurring
-              if (selectedDays.length > 0) {
+              // Add recurring info if days are selected
+              if (isRecurring) {
                 scheduleData.is_recurring = true;
                 scheduleData.recurring_days = selectedDays.join(',');
               }
