@@ -37,7 +37,7 @@ pm2 logs streambro --lines 20 --nostream
 
 echo ''
 echo '🎉 StreamBro deployed successfully!'
-echo '🌐 Access at: http://94.237.3.164:7575'
+echo '🌐 Access at: https://streambro.nivarastudio.site'
 "@
 
 # Execute SSH command
