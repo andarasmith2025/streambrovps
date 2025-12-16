@@ -1442,8 +1442,9 @@
             // Status is REAL - reflects actual FFmpeg process state
             const statusBadge = getStatusBadgeHTML(stream.status);
             const startDate = stream.start_time ? formatDate(new Date(stream.start_time)) : '';
-            const scheduleDate = stream.schedule_time ? formatDate(new Date(stream.schedule_time)) : '';
-            const scheduleTime = stream.schedule_time ? formatTime(new Date(stream.schedule_time)) : '';
+            const scheduleDateObj = stream.schedule_time ? parseScheduleTime(stream.schedule_time) : null;
+            const scheduleDate = scheduleDateObj ? formatDate(scheduleDateObj) : '';
+            const scheduleTime = scheduleDateObj ? formatTime(scheduleDateObj) : '';
             let settingsDisplay = '';
             if (stream.video_type === 'playlist') {
               settingsDisplay = 'Playlist • Loading...';
@@ -1565,7 +1566,7 @@
               '/images/playlist-thumbnail.svg' :
               (stream.video_thumbnail || '/images/default-video-thumbnail.svg');
             const startDate = stream.start_time ? new Date(stream.start_time) : null;
-            const scheduleDate = stream.schedule_time ? new Date(stream.schedule_time) : null;
+            const scheduleDate = stream.schedule_time ? parseScheduleTime(stream.schedule_time) : null;
             let settingsDisplay = '';
             if (stream.video_type === 'playlist') {
               settingsDisplay = 'Playlist • Loading...';
@@ -1765,6 +1766,33 @@
               minute: '2-digit',
               hour12: false
             });
+          }
+          
+          // Helper function to parse schedule_time correctly
+          function parseScheduleTime(scheduleTimeStr) {
+            if (!scheduleTimeStr) return null;
+            
+            // If it has 'Z' at the end, it's UTC - JavaScript will auto-convert to local
+            if (scheduleTimeStr.endsWith('Z')) {
+              return new Date(scheduleTimeStr);
+            }
+            
+            // If no 'Z', it's in local format - parse as-is
+            // Format: "2025-12-16T10:42:00.000" or "2025-12-16T10:42:00"
+            const timePart = scheduleTimeStr.split('T')[1].split('.')[0]; // "10:42:00"
+            const datePart = scheduleTimeStr.split('T')[0]; // "2025-12-16"
+            const [year, month, day] = datePart.split('-');
+            const [hour, minute, second] = timePart.split(':');
+            
+            // Create date with local time (not UTC)
+            return new Date(
+              parseInt(year),
+              parseInt(month) - 1, // Month is 0-indexed
+              parseInt(day),
+              parseInt(hour),
+              parseInt(minute),
+              parseInt(second) || 0
+            );
           }
           
           function formatRecurringDays(recurringDaysString) {
@@ -3180,7 +3208,25 @@
               container.innerHTML = ''; // Clear existing
 
               data.schedules.forEach(schedule => {
-                const scheduleDate = new Date(schedule.schedule_time);
+                // Parse schedule time correctly
+                // If it has 'Z' at the end, it's UTC - convert to local
+                // If no 'Z', it's already in local format - parse directly
+                let scheduleDate;
+                
+                if (schedule.schedule_time.endsWith('Z')) {
+                  // UTC format - JavaScript will auto-convert to local
+                  scheduleDate = new Date(schedule.schedule_time);
+                } else {
+                  // Local format without timezone - parse as-is
+                  // Format: "2025-12-16T10:42:00.000"
+                  const timePart = schedule.schedule_time.split('T')[1].split('.')[0]; // "10:42:00"
+                  const [hour, minute] = timePart.split(':');
+                  
+                  // Create date with local time
+                  scheduleDate = new Date();
+                  scheduleDate.setHours(parseInt(hour), parseInt(minute), 0, 0);
+                }
+                
                 const formattedTime = scheduleDate.toTimeString().slice(0, 5); // HH:MM
                 
                 // Convert duration from minutes to hours and minutes
