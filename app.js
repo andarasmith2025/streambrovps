@@ -735,7 +735,12 @@ app.post('/setup-account', upload.single('avatar'), [
   }
 });
 app.get('/', (req, res) => {
-  res.redirect('/dashboard');
+  // Redirect to login if not authenticated, otherwise to dashboard
+  if (req.session && req.session.userId) {
+    res.redirect('/dashboard');
+  } else {
+    res.redirect('/login');
+  }
 });
 app.get('/dashboard', isAuthenticated, async (req, res) => {
   try {
