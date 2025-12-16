@@ -1133,13 +1133,13 @@ app.get('/api/users/quota', async (req, res) => {
       quota: {
         streams: {
           used: activeStreamCount,
-          limit: user.max_concurrent_streams || 5,
-          percentage: Math.round((activeStreamCount / (user.max_concurrent_streams || 5)) * 100)
+          limit: user.max_concurrent_streams || 1,
+          percentage: Math.round((activeStreamCount / (user.max_concurrent_streams || 1)) * 100)
         },
         storage: {
           used: totalStorageGB,
-          limit: user.max_storage_gb || 10,
-          percentage: Math.round((totalStorageGB / (user.max_storage_gb || 10)) * 100)
+          limit: user.max_storage_gb || 3,
+          percentage: Math.round((totalStorageGB / (user.max_storage_gb || 3)) * 100)
         }
       }
     });
@@ -1532,7 +1532,7 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
       
       const newFileSize = req.file.size;
       const totalAfterUpload = totalStorageBytes + newFileSize;
-      const maxStorageBytes = (user.max_storage_gb || 10) * 1024 * 1024 * 1024;
+      const maxStorageBytes = (user.max_storage_gb || 3) * 1024 * 1024 * 1024;
       
       if (totalAfterUpload > maxStorageBytes) {
         // Delete the uploaded file since we're rejecting it
@@ -1542,7 +1542,7 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
         }
         
         const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
-        const maxGB = user.max_storage_gb || 10;
+        const maxGB = user.max_storage_gb || 3;
         const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
         
         return res.status(413).json({
@@ -1647,7 +1647,7 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
       
       const newFileSize = req.file.size;
       const totalAfterUpload = totalStorageBytes + newFileSize;
-      const maxStorageBytes = (user.max_storage_gb || 10) * 1024 * 1024 * 1024;
+      const maxStorageBytes = (user.max_storage_gb || 3) * 1024 * 1024 * 1024;
       
       if (totalAfterUpload > maxStorageBytes) {
         // Delete the uploaded file since we're rejecting it
@@ -1657,7 +1657,7 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
         }
         
         const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
-        const maxGB = user.max_storage_gb || 10;
+        const maxGB = user.max_storage_gb || 3;
         const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
         
         return res.status(413).json({

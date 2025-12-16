@@ -37,17 +37,29 @@ class User {
     try {
       const hashedPassword = await bcrypt.hash(userData.password, 10);
       const userId = uuidv4();
+      
+      // Set default quota for new users
+      const maxStreams = userData.max_concurrent_streams !== undefined ? userData.max_concurrent_streams : 1;
+      const maxStorage = userData.max_storage_gb !== undefined ? userData.max_storage_gb : 3.0;
+      
       return new Promise((resolve, reject) => {
         db.run(
-          'INSERT INTO users (id, username, password, avatar_path, user_role, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [userId, userData.username, hashedPassword, userData.avatar_path || null, userData.user_role || 'admin', userData.status || 'active'],
+          'INSERT INTO users (id, username, password, avatar_path, user_role, status, max_concurrent_streams, max_storage_gb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [userId, userData.username, hashedPassword, userData.avatar_path || null, userData.user_role || 'admin', userData.status || 'active', maxStreams, maxStorage],
           function (err) {
             if (err) {
               console.error("DB error during user creation:", err);
               return reject(err);
             }
-            console.log("User created successfully with ID:", userId);
-            resolve({ id: userId, username: userData.username, user_role: userData.user_role || 'admin', status: userData.status || 'active' });
+            console.log(`User created successfully with ID: ${userId}, Quota: ${maxStreams} streams, ${maxStorage} GB`);
+            resolve({ 
+              id: userId, 
+              username: userData.username, 
+              user_role: userData.user_role || 'admin', 
+              status: userData.status || 'active',
+              max_concurrent_streams: maxStreams,
+              max_storage_gb: maxStorage
+            });
           }
         );
       });

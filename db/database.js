@@ -205,11 +205,11 @@ function createTables() {
   });
 
   // Add max_storage_gb column for per-user storage limiting
-  db.run(`ALTER TABLE users ADD COLUMN max_storage_gb REAL DEFAULT 10.0`, (err) => {
+  db.run(`ALTER TABLE users ADD COLUMN max_storage_gb REAL DEFAULT 3.0`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding max_storage_gb column:', err.message);
     } else if (!err) {
-      console.log('Added max_storage_gb column to users table (default: 10GB)');
+      console.log('Added max_storage_gb column to users table (default: 3GB)');
     }
   });
 
