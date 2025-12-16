@@ -69,10 +69,14 @@ async function checkScheduledStreams() {
               
               if (schedule.schedule_time.endsWith('Z')) {
                 // UTC format - convert to local time
+                // Create Date object from UTC string - this automatically converts to local timezone
                 const utcDate = new Date(schedule.schedule_time);
+                
+                // getHours() and getMinutes() return values in LOCAL timezone
                 scheduleHour = utcDate.getHours();
                 scheduleMinute = utcDate.getMinutes();
-                console.log(`[Scheduler] Parsed datetime (UTC->Local): ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+                
+                console.log(`[Scheduler] Parsed datetime (UTC->Local): ${schedule.schedule_time} -> Local: ${scheduleHour}:${scheduleMinute} (Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone})`);
               } else {
                 // Local format - extract time directly
                 const timePart = schedule.schedule_time.split('T')[1].split('.')[0]; // Remove .000 if exists
