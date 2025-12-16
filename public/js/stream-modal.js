@@ -570,7 +570,10 @@ function selectAllDays(button) {
       btn.classList.remove('bg-primary', 'border-primary', 'text-white');
     } else {
       // Select all
-      btn.classList.
+      btn.classList.add('bg-primary', 'border-primary', 'text-white');
+    }
+  });
+}
 
 // Add schedule slot function
 function addScheduleSlot() {
