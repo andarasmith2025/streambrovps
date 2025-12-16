@@ -398,6 +398,11 @@ function calculateDurationFromEndTime(input) {
   if (durationInput) durationInput.value = durationMinutes;
 }
 
+// Alias for calculateEndTimeFromDuration - used by dashboard.ejs
+function calculateEndTimeFromDuration(input) {
+  calculateFromDuration(input);
+}
+
 function calculateFromDuration(input) {
   const slot = input.closest('.schedule-slot');
   const startInput = slot.querySelector('.schedule-time');
@@ -435,6 +440,8 @@ function calculateFromDuration(input) {
     endInput.value = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
   }
 }
+
+
 
 function toggleStreamMode(mode) {
   const streamNowBtn = document.getElementById('streamNowBtn');
@@ -492,6 +499,25 @@ function updateServerTime() {
   }
 }
 
+// Recurring day button handlers
+function attachRecurringDayListeners() {
+  const container = document.getElementById('scheduleSlotsContainer');
+  if (!container) return;
+
+  container.querySelectorAll('.recurring-day').forEach(button => {
+    button.removeEventListener('click', handleRecurringDayClick);
+    button.addEventListener('click', handleRecurringDayClick);
+  });
+}
+
+function handleRecurringDayClick(e) {
+  e.preventDefault();
+  const button = e.currentTarget;
+  button.classList.toggle('bg-primary');
+  button.classList.toggle('border-primary');
+  button.classList.toggle('text-white');
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function () {
   initModal();
@@ -501,6 +527,9 @@ document.addEventListener('DOMContentLoaded', function () {
     resolutionSelect.addEventListener('change', updateResolutionDisplay);
     setVideoOrientation('horizontal');
   }
+  
+  // Attach recurring day listeners on page load
+  attachRecurringDayListeners();
   
   // Update server time every second
   setInterval(updateServerTime, 1000);

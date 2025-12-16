@@ -2872,8 +2872,13 @@
               <input type="time" class="schedule-endtime w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
             </div>
             <div class="flex-1">
-              <label class="text-xs text-gray-400 mb-1 block">Duration (min)</label>
-              <input type="number" min="1" value="60" class="schedule-duration w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs" onchange="calculateEndTimeFromDuration(this)">
+              <label class="text-xs text-gray-400 mb-1 block">Duration</label>
+              <div class="flex gap-1">
+                <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="H" onchange="calculateFromDuration(this)">
+                <span class="text-xs text-gray-400 flex items-center">:</span>
+                <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="M" onchange="calculateFromDuration(this)">
+              </div>
+              <input type="hidden" class="schedule-duration" value="60">
             </div>
             <div class="pt-5">
               <button type="button" onclick="removeScheduleSlot(this)" class="h-[32px] w-[32px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded transition-colors">
