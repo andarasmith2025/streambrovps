@@ -55,19 +55,21 @@ async function checkScheduledStreams() {
             // We need to extract just the time part
             let scheduleHour, scheduleMinute;
             
-            // Try parsing as ISO datetime first
-            const scheduleTime = new Date(schedule.schedule_time);
-            if (!isNaN(scheduleTime.getTime())) {
-              // Valid datetime - extract local time
-              scheduleHour = scheduleTime.getHours();
-              scheduleMinute = scheduleTime.getMinutes();
-              console.log(`[Scheduler] Parsed datetime: ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
-            } else if (schedule.schedule_time.includes(':')) {
+            // Check if it's a time-only format first (HH:MM or HH:MM:SS)
+            if (schedule.schedule_time.includes(':') && !schedule.schedule_time.includes('T')) {
               // Time format: "HH:MM" or "HH:MM:SS"
               const timeParts = schedule.schedule_time.split(':');
               scheduleHour = parseInt(timeParts[0]);
               scheduleMinute = parseInt(timeParts[1]);
               console.log(`[Scheduler] Parsed time string: ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+            } else if (schedule.schedule_time.includes('T')) {
+              // ISO datetime format: "YYYY-MM-DDTHH:MM:SS"
+              // Parse as local time by extracting time components directly
+              const timePart = schedule.schedule_time.split('T')[1];
+              const timeParts = timePart.split(':');
+              scheduleHour = parseInt(timeParts[0]);
+              scheduleMinute = parseInt(timeParts[1]);
+              console.log(`[Scheduler] Parsed datetime (local): ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
             } else {
               console.log(`[Scheduler] ✗ Could not parse schedule_time: ${schedule.schedule_time}`);
               continue;
@@ -96,14 +98,30 @@ async function checkScheduledStreams() {
         }
       } else {
         // One-time schedule - check exact date & time
+        // Parse schedule_time as local time (not UTC)
+        // Format: "YYYY-MM-DDTHH:MM:SS" without timezone
+        const scheduleTime = new Date(schedule.schedule_time);
+        
+        // Check if parsing was successful
+        if (isNaN(scheduleTime.getTime())) {
+          console.log(`[Scheduler] ✗ Invalid schedule_time format: ${schedule.schedule_time}`);
+          continue;
+        }
+        
         const lookAheadTime = new Date(now.getTime() + SCHEDULE_LOOKAHEAD_SECONDS * 1000);
+        
+        console.log(`[Scheduler] One-time schedule check: ${schedule.stream_id}, schedule=${scheduleTime.toLocaleString()}, now=${now.toLocaleString()}`);
         
         if (scheduleTime >= now && scheduleTime <= lookAheadTime) {
           const stream = await Stream.findById(schedule.stream_id);
           if (stream && stream.status !== 'live') {
             schedulesToStart.push(schedule);
-            console.log(`[Scheduler] One-time schedule matched: ${schedule.stream_id} at ${scheduleTime.toISOString()}`);
+            console.log(`[Scheduler] ✓ One-time schedule matched: ${schedule.stream_id} at ${scheduleTime.toLocaleString()}`);
+          } else {
+            console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live or not found`);
           }
+        } else {
+          console.log(`[Scheduler] ✗ Schedule time not in range (${Math.round((scheduleTime - now) / 1000)}s away)`);
         }
       }
     }
