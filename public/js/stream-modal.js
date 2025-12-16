@@ -6,10 +6,12 @@ let desktopVideoPlayer = null;
 let streamKeyTimeout = null;
 let isStreamKeyValid = true;
 let currentPlatform = 'Custom';
+
 function openNewStreamModal() {
   const modal = document.getElementById('newStreamModal');
   document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
+  
   const advancedSettingsContent = document.getElementById('advancedSettingsContent');
   const advancedSettingsToggle = document.getElementById('advancedSettingsToggle');
   if (advancedSettingsContent && advancedSettingsToggle) {
@@ -17,11 +19,14 @@ function openNewStreamModal() {
     const icon = advancedSettingsToggle.querySelector('i');
     if (icon) icon.style.transform = '';
   }
+  
   requestAnimationFrame(() => {
     modal.classList.add('active');
   });
+  
   loadGalleryVideos();
 }
+
 function closeNewStreamModal() {
   const modal = document.getElementById('newStreamModal');
   modal.classList.remove('active');
@@ -29,6 +34,7 @@ function closeNewStreamModal() {
   document.body.style.overflow = 'auto';
   
   resetModalForm();
+  
   const advancedSettingsContent = document.getElementById('advancedSettingsContent');
   const advancedSettingsToggle = document.getElementById('advancedSettingsToggle');
   if (advancedSettingsContent && advancedSettingsToggle) {
@@ -43,6 +49,7 @@ function closeNewStreamModal() {
     desktopVideoPlayer = null;
   }
 }
+
 function toggleVideoSelector() {
   const dropdown = document.getElementById('videoSelectorDropdown');
   if (dropdown.classList.contains('hidden')) {
@@ -63,10 +70,12 @@ function toggleVideoSelector() {
     }
   }
 }
+
 function selectVideo(video) {
   selectedVideoData = video;
   const displayText = video.type === 'playlist' ? `[Playlist] ${video.name}` : video.name;
   document.getElementById('selectedVideo').textContent = displayText;
+  
   const videoSelector = document.querySelector('[onclick="toggleVideoSelector()"]');
   videoSelector.classList.remove('border-red-500');
   videoSelector.classList.add('border-gray-600');
@@ -115,11 +124,13 @@ function selectVideo(video) {
   }
   
   document.getElementById('videoSelectorDropdown').classList.add('hidden');
+  
   const hiddenVideoInput = document.getElementById('selectedVideoId');
   if (hiddenVideoInput) {
     hiddenVideoInput.value = video.id;
   }
 }
+
 async function loadGalleryVideos() {
   try {
     const container = document.getElementById('videoListContainer');
@@ -127,11 +138,15 @@ async function loadGalleryVideos() {
       console.error("Video list container not found");
       return;
     }
+    
     container.innerHTML = '<div class="text-center py-3"><i class="ti ti-loader animate-spin mr-2"></i>Loading content...</div>';
+    
     const response = await fetch('/api/stream/content');
     const content = await response.json();
+    
     window.allStreamVideos = content;
     displayFilteredVideos(content);
+    
     const searchInput = document.getElementById('videoSearchInput');
     if (searchInput) {
       searchInput.removeEventListener('input', handleVideoSearch);
@@ -154,27 +169,34 @@ async function loadGalleryVideos() {
     }
   }
 }
+
 function handleVideoSearch(e) {
   const searchTerm = e.target.value.toLowerCase().trim();
   console.log("Searching for:", searchTerm);
+  
   if (!window.allStreamVideos) {
     console.error("No content available for search");
     return;
   }
+  
   if (searchTerm === '') {
     displayFilteredVideos(window.allStreamVideos);
     return;
   }
+  
   const filteredContent = window.allStreamVideos.filter(item =>
     item.name.toLowerCase().includes(searchTerm) ||
     (item.type === 'playlist' && item.description && item.description.toLowerCase().includes(searchTerm))
   );
+  
   console.log(`Found ${filteredContent.length} matching items`);
   displayFilteredVideos(filteredContent);
 }
+
 function displayFilteredVideos(videos) {
   const container = document.getElementById('videoListContainer');
   container.innerHTML = '';
+  
   if (videos && videos.length > 0) {
     videos.forEach(item => {
       const button = document.createElement('button');
@@ -211,6 +233,7 @@ function displayFilteredVideos(videos) {
           </div>
         `;
       }
+      
       container.appendChild(button);
     });
   } else {
@@ -223,9 +246,11 @@ function displayFilteredVideos(videos) {
     `;
   }
 }
+
 function resetModalForm() {
   const form = document.getElementById('newStreamForm');
   form.reset();
+  
   selectedVideoData = null;
   document.getElementById('selectedVideo').textContent = 'Choose a video...';
   
@@ -245,6 +270,7 @@ function resetModalForm() {
     toggleVideoSelector();
   }
 }
+
 function initModal() {
   const modal = document.getElementById('newStreamModal');
   if (!modal) return;
@@ -259,6 +285,7 @@ function initModal() {
     document.addEventListener('click', (e) => {
       const isClickInsideDropdown = videoSelectorDropdown.contains(e.target);
       const isClickOnButton = e.target.closest('[onclick="toggleVideoSelector()"]');
+      
       if (!isClickInsideDropdown && !isClickOnButton && isDropdownOpen) {
         toggleVideoSelector();
       }
@@ -274,14 +301,17 @@ function initModal() {
       }
     }
   });
+  
   modal.addEventListener('touchmove', (e) => {
     if (e.target === modal) {
       e.preventDefault();
     }
   }, { passive: false });
 }
+
 function setVideoOrientation(orientation) {
   currentOrientation = orientation;
+  
   const buttons = document.querySelectorAll('[onclick^="setVideoOrientation"]');
   buttons.forEach(button => {
     if (button.getAttribute('onclick').includes(orientation)) {
@@ -292,25 +322,23 @@ function setVideoOrientation(orientation) {
       button.classList.add('bg-dark-700', 'border-gray-600');
     }
   });
+  
   updateResolutionDisplay();
 }
+
 function updateResolutionDisplay() {
   const select = document.getElementById('resolutionSelect');
   const option = select.options[select.selectedIndex];
   const resolution = option.getAttribute(`data-${currentOrientation}`);
   const quality = option.textContent;
+  
   document.getElementById('currentResolution').textContent = `${resolution} (${quality})`;
 }
-document.addEventListener('DOMContentLoaded', () => {
-  const resolutionSelect = document.getElementById('resolutionSelect');
-  if (resolutionSelect) {
-    resolutionSelect.addEventListener('change', updateResolutionDisplay);
-    setVideoOrientation('horizontal');
-  }
-});
+
 function toggleStreamKeyVisibility() {
   const streamKeyInput = document.getElementById('streamKey');
   const streamKeyToggle = document.getElementById('streamKeyToggle');
+  
   if (streamKeyInput.type === 'password') {
     streamKeyInput.type = 'text';
     streamKeyToggle.className = 'ti ti-eye-off';
@@ -319,61 +347,225 @@ function toggleStreamKeyVisibility() {
     streamKeyToggle.className = 'ti ti-eye';
   }
 }
+
+function validateStreamKeyForPlatform(streamKey, platform) {
+  // Allow duplicate stream keys - user can use the same key for multiple streams
+  // Only one stream can be active at a time (handled by streaming platform)
+  isStreamKeyValid = true;
+  
+  // Remove any existing error messages
+  const streamKeyInput = document.getElementById('streamKey');
+  if (streamKeyInput) {
+    streamKeyInput.classList.remove('border-red-500');
+    streamKeyInput.classList.add('border-gray-600', 'focus:border-primary');
+    
+    const errorMsg = document.getElementById('streamKeyError');
+    if (errorMsg) {
+      errorMsg.remove();
+    }
+  }
+}
+
+// Duration calculation functions
+function calculateDurationFromEndTime(input) {
+  const slot = input.closest('.schedule-slot');
+  const startInput = slot.querySelector('.schedule-time');
+  const endInput = slot.querySelector('.schedule-endtime');
+  const hoursInput = slot.querySelector('.duration-hours');
+  const minutesInput = slot.querySelector('.duration-minutes');
+  const durationInput = slot.querySelector('.schedule-duration');
+  
+  if (!startInput.value || !endInput.value) return;
+  
+  // Parse times
+  const [startHour, startMin] = startInput.value.split(':').map(Number);
+  const [endHour, endMin] = endInput.value.split(':').map(Number);
+  
+  // Calculate duration in minutes
+  let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+  
+  // Handle overnight streams
+  if (durationMinutes < 0) {
+    durationMinutes += 24 * 60;
+  }
+  
+  // Update duration inputs
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+  
+  if (hoursInput) hoursInput.value = hours;
+  if (minutesInput) minutesInput.value = minutes;
+  if (durationInput) durationInput.value = durationMinutes;
+}
+
+function calculateFromDuration(input) {
+  const slot = input.closest('.schedule-slot');
+  const startInput = slot.querySelector('.schedule-time');
+  const endInput = slot.querySelector('.schedule-endtime');
+  const hoursInput = slot.querySelector('.duration-hours');
+  const minutesInput = slot.querySelector('.duration-minutes');
+  const durationInput = slot.querySelector('.schedule-duration');
+  
+  if (!startInput.value) return;
+  
+  // Get duration in minutes
+  const hours = parseInt(hoursInput.value) || 0;
+  const minutes = parseInt(minutesInput.value) || 0;
+  const totalMinutes = hours * 60 + minutes;
+  
+  // Update hidden duration input
+  if (durationInput) durationInput.value = totalMinutes;
+  
+  // Parse start time
+  const [startHour, startMin] = startInput.value.split(':').map(Number);
+  
+  // Calculate end time
+  let endMinutes = startHour * 60 + startMin + totalMinutes;
+  
+  // Handle overflow to next day
+  if (endMinutes >= 24 * 60) {
+    endMinutes = endMinutes % (24 * 60);
+  }
+  
+  const endHour = Math.floor(endMinutes / 60);
+  const endMin = endMinutes % 60;
+  
+  // Format and set end time
+  if (endInput) {
+    endInput.value = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
+  }
+}
+
+function toggleStreamMode(mode) {
+  const streamNowBtn = document.getElementById('streamNowBtn');
+  const streamScheduleBtn = document.getElementById('streamScheduleBtn');
+  const scheduleSection = document.getElementById('scheduleSettingsSection');
+  const scheduleSlotsContainer = document.getElementById('scheduleSlotsContainer');
+  const modeDescription = document.getElementById('streamModeDescription');
+  
+  if (mode === 'now') {
+    // Activate Stream Now
+    streamNowBtn.classList.add('bg-primary', 'text-white');
+    streamNowBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
+    
+    streamScheduleBtn.classList.remove('bg-primary', 'text-white');
+    streamScheduleBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
+    
+    // Hide schedule section
+    if (scheduleSection) scheduleSection.classList.add('hidden');
+    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.add('hidden');
+    
+    // Update description
+    if (modeDescription) {
+      modeDescription.textContent = 'Stream will start immediately after creation';
+    }
+  } else {
+    // Activate Schedule
+    streamScheduleBtn.classList.add('bg-primary', 'text-white');
+    streamScheduleBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
+    
+    streamNowBtn.classList.remove('bg-primary', 'text-white');
+    streamNowBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
+    
+    // Show schedule section
+    if (scheduleSection) scheduleSection.classList.remove('hidden');
+    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.remove('hidden');
+    
+    // Update description
+    if (modeDescription) {
+      modeDescription.textContent = 'Schedule your stream to start automatically at specific times';
+    }
+  }
+}
+
+function updateServerTime() {
+  const serverTimeDisplay = document.getElementById('serverTimeDisplay');
+  if (serverTimeDisplay) {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', {
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    serverTimeDisplay.textContent = `Server time: ${timeString}`;
+  }
+}
+
+// Initialize
 document.addEventListener('DOMContentLoaded', function () {
+  initModal();
+  
+  const resolutionSelect = document.getElementById('resolutionSelect');
+  if (resolutionSelect) {
+    resolutionSelect.addEventListener('change', updateResolutionDisplay);
+    setVideoOrientation('horizontal');
+  }
+  
+  // Update server time every second
+  setInterval(updateServerTime, 1000);
+  updateServerTime();
+  
+  // Platform selector
   const platformSelector = document.getElementById('platformSelector');
   const platformDropdown = document.getElementById('platformDropdown');
   const rtmpInput = document.getElementById('rtmpUrl');
-  if (!platformSelector || !platformDropdown || !rtmpInput) return;
-  platformSelector.addEventListener('click', function (e) {
-    e.stopPropagation();
-    platformDropdown.classList.toggle('hidden');
-  });
-  const platformOptions = document.querySelectorAll('.platform-option');
-  platformOptions.forEach(option => {
-    option.addEventListener('click', function () {
-      const platformUrl = this.getAttribute('data-url');
-      const platformName = this.querySelector('span').textContent;
-      rtmpInput.value = platformUrl;
-      platformDropdown.classList.add('hidden');
-      updatePlatformIcon(this.querySelector('i').className);
+  
+  if (platformSelector && platformDropdown && rtmpInput) {
+    platformSelector.addEventListener('click', function (e) {
+      e.stopPropagation();
+      platformDropdown.classList.toggle('hidden');
     });
-  });
-  document.addEventListener('click', function (e) {
-    if (platformDropdown && !platformDropdown.contains(e.target) &&
-      !platformSelector.contains(e.target)) {
-      platformDropdown.classList.add('hidden');
-    }
-  });
-  function updatePlatformIcon(iconClass) {
-    const currentIcon = platformSelector.querySelector('i');
-    const iconParts = iconClass.split(' ');
-    const brandIconPart = iconParts.filter(part => part.startsWith('ti-'))[0];
-    currentIcon.className = `ti ${brandIconPart} text-center`;
-    if (brandIconPart.includes('youtube')) {
-      currentIcon.classList.add('text-red-500');
-    } else if (brandIconPart.includes('twitch')) {
-      currentIcon.classList.add('text-purple-500');
-    } else if (brandIconPart.includes('facebook')) {
-      currentIcon.classList.add('text-blue-500');
-    } else if (brandIconPart.includes('instagram')) {
-      currentIcon.classList.add('text-pink-500');
-    } else if (brandIconPart.includes('tiktok')) {
-      currentIcon.classList.add('text-white');
-    } else if (brandIconPart.includes('shopee')) {
-      currentIcon.classList.add('text-orange-500');
-    } else if (brandIconPart.includes('live-photo')) {
-      currentIcon.classList.add('text-teal-500');
+    
+    const platformOptions = document.querySelectorAll('.platform-option');
+    platformOptions.forEach(option => {
+      option.addEventListener('click', function () {
+        const platformUrl = this.getAttribute('data-url');
+        const platformName = this.querySelector('span').textContent;
+        rtmpInput.value = platformUrl;
+        platformDropdown.classList.add('hidden');
+        updatePlatformIcon(this.querySelector('i').className);
+      });
+    });
+    
+    document.addEventListener('click', function (e) {
+      if (platformDropdown && !platformDropdown.contains(e.target) &&
+        !platformSelector.contains(e.target)) {
+        platformDropdown.classList.add('hidden');
+      }
+    });
+    
+    function updatePlatformIcon(iconClass) {
+      const currentIcon = platformSelector.querySelector('i');
+      const iconParts = iconClass.split(' ');
+      const brandIconPart = iconParts.filter(part => part.startsWith('ti-'))[0];
+      
+      currentIcon.className = `ti ${brandIconPart} text-center`;
+      
+      if (brandIconPart.includes('youtube')) {
+        currentIcon.classList.add('text-red-500');
+      } else if (brandIconPart.includes('twitch')) {
+        currentIcon.classList.add('text-purple-500');
+      } else if (brandIconPart.includes('facebook')) {
+        currentIcon.classList.add('text-blue-500');
+      } else if (brandIconPart.includes('instagram')) {
+        currentIcon.classList.add('text-pink-500');
+      } else if (brandIconPart.includes('tiktok')) {
+        currentIcon.classList.add('text-white');
+      } else if (brandIconPart.includes('shopee')) {
+        currentIcon.classList.add('text-orange-500');
+      } else if (brandIconPart.includes('live-photo')) {
+        currentIcon.classList.add('text-teal-500');
+      }
     }
   }
-  if (typeof showToast !== 'function') {
-    window.showToast = function (type, message) {
-      console.log(`${type}: ${message}`);
-    }
-  }
+  
+  // Stream key validation
   const streamKeyInput = document.getElementById('streamKey');
   if (streamKeyInput && rtmpInput) {
     rtmpInput.addEventListener('input', function () {
       const url = this.value.toLowerCase();
+      
       if (url.includes('youtube.com')) {
         currentPlatform = 'YouTube';
       } else if (url.includes('facebook.com')) {
@@ -391,152 +583,29 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         currentPlatform = 'Custom';
       }
+      
       if (streamKeyInput.value) {
         validateStreamKeyForPlatform(streamKeyInput.value, currentPlatform);
       }
     });
+    
     streamKeyInput.addEventListener('input', function () {
       clearTimeout(streamKeyTimeout);
       const streamKey = this.value.trim();
+      
       if (!streamKey) {
         return;
       }
+      
       streamKeyTimeout = setTimeout(() => {
         validateStreamKeyForPlatform(streamKey, currentPlatform);
       }, 500);
     });
   }
+  
+  if (typeof showToast !== 'function') {
+    window.showToast = function (type, message) {
+      console.log(`${type}: ${message}`);
+    }
+  }
 });
-function validateStreamKeyForPlatform(streamKey, platform) {
-  // Allow duplicate stream keys - user can use the same key for multiple streams
-  // Only one stream can be active at a time (handled by streaming platform)
-  isStreamKeyValid = true;
-  
-  // Remove any existing error messages
-  const streamKeyInput = document.getElementById('streamKey');
-  if (streamKeyInput) {
-    streamKeyInput.classList.remove('border-red-500');
-    streamKeyInput.classList.add('border-gray-600', 'focus:border-primary');
-    const errorMsg = document.getElementById('streamKeyError');
-    if (errorMsg) {
-      errorMsg.remove();
-    }
-  }
-}
-document.addEventListener('DOMContentLoaded', initModal);
-
-// NOTE: addScheduleSlot() is de
-// This file only contains ms
-
-// Duration Calculation Functions
-function calculateDurationFromEndTime(input) {
-  const slot = input.closest('.schedule-slot');
-  const startInput = sl
-  const endInput = slot.querySelme');
-  const durationInput = slot.querySelector('.
-  
-  if (!startInput.value || return;
-  
-  // Parse times
-  const [sta
-  cons);
-  
-  // Calculate duration ines
-  let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 +in);
-  
-  // Handle 
-  if (
-    durationMinutes += 24 * 60;
-  }
-  
-  // Update duration input
-  durationIninutes;
-}
-
-function calculateEndTim
-  const slot = input.closest('.schedule-slot');
-  const startInput = slot.querySelector('.schedule-time');
-  const endInput = slot.querySelector('.schedtime');
-  const durationI;
-  
-  if (!stan;
-  
-  // Get duration in minutes
-  const totalMinutes = parseInt(durationI;
-  
-  // Parse start time
-  const [startHour, startMin] = startInput.value.split(':').map(Number);
-  
-  // Calculate end time
-  let endMinutes = startHour * 60 + startMin + totalMinutes;
-  
-  // Handle overnext day
-  if (endMinut) {
-    0);
-  }
-  
-  const endHour/ 60);
-  const en60;
-  
-  // Format and set end time
-  0')}`;
-}
-
-function toggleStreamMode(mode) {
-  const streamNowBtn = document');
-  const streamSch);
-  const scheduleSection = document.getElem');
-  const scheduleSlotsContainer = document.getE);
-  const modeDescription = doc);
-  
-  if 
- e
-
-    streamNowBtn.
-    streamScheduleBtn.classList.remove('bg-prima;
-    streamScheduleBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
-  
-    // Hide schedule on
-    if (scheduleSection) scheduleSection.classList.add('hidden');
-    if (scheduleSlhidden');
-    
-    // Update description
-    if (modeDescription) {
-     tream';
-   
-  {
-
-    stream;
-    str);
-    streamNowBtn.classList.remove(-white');
- 00');
-  
-    // Show schedule section
-    if (scheduleSection) scheduleSection.classLi
-  
-    
-    // Update descript
-    if (modeDescripti
-      modeDescription.te;
-    }
-  }
-}
-
-/
-f() {
-;
-  if (serverTimeDisplay) {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  ring}`;
-  }
-}
-
-// Update server time every second
-setInterval(updateServerTime, 1000);
-upe();
