@@ -2855,6 +2855,7 @@
 
         // Multiple Schedule Functions
         function addScheduleSlot() {
+          console.log('[addScheduleSlot] Adding new schedule slot...');
           const container = document.getElementById('scheduleSlotsContainer');
           const slotCount = container.querySelectorAll('.schedule-slot').length;
           const uniqueId = Date.now(); // Unique ID for radio button names
@@ -2898,9 +2899,12 @@
           </div>
         </div>
       `;
+          console.log('[addScheduleSlot] Inserting HTML:', slotHTML.substring(0, 200) + '...');
           container.insertAdjacentHTML('beforeend', slotHTML);
+          console.log('[addScheduleSlot] Attaching recurring day listeners...');
           attachRecurringDayListeners();
           updateRemoveButtons();
+          console.log('[addScheduleSlot] Schedule slot added successfully');
         }
 
         function removeScheduleSlot(button) {
