@@ -3139,6 +3139,13 @@
         function collectEditSchedules() {
           const slots = document.querySelectorAll('#editScheduleSlotsContainer .schedule-slot');
           const schedules = [];
+          
+          // Get today's date in local timezone (not UTC)
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          const todayLocal = `${year}-${month}-${day}`;
 
           slots.forEach(slot => {
             const time = slot.querySelector('.schedule-time').value;
@@ -3154,7 +3161,7 @@
 
             if (time && duration) {
               const schedule = {
-                schedule_time: time,
+                schedule_time: `${todayLocal}T${time}:00`, // Local timezone format
                 duration: parseInt(duration)
               };
               
