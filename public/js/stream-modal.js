@@ -408,38 +408,20 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 function validateStreamKeyForPlatform(streamKey, platform) {
-  if (!streamKey.trim()) {
-    return;
+  // Allow duplicate stream keys - user can use the same key for multiple streams
+  // Only one stream can be active at a time (handled by streaming platform)
+  isStreamKeyValid = true;
+  
+  // Remove any existing error messages
+  const streamKeyInput = document.getElementById('streamKey');
+  if (streamKeyInput) {
+    streamKeyInput.classList.remove('border-red-500');
+    streamKeyInput.classList.add('border-gray-600', 'focus:border-primary');
+    const errorMsg = document.getElementById('streamKeyError');
+    if (errorMsg) {
+      errorMsg.remove();
+    }
   }
-  fetch(`/api/streams/check-key?key=${encodeURIComponent(streamKey)}`)
-    .then(response => response.json())
-    .then(data => {
-      const streamKeyInput = document.getElementById('streamKey');
-      if (data.isInUse) {
-        streamKeyInput.classList.add('border-red-500');
-        streamKeyInput.classList.remove('border-gray-600', 'focus:border-primary');
-        let errorMsg = document.getElementById('streamKeyError');
-        if (!errorMsg) {
-          errorMsg = document.createElement('div');
-          errorMsg.id = 'streamKeyError';
-          errorMsg.className = 'text-xs text-red-500 mt-1';
-          streamKeyInput.parentNode.appendChild(errorMsg);
-        }
-        errorMsg.textContent = 'This stream key is already in use. Please use a different key.';
-        isStreamKeyValid = false;
-      } else {
-        streamKeyInput.classList.remove('border-red-500');
-        streamKeyInput.classList.add('border-gray-600', 'focus:border-primary');
-        const errorMsg = document.getElementById('streamKeyError');
-        if (errorMsg) {
-          errorMsg.remove();
-        }
-        isStreamKeyValid = true;
-      }
-    })
-    .catch(error => {
-      console.error('Error validating stream key:', error);
-    });
 }
 document.addEventListener('DOMContentLoaded', initModal);
 

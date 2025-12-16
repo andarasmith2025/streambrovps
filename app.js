@@ -2106,13 +2106,9 @@ app.post('/api/streams', isAuthenticated, [
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, error: errors.array()[0].msg });
     }
-    const isInUse = await Stream.isStreamKeyInUse(req.body.streamKey, req.session.userId);
-    if (isInUse) {
-      return res.status(400).json({
-        success: false,
-        error: 'This stream key is already in use. Please use a different key.'
-      });
-    }
+    // Allow same stream key for multiple streams
+    // User can use the same YouTube/Facebook key for different scheduled streams
+    // Only one stream can be active at a time with the same key (handled by platform)
     let platform = 'Custom';
     let platform_icon = 'ti-broadcast';
     if (req.body.rtmpUrl.includes('youtube.com')) {
