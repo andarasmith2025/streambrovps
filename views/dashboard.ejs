@@ -2967,17 +2967,15 @@
               const month = String(today.getMonth() + 1).padStart(2, '0');
               const day = String(today.getDate()).padStart(2, '0');
               
-              // Parse as local time
-              const localDateTime = new Date(`${year}-${month}-${day}T${time}:00`);
+              // Format as local time WITHOUT timezone (no 'Z' at end)
+              // This tells the system it's already in local time
+              const localTimeString = `${year}-${month}-${day}T${time}:00.000`;
               
-              // Convert to UTC for storage (backend will handle this universally)
-              const utcDateTime = localDateTime.toISOString();
-              
-              // Get user's timezone for display purposes
+              // Get user's timezone for reference
               const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
               
               const scheduleData = {
-                schedule_time: utcDateTime, // UTC format for universal storage
+                schedule_time: localTimeString, // Local time format (no Z)
                 user_timezone: userTimezone, // Store user's timezone for reference
                 duration: parseInt(duration),
                 is_recurring: isRecurring
@@ -3166,17 +3164,14 @@
               const month = String(today.getMonth() + 1).padStart(2, '0');
               const day = String(today.getDate()).padStart(2, '0');
               
-              // Parse as local time
-              const localDateTime = new Date(`${year}-${month}-${day}T${time}:00`);
-              
-              // Convert to UTC for storage
-              const utcDateTime = localDateTime.toISOString();
+              // Format as local time WITHOUT timezone (no 'Z' at end)
+              const localTimeString = `${year}-${month}-${day}T${time}:00.000`;
               
               // Get user's timezone
               const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
               
               const schedule = {
-                schedule_time: utcDateTime, // UTC format
+                schedule_time: localTimeString, // Local time format (no Z)
                 user_timezone: userTimezone, // User's timezone
                 duration: parseInt(duration)
               };
