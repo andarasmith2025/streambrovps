@@ -518,6 +518,128 @@ function handleRecurringDayClick(e) {
   button.classList.toggle('text-white');
 }
 
+// Select all days in first schedule slot (for initial modal)
+function selectAllDays(button) {
+  const slot = button.closest('.schedule-slot') || document.querySelector('#scheduleSlotsContainer .schedule-slot');
+  if (!slot) return;
+  
+  const dayButtons = slot.querySelectorAll('.recurring-day');
+  const allSelected = Array.from(dayButtons).every(btn => btn.classList.contains('bg-primary'));
+  
+  dayButtons.forEach(btn => {
+    if (allSelected) {
+      // Deselect all
+      btn.classList.remove('bg-primary', 'border-primary', 'text-white');
+    } else {
+      // Select all
+      btn.classList.add('bg-primary', 'border-primary', 'text-white');
+    }
+  });
+}
+
+// Select all days in specific slot (for added slots)
+function selectAllDaysInSlot(button) {
+  const slot = button.closest('.schedule-slot');
+  if (!slot) return;
+  
+  const dayButtons = slot.querySelectorAll('.recurring-day');
+  const allSelected = Array.from(dayButtons).every(btn => btn.classList.contains('bg-primary'));
+  
+  dayButtons.forEach(btn => {
+    if (allSelected) {
+      // Deselect all
+      btn.classList.remove('bg-primary', 'border-primary', 'text-white');
+    } else {
+      // Select all
+      btn.classList.add('bg-primary', 'border-primary', 'text-white');
+    }
+  });
+}
+
+// Select all days in first schedule slot (for initial modal)
+function selectAllDays(button) {
+  const slot = button.closest('.schedule-slot') || document.querySelector('#scheduleSlotsContainer .schedule-slot');
+  if (!slot) return;
+  
+  const dayButtons = slot.querySelectorAll('.recurring-day');
+  const allSelected = Array.from(dayButtons).every(btn => btn.classList.contains('bg-primary'));
+  
+  dayButtons.forEach(btn => {
+    if (allSelected) {
+      // Deselect all
+      btn.classList.remove('bg-primary', 'border-primary', 'text-white');
+    } else {
+      // Select all
+      btn.classList.
+
+// Add schedule slot function
+function addScheduleSlot() {
+  console.log('[addScheduleSlot] Adding new schedule slot...');
+  const container = document.getElementById('scheduleSlotsContainer');
+  const slotCount = container.querySelectorAll('.schedule-slot').length;
+
+  const slotHTML = `
+    <div class="schedule-slot p-2.5 bg-dark-700/50 rounded border border-gray-600">
+      <div class="flex gap-2 items-start mb-2">
+        <div class="flex-1">
+          <label class="text-xs text-gray-400 mb-1 block">Start</label>
+          <input type="time" class="schedule-time w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+        </div>
+        <div class="flex-1">
+          <label class="text-xs text-gray-400 mb-1 block">End</label>
+          <input type="time" class="schedule-endtime w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+        </div>
+        <div class="flex-1">
+          <label class="text-xs text-gray-400 mb-1 block">Duration</label>
+          <div class="flex gap-1">
+            <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="H" onchange="calculateFromDuration(this)">
+            <span class="text-xs text-gray-400 flex items-center">:</span>
+            <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="M" onchange="calculateFromDuration(this)">
+          </div>
+          <input type="hidden" class="schedule-duration" value="60">
+        </div>
+        <div class="pt-5">
+          <button type="button" onclick="removeScheduleSlot(this)" class="h-[32px] w-[32px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded transition-colors">
+            <i class="ti ti-trash text-sm"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="flex gap-2 items-center">
+        <label class="text-xs text-gray-400 flex-shrink-0">Recurring:</label>
+        <div class="flex gap-1 flex-wrap">
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
+        </div>
+        <button type="button" onclick="selectAllDaysInSlot(this)" class="ml-auto px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+          All Days
+        </button>
+      </div>
+    </div>
+  `;
+  
+  console.log('[addScheduleSlot] Inserting HTML...');
+  container.insertAdjacentHTML('beforeend', slotHTML);
+  console.log('[addScheduleSlot] Attaching recurring day listeners...');
+  attachRecurringDayListeners();
+  console.log('[addScheduleSlot] Schedule slot added successfully');
+}
+
+function removeScheduleSlot(button) {
+  const slot = button.closest('.schedule-slot');
+  const container = document.getElementById('scheduleSlotsContainer');
+
+  // Don't allow removing if only one slot left
+  if (container.querySelectorAll('.schedule-slot').length > 1) {
+    slot.remove();
+  }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function () {
   initModal();

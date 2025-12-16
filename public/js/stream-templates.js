@@ -158,20 +158,15 @@ async function loadTemplate(templateId) {
           calculateFromDuration(slot.querySelector('.duration-hours'));
         }
         
-        // Set recurring
-        if (schedule.is_recurring) {
-          const recurringCheckbox = slot.querySelector('.schedule-recurring');
-          recurringCheckbox.checked = true;
-          toggleRecurringDays(recurringCheckbox);
-          
-          // Set recurring days
-          if (schedule.recurring_days) {
-            const days = schedule.recurring_days.split(',');
-            days.forEach(day => {
-              const dayCheckbox = slot.querySelector(`.recurring-day[value="${day}"]`);
-              if (dayCheckbox) dayCheckbox.checked = true;
-            });
-          }
+        // Set recurring days (using buttons now, not checkboxes)
+        if (schedule.is_recurring && schedule.recurring_days) {
+          const days = schedule.recurring_days.split(',');
+          days.forEach(day => {
+            const dayButton = slot.querySelector(`.recurring-day[data-day="${day}"]`);
+            if (dayButton) {
+              dayButton.classList.add('bg-primary', 'border-primary', 'text-white');
+            }
+          });
         }
       });
     }
@@ -199,14 +194,22 @@ async function saveAsTemplate() {
   const schedules = [];
   document.querySelectorAll('.schedule-slot').forEach(slot => {
     const time = slot.querySelector('.schedule-time')?.value;
-    const duration = parseInt(slot.querySelector('.schedule-duration')?.value) || 0;
-    const isRecurring = slot.querySelector('.schedule-recurring')?.checked;
+    
+    // Get duration from hours and minutes inputs
+    const hoursInput = slot.querySelector('.duration-hours');
+    const minutesInput = slot.querySelector('.duration-minutes');
+    const hours = parseInt(hoursInput?.value) || 0;
+    const minutes = parseInt(minutesInput?.value) || 0;
+    const duration = hours * 60 + minutes;
+    
+    // Check if any recurring day button is selected
+    const selectedDayButtons = Array.from(slot.querySelectorAll('.recurring-day.bg-primary'));
+    const isRecurring = selectedDayButtons.length > 0;
     
     let recurringDays = '';
     if (isRecurring) {
-      const checkedDays = Array.from(slot.querySelectorAll('.recurring-day:checked'))
-        .map(cb => cb.value);
-      recurringDays = checkedDays.join(',');
+      const selectedDays = selectedDayButtons.map(btn => btn.getAttribute('data-day'));
+      recurringDays = selectedDays.join(',');
     }
     
     if (time) {
