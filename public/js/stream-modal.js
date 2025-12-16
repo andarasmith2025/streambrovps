@@ -425,168 +425,44 @@ function validateStreamKeyForPlatform(streamKey, platform) {
 }
 document.addEventListener('DOMContentLoaded', initModal);
 
-// Schedule Management Functions
-function addScheduleSlot() {
-  const container = document.getElementById('scheduleSlotsContainer');
-  const newSlot = document.createElement('div');
-  newSlot.className = 'schedule-slot p-2.5 bg-dark-700/50 rounded border border-gray-600';
-  newSlot.innerHTML = `
-    <!-- Time & Duration Row -->
-    <div class="flex gap-2 items-start mb-2">
-      <!-- Start Time -->
-      <div class="flex-1">
-        <label class="text-xs text-gray-400 mb-1 block">Start</label>
-        <input type="time" class="schedule-time w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary focus:ring-1 focus:ring-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
-      </div>
-      
-      <!-- End Time -->
-      <div class="flex-1">
-        <label class="text-xs text-gray-400 mb-1 block">End</label>
-        <input type="time" class="schedule-endtime w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary focus:ring-1 focus:ring-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
-      </div>
-      
-      <!-- Duration Input (Hours & Minutes) -->
-      <div class="flex-1">
-        <label class="text-xs text-gray-400 mb-1 block">Duration</label>
-        <div class="flex gap-1">
-          <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary focus:ring-1 focus:ring-primary text-xs text-center" placeholder="H" onchange="calculateFromDuration(this)">
-          <span class="text-xs text-gray-400 flex items-center">:</span>
-          <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary focus:ring-1 focus:ring-primary text-xs text-center" placeholder="M" onchange="calculateFromDuration(this)">
-        </div>
-        <input type="hidden" class="schedule-duration" value="60">
-      </div>
-      
-      <!-- Delete Button -->
-      <div class="pt-5">
-        <button type="button" onclick="removeScheduleSlot(this)" 
-          class="h-[32px] w-[32px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded transition-colors">
-          <i class="ti ti-trash text-sm"></i>
-        </button>
-      </div>
-    </div>
-    
-    <!-- Recurring Toggle -->
-    <div class="flex items-center gap-2 mb-2">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" class="schedule-recurring w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700" onchange="toggleRecurringDays(this)">
-        <span class="text-xs text-gray-300">Recurring</span>
-      </label>
-    </div>
-    
-    <!-- Recurring Days (Hidden by default) -->
-    <div class="recurring-days-container hidden">
-      <div class="text-xs text-gray-400 mb-1.5">Repeat on:</div>
-      <div class="flex flex-wrap gap-1.5">
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="1">
-          <span>Mon</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="2">
-          <span>Tue</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="3">
-          <span>Wed</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="4">
-          <span>Thu</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="5">
-          <span>Fri</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="6">
-          <span>Sat</span>
-        </label>
-        <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-          <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="0">
-          <span>Sun</span>
-        </label>
-      </div>
-    </div>
-  `;
-  container.appendChild(newSlot);
-}
-
-function removeScheduleSlot(button) {
-  const slot = button.closest('.schedule-slot');
-  const container = document.getElementById('scheduleSlotsContainer');
-  
-  // Prevent removing the last schedule slot
-  if (container.querySelectorAll('.schedule-slot').length > 1) {
-    slot.remove();
-  } else {
-    showNotification('Cannot Remove', 'At least one schedule slot is required', 'warning');
-  }
-}
-
-function toggleRecurringDays(checkbox) {
-  const slot = checkbox.closest('.schedule-slot');
-  const daysContainer = slot.querySelector('.recurring-days-container');
-  
-  if (checkbox.checked) {
-    daysContainer.classList.remove('hidden');
-  } else {
-    daysContainer.classList.add('hidden');
-    // Uncheck all day checkboxes
-    const dayCheckboxes = daysContainer.querySelectorAll('.recurring-day');
-    dayCheckboxes.forEach(cb => cb.checked = false);
-  }
-}
+// NOTE: addScheduleSlot() is de
+// This file only contains ms
 
 // Duration Calculation Functions
 function calculateDurationFromEndTime(input) {
   const slot = input.closest('.schedule-slot');
-  const startInput = slot.querySelector('.schedule-time');
-  const endInput = slot.querySelector('.schedule-endtime');
-  const durationHoursInput = slot.querySelector('.duration-hours');
-  const durationMinutesInput = slot.querySelector('.duration-minutes');
-  const hiddenDurationInput = slot.querySelector('.schedule-duration');
+  const startInput = sl
+  const endInput = slot.querySelme');
+  const durationInput = slot.querySelector('.
   
-  if (!startInput.value || !endInput.value) return;
+  if (!startInput.value || return;
   
   // Parse times
-  const [startHour, startMin] = startInput.value.split(':').map(Number);
-  const [endHour, endMin] = endInput.value.split(':').map(Number);
+  const [sta
+  cons);
   
-  // Calculate duration in minutes
-  let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+  // Calculate duration ines
+  let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 +in);
   
-  // Handle next day scenario
-  if (durationMinutes < 0) {
+  // Handle 
+  if (
     durationMinutes += 24 * 60;
   }
   
-  // Convert to hours and minutes
-  const hours = Math.floor(durationMinutes / 60);
-  const minutes = durationMinutes % 60;
-  
-  // Update duration inputs
-  durationHoursInput.value = hours;
-  durationMinutesInput.value = minutes;
-  hiddenDurationInput.value = durationMinutes;
+  // Update duration input
+  durationIninutes;
 }
 
-function calculateFromDuration(input) {
+function calculateEndTim
   const slot = input.closest('.schedule-slot');
   const startInput = slot.querySelector('.schedule-time');
-  const endInput = slot.querySelector('.schedule-endtime');
-  const durationHoursInput = slot.querySelector('.duration-hours');
-  const durationMinutesInput = slot.querySelector('.duration-minutes');
-  const hiddenDurationInput = slot.querySelector('.schedule-duration');
+  const endInput = slot.querySelector('.schedtime');
+  const durationI;
   
-  if (!startInput.value) return;
+  if (!stan;
   
-  // Get duration in hours and minutes
-  const hours = parseInt(durationHoursInput.value) || 0;
-  const minutes = parseInt(durationMinutesInput.value) || 0;
-  
-  // Calculate total duration in minutes
-  const totalMinutes = hours * 60 + minutes;
-  hiddenDurationInput.value = totalMinutes;
+  // Get duration in minutes
+  const totalMinutes = parseInt(durationI;
   
   // Parse start time
   const [startHour, startMin] = startInput.value.split(':').map(Number);
@@ -594,73 +470,73 @@ function calculateFromDuration(input) {
   // Calculate end time
   let endMinutes = startHour * 60 + startMin + totalMinutes;
   
-  // Handle overflow to next day
-  if (endMinutes >= 24 * 60) {
-    endMinutes = endMinutes % (24 * 60);
+  // Handle overnext day
+  if (endMinut) {
+    0);
   }
   
-  const endHour = Math.floor(endMinutes / 60);
-  const endMin = endMinutes % 60;
+  const endHour/ 60);
+  const en60;
   
   // Format and set end time
-  endInput.value = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
+  0')}`;
 }
 
 function toggleStreamMode(mode) {
-  const streamNowBtn = document.getElementById('streamNowBtn');
-  const streamScheduleBtn = document.getElementById('streamScheduleBtn');
-  const scheduleSection = document.getElementById('scheduleSettingsSection');
-  const scheduleSlotsContainer = document.getElementById('scheduleSlotsContainer');
-  const modeDescription = document.getElementById('streamModeDescription');
+  const streamNowBtn = document');
+  const streamSch);
+  const scheduleSection = document.getElem');
+  const scheduleSlotsContainer = document.getE);
+  const modeDescription = doc);
   
-  if (mode === 'now') {
-    // Activate Stream Now mode
-    streamNowBtn.classList.add('bg-primary', 'text-white');
-    streamNowBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
-    streamScheduleBtn.classList.remove('bg-primary', 'text-white');
+  if 
+ e
+
+    streamNowBtn.
+    streamScheduleBtn.classList.remove('bg-prima;
     streamScheduleBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
-    
-    // Hide schedule section
+  
+    // Hide schedule on
     if (scheduleSection) scheduleSection.classList.add('hidden');
-    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.add('hidden');
+    if (scheduleSlhidden');
     
     // Update description
     if (modeDescription) {
-      modeDescription.textContent = 'Stream will start immediately when you click Create Stream';
-    }
-  } else {
-    // Activate Schedule mode
-    streamScheduleBtn.classList.add('bg-primary', 'text-white');
-    streamScheduleBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
-    streamNowBtn.classList.remove('bg-primary', 'text-white');
-    streamNowBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
-    
+     tream';
+   
+  {
+
+    stream;
+    str);
+    streamNowBtn.classList.remove(-white');
+ 00');
+  
     // Show schedule section
-    if (scheduleSection) scheduleSection.classList.remove('hidden');
-    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.remove('hidden');
+    if (scheduleSection) scheduleSection.classLi
+  
     
-    // Update description
-    if (modeDescription) {
-      modeDescription.textContent = 'Schedule your stream to start automatically at specific times';
+    // Update descript
+    if (modeDescripti
+      modeDescription.te;
     }
   }
 }
 
-// Update server time display
-function updateServerTime() {
-  const serverTimeDisplay = document.getElementById('serverTimeDisplay');
+/
+f() {
+;
   if (serverTimeDisplay) {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
+    const timeString = now.toLocaleTimeString('
       hour12: false, 
       hour: '2-digit', 
       minute: '2-digit',
       second: '2-digit'
     });
-    serverTimeDisplay.textContent = `Server time: ${timeString}`;
+  ring}`;
   }
 }
 
 // Update server time every second
 setInterval(updateServerTime, 1000);
-updateServerTime();
+upe();
