@@ -47,7 +47,7 @@ function parseScheduleTime(scheduleTimeStr) {
   
   // Check if it's time-only format (HH:MM or HH:MM:SS)
   if (scheduleTimeStr.includes(':') && !scheduleTimeStr.includes('T') && !scheduleTimeStr.includes('-')) {
-    // Time only format - create datetime for today
+    // Time only format - create datetime for today in local timezone
     const today = new Date();
     const timeParts = scheduleTimeStr.split(':');
     const hours = parseInt(timeParts[0]);
@@ -58,14 +58,27 @@ function parseScheduleTime(scheduleTimeStr) {
     }
     
     today.setHours(hours, minutes, 0, 0);
-    return today.toISOString();
+    
+    // Return in local timezone format (YYYY-MM-DDTHH:MM:SS)
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const hour = String(today.getHours()).padStart(2, '0');
+    const minute = String(today.getMinutes()).padStart(2, '0');
+    const second = String(today.getSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
   } else {
-    // Full datetime format
+    // Full datetime format - keep as is (already in local timezone from frontend)
+    // Just validate it's a valid date
     const parsedDate = new Date(scheduleTimeStr);
     if (isNaN(parsedDate.getTime())) {
       throw new Error(`Invalid datetime format: ${scheduleTimeStr}`);
     }
-    return parsedDate.toISOString();
+    
+    // Return the original string (local timezone format)
+    // Remove any timezone info if present
+    return scheduleTimeStr.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
   }
 }
 

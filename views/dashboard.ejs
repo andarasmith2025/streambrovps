@@ -2348,8 +2348,14 @@
             }
 
             if (stream.schedule_time) {
+              // Parse as local time, not UTC
               const scheduleDate = new Date(stream.schedule_time);
-              const formattedDate = scheduleDate.toISOString().slice(0, 16);
+              const year = scheduleDate.getFullYear();
+              const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+              const day = String(scheduleDate.getDate()).padStart(2, '0');
+              const hours = String(scheduleDate.getHours()).padStart(2, '0');
+              const minutes = String(scheduleDate.getMinutes()).padStart(2, '0');
+              const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
               safeSetValue('editScheduleTime', formattedDate);
             } else {
               safeSetValue('editScheduleTime', '');
@@ -2950,7 +2956,13 @@
         function collectSchedules() {
           const slots = document.querySelectorAll('#scheduleSlotsContainer .schedule-slot');
           const schedules = [];
-          const today = new Date().toISOString().split('T')[0]; // Get today's date
+          
+          // Get today's date in local timezone (not UTC)
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          const todayLocal = `${year}-${month}-${day}`;
 
           slots.forEach(slot => {
             const time = slot.querySelector('.schedule-time').value;
@@ -2959,7 +2971,7 @@
 
             if (time && duration) {
               const scheduleData = {
-                schedule_time: `${today}T${time}`, // Combine today's date with time
+                schedule_time: `${todayLocal}T${time}:00`, // Local timezone format
                 duration: parseInt(duration),
                 is_recurring: isRecurring
               };
