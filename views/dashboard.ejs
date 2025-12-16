@@ -418,63 +418,21 @@
                         </div>
                       </div>
 
-                      <!-- Recurring Toggle -->
-                      <div class="flex items-center gap-2 mb-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox"
-                            class="schedule-recurring w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700"
-                            onchange="toggleRecurringDays(this)">
-                          <span class="text-xs text-gray-300">Recurring</span>
-                        </label>
-                      </div>
-
-                      <!-- Recurring Days (Hidden by default) -->
-                      <div class="recurring-days-container hidden">
-                        <div class="text-xs text-gray-400 mb-1.5">Repeat on:</div>
-                        <div class="flex flex-wrap gap-1.5">
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="1">
-                            <span>Mon</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="2">
-                            <span>Tue</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="3">
-                            <span>Wed</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="4">
-                            <span>Thu</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="5">
-                            <span>Fri</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="6">
-                            <span>Sat</span>
-                          </label>
-                          <label
-                            class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                            <input type="checkbox"
-                              class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="0">
-                            <span>Sun</span>
-                          </label>
+                      <!-- Recurring Days -->
+                      <div class="flex gap-2 items-center">
+                        <label class="text-xs text-gray-400 flex-shrink-0">Recurring:</label>
+                        <div class="flex gap-1 flex-wrap">
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
+                          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
                         </div>
+                        <button type="button" onclick="selectAllDays(this)" class="ml-auto px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                          All Days
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2895,19 +2853,6 @@
           endTimeInput.value = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
         }
 
-        // Recurring Days Toggle
-        function toggleRecurringDays(checkbox) {
-          const slot = checkbox.closest('.schedule-slot');
-          const daysContainer = slot.querySelector('.recurring-days-container');
-          if (checkbox.checked) {
-            daysContainer.classList.remove('hidden');
-          } else {
-            daysContainer.classList.add('hidden');
-            // Uncheck all days
-            daysContainer.querySelectorAll('.recurring-day').forEach(cb => cb.checked = false);
-          }
-        }
-
         // Multiple Schedule Functions
         function addScheduleSlot() {
           const container = document.getElementById('scheduleSlotsContainer');
@@ -2936,42 +2881,25 @@
             </div>
           </div>
           
-          <div class="flex items-center gap-2 mb-2">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" class="schedule-recurring w-4 h-4 rounded border-gray-600 text-primary bg-dark-700" onchange="toggleRecurringDays(this)">
-              <span class="text-xs text-gray-300">Recurring</span>
-            </label>
-          </div>
-          
-          <div class="recurring-days-container hidden">
-            <div class="text-xs text-gray-400 mb-1.5">Repeat on:</div>
-            <div class="flex flex-wrap gap-1.5">
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="1"><span>Mon</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="2"><span>Tue</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="3"><span>Wed</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="4"><span>Thu</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="5"><span>Fri</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="6"><span>Sat</span>
-              </label>
-              <label class="flex items-center gap-1 px-2 py-1 bg-dark-700 border border-gray-600 rounded text-xs cursor-pointer hover:border-primary transition-colors">
-                <input type="checkbox" class="recurring-day w-3 h-3 rounded border-gray-600 text-primary focus:ring-0" value="0"><span>Sun</span>
-              </label>
+          <div class="flex gap-2 items-center">
+            <label class="text-xs text-gray-400 flex-shrink-0">Recurring:</label>
+            <div class="flex gap-1 flex-wrap">
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
+              <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
             </div>
+            <button type="button" onclick="selectAllDaysInSlot(this)" class="ml-auto px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+              All Days
+            </button>
           </div>
         </div>
       `;
           container.insertAdjacentHTML('beforeend', slotHTML);
+          attachRecurringDayListeners();
           updateRemoveButtons();
         }
 
@@ -2984,6 +2912,63 @@
             slot.remove();
             updateRemoveButtons();
           }
+        }
+
+        // Attach recurring day listeners for new stream modal
+        function attachRecurringDayListeners() {
+          const container = document.getElementById('scheduleSlotsContainer');
+          if (!container) return;
+
+          container.querySelectorAll('.recurring-day').forEach(button => {
+            button.removeEventListener('click', handleRecurringDayClick);
+            button.addEventListener('click', handleRecurringDayClick);
+          });
+        }
+
+        function handleRecurringDayClick(e) {
+          e.preventDefault();
+          const button = e.currentTarget;
+          button.classList.toggle('bg-primary');
+          button.classList.toggle('border-primary');
+          button.classList.toggle('text-white');
+        }
+
+        // Select all days in first schedule slot (for initial modal)
+        function selectAllDays(button) {
+          const slot = button.closest('.schedule-slot') || document.querySelector('#scheduleSlotsContainer .schedule-slot');
+          if (!slot) return;
+          
+          const dayButtons = slot.querySelectorAll('.recurring-day');
+          const allSelected = Array.from(dayButtons).every(btn => btn.classList.contains('bg-primary'));
+          
+          dayButtons.forEach(btn => {
+            if (allSelected) {
+              // Deselect all
+              btn.classList.remove('bg-primary', 'border-primary', 'text-white');
+            } else {
+              // Select all
+              btn.classList.add('bg-primary', 'border-primary', 'text-white');
+            }
+          });
+        }
+
+        // Select all days in specific slot (for added slots)
+        function selectAllDaysInSlot(button) {
+          const slot = button.closest('.schedule-slot');
+          if (!slot) return;
+          
+          const dayButtons = slot.querySelectorAll('.recurring-day');
+          const allSelected = Array.from(dayButtons).every(btn => btn.classList.contains('bg-primary'));
+          
+          dayButtons.forEach(btn => {
+            if (allSelected) {
+              // Deselect all
+              btn.classList.remove('bg-primary', 'border-primary', 'text-white');
+            } else {
+              // Select all
+              btn.classList.add('bg-primary', 'border-primary', 'text-white');
+            }
+          });
         }
 
         function updateRemoveButtons() {
@@ -3008,10 +2993,22 @@
 
             if (time && duration) {
               // Create datetime in user's local timezone
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, '0');
-              const day = String(today.getDate()).padStart(2, '0');
+              const now = new Date();
+              const [hours, minutes] = time.split(':').map(Number);
+              
+              // Create schedule date starting from today
+              let scheduleDate = new Date();
+              scheduleDate.setHours(hours, minutes, 0, 0);
+              
+              // If time has already passed today AND it's not recurring, use tomorrow
+              if (!isRecurring && scheduleDate <= now) {
+                scheduleDate.setDate(scheduleDate.getDate() + 1);
+                console.log(`[Schedule] Time ${time} has passed today, scheduling for tomorrow`);
+              }
+              
+              const year = scheduleDate.getFullYear();
+              const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+              const day = String(scheduleDate.getDate()).padStart(2, '0');
               
               // Format as local time WITHOUT timezone (no 'Z' at end)
               // This tells the system it's already in local time
@@ -3020,6 +3017,8 @@
               // Get user's timezone for reference
               const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
               
+              console.log(`[Schedule] Created schedule: ${localTimeString} (${userTimezone})`);
+              
               const scheduleData = {
                 schedule_time: localTimeString, // Local time format (no Z)
                 user_timezone: userTimezone, // Store user's timezone for reference
@@ -3027,13 +3026,18 @@
                 is_recurring: isRecurring
               };
 
-              // Collect recurring days if recurring is enabled
-              if (isRecurring) {
-                const days = [];
-                slot.querySelectorAll('.recurring-day:checked').forEach(cb => {
-                  days.push(parseInt(cb.value));
-                });
-                scheduleData.recurring_days = days.join(','); // "1,2,3,4,5" for Mon-Fri
+              // Collect recurring days from selected buttons
+              const selectedDays = [];
+              slot.querySelectorAll('.recurring-day').forEach(btn => {
+                if (btn.classList.contains('bg-primary')) {
+                  selectedDays.push(btn.dataset.day);
+                }
+              });
+              
+              // If any days are selected, mark as recurring
+              if (selectedDays.length > 0) {
+                scheduleData.is_recurring = true;
+                scheduleData.recurring_days = selectedDays.join(',');
               }
 
               schedules.push(scheduleData);
@@ -3205,16 +3209,33 @@
 
             if (time && duration) {
               // Create datetime in user's local timezone
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, '0');
-              const day = String(today.getDate()).padStart(2, '0');
+              const now = new Date();
+              const [hours, minutes] = time.split(':').map(Number);
+              
+              // Check if it's recurring
+              const isRecurring = selectedDays.length > 0;
+              
+              // Create schedule date starting from today
+              let scheduleDate = new Date();
+              scheduleDate.setHours(hours, minutes, 0, 0);
+              
+              // If time has already passed today AND it's not recurring, use tomorrow
+              if (!isRecurring && scheduleDate <= now) {
+                scheduleDate.setDate(scheduleDate.getDate() + 1);
+                console.log(`[Edit Schedule] Time ${time} has passed today, scheduling for tomorrow`);
+              }
+              
+              const year = scheduleDate.getFullYear();
+              const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+              const day = String(scheduleDate.getDate()).padStart(2, '0');
               
               // Format as local time WITHOUT timezone (no 'Z' at end)
               const localTimeString = `${year}-${month}-${day}T${time}:00.000`;
               
               // Get user's timezone
               const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              
+              console.log(`[Edit Schedule] Created schedule: ${localTimeString} (${userTimezone})`);
               
               const schedule = {
                 schedule_time: localTimeString, // Local time format (no Z)
@@ -3223,7 +3244,7 @@
               };
               
               // Add recurring info if days are selected
-              if (selectedDays.length > 0) {
+              if (isRecurring) {
                 schedule.is_recurring = true;
                 schedule.recurring_days = selectedDays.join(',');
               }
@@ -3406,6 +3427,9 @@
               }
             });
           }
+          
+          // Initialize recurring day listeners for initial schedule slot
+          attachRecurringDayListeners();
         });
       </script>
 
