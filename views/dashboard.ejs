@@ -102,6 +102,15 @@
               <i class="ti ti-refresh text-sm"></i>
               <span>Auto-refresh: <span id="refreshInterval">--</span></span>
             </div>
+            <!-- Time Format Toggle -->
+            <div class="flex items-center gap-2 ml-auto">
+              <span class="text-xs text-gray-400">Time Format:</span>
+              <button id="timeFormatToggle" onclick="toggleTimeFormat()" 
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-colors text-xs">
+                <i class="ti ti-clock text-sm"></i>
+                <span id="timeFormatLabel">24h</span>
+              </button>
+            </div>
             <!-- Bulk Actions (Hidden by default) -->
             <div id="bulkActionsContainer" class="hidden flex items-center gap-2">
               <span class="text-sm text-gray-400" id="selectedCount">0 selected</span>
@@ -1746,6 +1755,9 @@
           // Assign to global scope
           createStreamTableRow = _createStreamTableRow;
           
+          // Initialize time format toggle
+          initTimeFormatToggle();
+          
           // Now load streams after functions are assigned
           loadStreams();
           
@@ -1755,13 +1767,52 @@
           }
           function formatTime(date) {
             if (!date) return '';
-
-            return date.toLocaleTimeString('en-US', {
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false
-            });
+            return formatTimeDisplay(date);
+          }
+          
+          // Time format preference (stored in localStorage)
+          let timeFormat24h = localStorage.getItem('timeFormat24h') !== 'false'; // default to 24h
+          
+          // Initialize time format toggle on page load
+          function initTimeFormatToggle() {
+            updateTimeFormatLabel();
+          }
+          
+          // Toggle between 12h and 24h format
+          function toggleTimeFormat() {
+            timeFormat24h = !timeFormat24h;
+            localStorage.setItem('timeFormat24h', timeFormat24h);
+            updateTimeFormatLabel();
+            loadStreams(); // Reload table with new format
+          }
+          
+          // Update toggle button label
+          function updateTimeFormatLabel() {
+            const label = document.getElementById('timeFormatLabel');
+            if (label) {
+              label.textContent = timeFormat24h ? '24h' : '12h';
+            }
+          }
+          
+          // Format time based on user preference
+          function formatTimeDisplay(date) {
+            if (!date) return '--:--';
+            
+            if (timeFormat24h) {
+              // 24-hour format: 16:30
+              return date.toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              });
+            } else {
+              // 12-hour format: 04:30 PM
+              return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              });
+            }
           }
           
           // Helper function to parse schedule_time correctly
@@ -1945,8 +1996,8 @@
                 // If has schedule, show info instead of Start button
                 if (hasSchedule) {
                   const schedule = stream.schedules[0];
-                  const scheduleTime = new Date(schedule.schedule_time);
-                  const timeStr = scheduleTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  const scheduleTime = parseScheduleTime(schedule.schedule_time);
+                  const timeStr = formatTimeDisplay(scheduleTime);
                   
                   return `
             <div class="flex items-center gap-2 text-xs">
