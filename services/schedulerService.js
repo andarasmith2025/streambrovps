@@ -63,13 +63,24 @@ async function checkScheduledStreams() {
               scheduleMinute = parseInt(timeParts[1]);
               console.log(`[Scheduler] Parsed time string: ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
             } else if (schedule.schedule_time.includes('T')) {
-              // ISO datetime format: "YYYY-MM-DDTHH:MM:SS"
-              // Parse as local time by extracting time components directly
-              const timePart = schedule.schedule_time.split('T')[1];
-              const timeParts = timePart.split(':');
-              scheduleHour = parseInt(timeParts[0]);
-              scheduleMinute = parseInt(timeParts[1]);
-              console.log(`[Scheduler] Parsed datetime (local): ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+              // ISO datetime format: "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DDTHH:MM:SS.000Z"
+              // IMPORTANT: If it has 'Z' at the end, it's UTC and needs conversion to local
+              // If no 'Z', it's already local time
+              
+              if (schedule.schedule_time.endsWith('Z')) {
+                // UTC format - convert to local time
+                const utcDate = new Date(schedule.schedule_time);
+                scheduleHour = utcDate.getHours();
+                scheduleMinute = utcDate.getMinutes();
+                console.log(`[Scheduler] Parsed datetime (UTC->Local): ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+              } else {
+                // Local format - extract time directly
+                const timePart = schedule.schedule_time.split('T')[1].split('.')[0]; // Remove .000 if exists
+                const timeParts = timePart.split(':');
+                scheduleHour = parseInt(timeParts[0]);
+                scheduleMinute = parseInt(timeParts[1]);
+                console.log(`[Scheduler] Parsed datetime (local): ${schedule.schedule_time} -> ${scheduleHour}:${scheduleMinute}`);
+              }
             } else {
               console.log(`[Scheduler] ✗ Could not parse schedule_time: ${schedule.schedule_time}`);
               continue;
