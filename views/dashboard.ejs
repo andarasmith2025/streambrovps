@@ -1693,7 +1693,7 @@
           ${stream.schedules && stream.schedules.length > 0
                 ? stream.schedules.sort((a, b) => new Date(a.schedule_time) - new Date(b.schedule_time))
                   .map((sch, idx) => {
-                    const schStart = new Date(sch.schedule_time);
+                    const schStart = parseScheduleTime(sch.schedule_time);
                     return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''}">
                     <i class="ti ti-clock text-gray-400 text-xs mr-1.5"></i>
                     <span class="text-sm">${formatTime(schStart)}</span>
@@ -1708,7 +1708,7 @@
           ${stream.schedules && stream.schedules.length > 0
                 ? stream.schedules.sort((a, b) => new Date(a.schedule_time) - new Date(b.schedule_time))
                   .map((sch, idx) => {
-                    const schEnd = new Date(sch.schedule_time);
+                    const schEnd = parseScheduleTime(sch.schedule_time);
                     schEnd.setMinutes(schEnd.getMinutes() + parseInt(sch.duration));
                     return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''}">
                     <i class="ti ti-clock-stop text-gray-400 mr-1.5 text-xs"></i>
