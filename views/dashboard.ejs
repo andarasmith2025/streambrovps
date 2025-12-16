@@ -1765,13 +1765,29 @@
             if (!date) return '';
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
           }
-          function formatTime(date) {
-            if (!date) return '';
-            return formatTimeDisplay(date);
-          }
-          
           // Time format preference (stored in localStorage)
           let timeFormat24h = localStorage.getItem('timeFormat24h') !== 'false'; // default to 24h
+          
+          // Format time based on user preference
+          function formatTimeDisplay(date) {
+            if (!date) return '--:--';
+            
+            if (timeFormat24h) {
+              // 24-hour format: 16:30
+              return date.toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              });
+            } else {
+              // 12-hour format: 04:30 PM
+              return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              });
+            }
+          }
           
           // Initialize time format toggle on page load
           function initTimeFormatToggle() {
@@ -1794,25 +1810,9 @@
             }
           }
           
-          // Format time based on user preference
-          function formatTimeDisplay(date) {
-            if (!date) return '--:--';
-            
-            if (timeFormat24h) {
-              // 24-hour format: 16:30
-              return date.toLocaleTimeString('en-GB', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              });
-            } else {
-              // 12-hour format: 04:30 PM
-              return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              });
-            }
+          function formatTime(date) {
+            if (!date) return '';
+            return formatTimeDisplay(date);
           }
           
           // Helper function to parse schedule_time correctly
