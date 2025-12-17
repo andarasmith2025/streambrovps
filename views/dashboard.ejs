@@ -1651,6 +1651,27 @@
           ${stream.schedules && stream.schedules.length > 0
                 ? stream.schedules.sort((a, b) => new Date(a.schedule_time) - new Date(b.schedule_time))
                   .map((sch, idx) => {
+                    // Check if this schedule is currently active
+                    const now = new Date();
+                    const schStart = parseScheduleTime(sch.schedule_time);
+                    const schEnd = new Date(schStart.getTime() + (parseInt(sch.duration) * 60 * 1000));
+                    let isActive = false;
+                    
+                    if (stream.status === 'live') {
+                      if (sch.is_recurring && sch.recurring_days) {
+                        const currentDay = now.getDay();
+                        const allowedDays = sch.recurring_days.split(',').map(d => parseInt(d));
+                        if (allowedDays.includes(currentDay)) {
+                          const nowTime = now.getHours() * 60 + now.getMinutes();
+                          const startTime = schStart.getHours() * 60 + schStart.getMinutes();
+                          const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
+                          isActive = nowTime >= startTime && nowTime < endTime;
+                        }
+                      } else {
+                        isActive = now >= schStart && now < schEnd;
+                      }
+                    }
+                    
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                     let recurringInfo = '';
                     if (sch.is_recurring && sch.recurring_days) {
@@ -1678,14 +1699,18 @@
                       }
                       
                       recurringInfo = `<div class="flex items-center gap-1 mt-0.5">
-                      <i class="ti ti-repeat text-blue-400 text-xs"></i>
-                      <span class="text-xs text-blue-400">${dayLabel}</span>
+                      <i class="ti ti-repeat ${isActive ? 'text-green-400' : 'text-blue-400'} text-xs"></i>
+                      <span class="text-xs ${isActive ? 'text-green-400 font-semibold' : 'text-blue-400'}">${dayLabel}</span>
+                      ${isActive ? '<span class="ml-1 px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">ACTIVE</span>' : ''}
                     </div>`;
                     } else {
                       const schDate = new Date(sch.schedule_time);
-                      recurringInfo = `<div class="text-xs text-gray-500">${formatDate(schDate)}</div>`;
+                      recurringInfo = `<div class="text-xs ${isActive ? 'text-green-400 font-semibold' : 'text-gray-500'}">
+                        ${formatDate(schDate)}
+                        ${isActive ? '<span class="ml-1 px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">ACTIVE</span>' : ''}
+                      </div>`;
                     }
-                    return `<div class="${idx > 0 ? 'mt-2 pt-2 border-t border-gray-700' : ''}">
+                    return `<div class="${idx > 0 ? 'mt-2 pt-2 border-t border-gray-700' : ''} ${isActive ? 'bg-green-500/10 -mx-2 px-2 py-1 rounded border-l-2 border-green-500' : ''}">
                     ${recurringInfo}
                   </div>`;
                   }).join('')
@@ -1696,10 +1721,30 @@
           ${stream.schedules && stream.schedules.length > 0
                 ? stream.schedules.sort((a, b) => new Date(a.schedule_time) - new Date(b.schedule_time))
                   .map((sch, idx) => {
+                    // Check if this schedule is currently active
+                    const now = new Date();
                     const schStart = parseScheduleTime(sch.schedule_time);
-                    return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''}">
-                    <i class="ti ti-clock text-gray-400 text-xs mr-1.5"></i>
-                    <span class="text-sm">${formatTime(schStart)}</span>
+                    const schEnd = new Date(schStart.getTime() + (parseInt(sch.duration) * 60 * 1000));
+                    let isActive = false;
+                    
+                    if (stream.status === 'live') {
+                      if (sch.is_recurring && sch.recurring_days) {
+                        const currentDay = now.getDay();
+                        const allowedDays = sch.recurring_days.split(',').map(d => parseInt(d));
+                        if (allowedDays.includes(currentDay)) {
+                          const nowTime = now.getHours() * 60 + now.getMinutes();
+                          const startTime = schStart.getHours() * 60 + schStart.getMinutes();
+                          const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
+                          isActive = nowTime >= startTime && nowTime < endTime;
+                        }
+                      } else {
+                        isActive = now >= schStart && now < schEnd;
+                      }
+                    }
+                    
+                    return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''} ${isActive ? 'bg-green-500/10 -mx-2 px-2 py-1 rounded' : ''}">
+                    <i class="ti ti-clock ${isActive ? 'text-green-400' : 'text-gray-400'} text-xs mr-1.5"></i>
+                    <span class="text-sm ${isActive ? 'text-green-400 font-semibold' : ''}">${formatTime(schStart)}</span>
                   </div>`;
                   }).join('')
                 : `<div class="flex items-center">
@@ -1711,12 +1756,31 @@
           ${stream.schedules && stream.schedules.length > 0
                 ? stream.schedules.sort((a, b) => new Date(a.schedule_time) - new Date(b.schedule_time))
                   .map((sch, idx) => {
-                    const schEnd = parseScheduleTime(sch.schedule_time);
-                    schEnd.setMinutes(schEnd.getMinutes() + parseInt(sch.duration));
-                    return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''}">
-                    <i class="ti ti-clock-stop text-gray-400 mr-1.5 text-xs"></i>
-                    <span class="text-sm">${formatTime(schEnd)}</span>
-                    <span class="text-xs text-gray-500 ml-2">(${sch.duration}m)</span>
+                    // Check if this schedule is currently active
+                    const now = new Date();
+                    const schStart = parseScheduleTime(sch.schedule_time);
+                    const schEnd = new Date(schStart.getTime() + (parseInt(sch.duration) * 60 * 1000));
+                    let isActive = false;
+                    
+                    if (stream.status === 'live') {
+                      if (sch.is_recurring && sch.recurring_days) {
+                        const currentDay = now.getDay();
+                        const allowedDays = sch.recurring_days.split(',').map(d => parseInt(d));
+                        if (allowedDays.includes(currentDay)) {
+                          const nowTime = now.getHours() * 60 + now.getMinutes();
+                          const startTime = schStart.getHours() * 60 + schStart.getMinutes();
+                          const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
+                          isActive = nowTime >= startTime && nowTime < endTime;
+                        }
+                      } else {
+                        isActive = now >= schStart && now < schEnd;
+                      }
+                    }
+                    
+                    return `<div class="flex items-center ${idx > 0 ? 'mt-1.5' : ''} ${isActive ? 'bg-green-500/10 -mx-2 px-2 py-1 rounded' : ''}">
+                    <i class="ti ti-clock-stop ${isActive ? 'text-green-400' : 'text-gray-400'} mr-1.5 text-xs"></i>
+                    <span class="text-sm ${isActive ? 'text-green-400 font-semibold' : ''}">${formatTime(schEnd)}</span>
+                    <span class="text-xs ${isActive ? 'text-green-400' : 'text-gray-500'} ml-2">(${sch.duration}m)</span>
                   </div>`;
                   }).join('')
                 : `<div class="flex items-center">
