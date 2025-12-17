@@ -95,17 +95,24 @@ async function checkScheduledStreams() {
             
             console.log(`[Scheduler] Time comparison: schedule=${scheduleHour}:${scheduleMinute}, now=${nowHour}:${nowMinute}`);
             
-            if (scheduleHour === nowHour && Math.abs(scheduleMinute - nowMinute) <= 1) {
+            // Calculate time difference in minutes
+            const scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+            const nowTimeInMinutes = nowHour * 60 + nowMinute;
+            const timeDiff = nowTimeInMinutes - scheduleTimeInMinutes;
+            
+            // Only start if current time is AT or AFTER schedule time (within 1 minute window)
+            // This prevents starting before the scheduled time
+            if (scheduleHour === nowHour && timeDiff >= 0 && timeDiff <= 1) {
               // Check if stream is not already live
               const stream = await Stream.findById(schedule.stream_id);
               if (stream && stream.status !== 'live') {
                 schedulesToStart.push(schedule);
-                console.log(`[Scheduler] ✓ Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime}`);
+                console.log(`[Scheduler] ✓ Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime} (diff: ${timeDiff}m)`);
               } else {
                 console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live or not found`);
               }
             } else {
-              console.log(`[Scheduler] ✗ Time does not match (difference: ${Math.abs((scheduleHour * 60 + scheduleMinute) - (nowHour * 60 + nowMinute))} minutes)`);
+              console.log(`[Scheduler] ✗ Time does not match (difference: ${Math.abs(timeDiff)} minutes, too ${timeDiff < 0 ? 'early' : 'late'})`);
             }
           } else {
             console.log(`[Scheduler] ✗ Today (${currentDay}) is not in allowed days`);
