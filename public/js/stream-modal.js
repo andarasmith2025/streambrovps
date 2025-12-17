@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // Tab switching functionality
 let currentStreamTab = 'manual'; // 'manual' or 'youtube'
 
-window.switchStreamTab = function(tab) {
+function switchStreamTab(tab) {
   currentStreamTab = tab;
   
   const tabManual = document.getElementById('tabManual');
