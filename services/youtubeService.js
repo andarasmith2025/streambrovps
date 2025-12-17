@@ -154,20 +154,30 @@ module.exports = {
   },
   async setAudience(tokens, { videoId, selfDeclaredMadeForKids, ageRestricted }) {
     const yt = getYouTubeClient(tokens);
-    const body = {
-      id: videoId,
-      status: {},
-      contentRating: {},
-    };
+    
+    // Build parts array based on what we're updating
+    const parts = [];
+    const body = { id: videoId };
+    
+    // Add status if selfDeclaredMadeForKids is provided
     if (typeof selfDeclaredMadeForKids === 'boolean') {
-      body.status.selfDeclaredMadeForKids = selfDeclaredMadeForKids;
+      body.status = { selfDeclaredMadeForKids };
+      parts.push('status');
     }
-    if (typeof ageRestricted === 'boolean') {
-      if (ageRestricted) body.contentRating.ytRating = 'ytAgeRestricted';
-      else body.contentRating = {}; // clear
+    
+    // Add contentRating only if ageRestricted is true
+    if (typeof ageRestricted === 'boolean' && ageRestricted) {
+      body.contentRating = { ytRating: 'ytAgeRestricted' };
+      parts.push('contentRating');
     }
+    
+    // If no parts to update, just return success
+    if (parts.length === 0) {
+      return { success: true, message: 'No audience settings to update' };
+    }
+    
     return yt.videos.update({
-      part: 'status,contentRating',
+      part: parts.join(','),
       requestBody: body,
     });
   }

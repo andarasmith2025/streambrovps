@@ -1,0 +1,424 @@
+<% layout('layout') -%>
+
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+  <div>
+    <h2 class="text-2xl font-bold">YouTube Schedule Live</h2>
+    <p class="text-gray-400 text-sm mt-1">Create and manage YouTube live broadcasts with full metadata control</p>
+  </div>
+  <button onclick="openNewBroadcastModal()" class="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+    <i class="ti ti-plus"></i>
+    <span>New Broadcast</span>
+  </button>
+</div>
+
+<!-- Broadcasts List -->
+<div class="bg-gray-800 rounded-lg overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead class="bg-dark-700 border-b border-gray-700">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Broadcast</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Scheduled</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Privacy</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+          <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="broadcastsTableBody" class="divide-y divide-gray-700">
+        <!-- Loading state -->
+        <tr id="loadingState">
+          <td colspan="5" class="px-6 py-8 text-center">
+            <i class="ti ti-loader animate-spin text-2xl text-gray-400"></i>
+            <p class="text-gray-400 mt-2">Loading broadcasts...</p>
+          </td>
+        </tr>
+        <!-- Empty state -->
+        <tr id="emptyState" class="hidden">
+          <td colspan="5" class="px-6 py-12 text-center">
+            <i class="ti ti-calendar-off text-4xl text-gray-600 mb-2"></i>
+            <p class="text-gray-400 font-medium mb-2">No broadcasts found</p>
+            <p class="text-gray-500 mb-4">Create your first YouTube live broadcast</p>
+            <button onclick="openNewBroadcastModal()" class="inline-flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+              <i class="ti ti-plus"></i>
+              <span>New Broadcast</span>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New Broadcast Modal -->
+<div id="newBroadcastModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+        <h3 class="text-lg font-semibold">Create YouTube Live Broadcast</h3>
+        <button onclick="closeNewBroadcastModal()" class="text-gray-400 hover:text-white transition-colors">
+          <i class="ti ti-x text-xl"></i>
+        </button>
+      </div>
+      
+      <form id="newBroadcastForm" class="p-6 space-y-4">
+        <!-- Title -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Title *</label>
+          <input type="text" name="title" required 
+            class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="My Live Stream">
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+          <textarea name="description" rows="3"
+            class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="Stream description..."></textarea>
+        </div>
+
+        <!-- Row: Privacy & Scheduled Time -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Privacy *</label>
+            <select name="privacyStatus" required
+              class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+              <option value="public">Public</option>
+              <option value="unlisted" selected>Unlisted</option>
+              <option value="private">Private</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Scheduled Time *</label>
+            <input type="datetime-local" name="scheduledStartTime" required
+              class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary [color-scheme:dark]">
+          </div>
+        </div>
+
+        <!-- Thumbnail -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Thumbnail</label>
+          <input type="file" name="thumbnail" accept="image/*"
+            class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded">
+          <p class="text-xs text-gray-500 mt-1">Recommended: 1280x720px, max 2MB</p>
+        </div>
+
+        <!-- Row: Auto Start & Auto Stop -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+            <input type="checkbox" name="enableAutoStart" class="w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700">
+            <span>Auto Start</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+            <input type="checkbox" name="enableAutoStop" class="w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700">
+            <span>Auto Stop</span>
+          </label>
+        </div>
+
+        <!-- Row: Made for Kids & Age Restriction -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Made for Kids</label>
+            <div class="flex items-center gap-4">
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="madeForKids" value="yes" class="w-4 h-4 border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700">
+                <span>Yes</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="madeForKids" value="no" checked class="w-4 h-4 border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700">
+                <span>No</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mt-7">
+              <input type="checkbox" name="ageRestricted" class="w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700">
+              <span>Age-restricted (18+)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Use Existing Stream Key -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Stream Key (Optional)</label>
+          <select name="streamId" class="w-full px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+            <option value="">Create new stream key</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Leave empty to create a new stream key</p>
+        </div>
+      </form>
+
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700">
+        <button onclick="closeNewBroadcastModal()" class="px-4 py-2 text-gray-300 hover:text-white transition-colors">
+          Cancel
+        </button>
+        <button type="submit" form="newBroadcastForm" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
+          Create Broadcast
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Load broadcasts on page load
+document.addEventListener('DOMContentLoaded', function() {
+  loadBroadcasts();
+  
+  // Setup form submission
+  document.getElementById('newBroadcastForm').addEventListener('submit', handleCreateBroadcast);
+});
+
+async function loadBroadcasts() {
+  const tableBody = document.getElementById('broadcastsTableBody');
+  const loadingState = document.getElementById('loadingState');
+  const emptyState = document.getElementById('emptyState');
+  
+  try {
+    const response = await fetch('/youtube/api/broadcasts');
+    const data = await response.json();
+    
+    loadingState.classList.add('hidden');
+    
+    if (!data.items || data.items.length === 0) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+    
+    // Clear existing rows except states
+    const existingRows = tableBody.querySelectorAll('tr:not(#loadingState):not(#emptyState)');
+    existingRows.forEach(row => row.remove());
+    
+    // Add broadcast rows
+    data.items.forEach(broadcast => {
+      const row = createBroadcastRow(broadcast);
+      tableBody.appendChild(row);
+    });
+    
+  } catch (error) {
+    console.error('Error loading broadcasts:', error);
+    loadingState.innerHTML = `
+      <td colspan="5" class="px-6 py-8 text-center">
+        <i class="ti ti-alert-circle text-2xl text-red-400"></i>
+        <p class="text-red-400 mt-2">Failed to load broadcasts</p>
+      </td>
+    `;
+  }
+}
+
+function createBroadcastRow(broadcast) {
+  const row = document.createElement('tr');
+  row.className = 'hover:bg-dark-700/50 transition-colors';
+  
+  const snippet = broadcast.snippet || {};
+  const status = broadcast.status || {};
+  const scheduledTime = snippet.scheduledStartTime ? new Date(snippet.scheduledStartTime) : null;
+  
+  // Status badge
+  let statusBadge = '';
+  const lifeCycleStatus = status.lifeCycleStatus || 'created';
+  if (lifeCycleStatus === 'live') {
+    statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-red-500/20 text-red-400 rounded">Live</span>';
+  } else if (lifeCycleStatus === 'complete') {
+    statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-gray-500/20 text-gray-400 rounded">Completed</span>';
+  } else {
+    statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded">Upcoming</span>';
+  }
+  
+  row.innerHTML = `
+    <td class="px-6 py-4">
+      <div class="flex items-center gap-3">
+        <div class="w-20 h-12 bg-dark-700 rounded overflow-hidden flex-shrink-0">
+          <img src="${snippet.thumbnails?.default?.url || '/images/default-thumbnail.jpg'}" 
+            class="w-full h-full object-cover" alt="${snippet.title || 'Broadcast'}">
+        </div>
+        <div>
+          <div class="text-sm font-medium">${snippet.title || 'Untitled'}</div>
+          <div class="text-xs text-gray-400">${snippet.description ? snippet.description.substring(0, 50) + '...' : 'No description'}</div>
+        </div>
+      </div>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm">
+      ${scheduledTime ? scheduledTime.toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }) : 'Not scheduled'}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm capitalize">
+      ${status.privacyStatus || 'private'}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+      ${statusBadge}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-right">
+      <div class="flex items-center justify-end gap-2">
+        <button onclick="editBroadcast('${broadcast.id}')" class="p-2 hover:bg-dark-700 rounded transition-colors" title="Edit">
+          <i class="ti ti-edit text-gray-400 hover:text-white"></i>
+        </button>
+        <button onclick="duplicateBroadcast('${broadcast.id}')" class="p-2 hover:bg-dark-700 rounded transition-colors" title="Duplicate">
+          <i class="ti ti-copy text-gray-400 hover:text-white"></i>
+        </button>
+        <button onclick="changeThumbnail('${broadcast.id}')" class="p-2 hover:bg-dark-700 rounded transition-colors" title="Change Thumbnail">
+          <i class="ti ti-photo text-gray-400 hover:text-white"></i>
+        </button>
+        <button onclick="deleteBroadcast('${broadcast.id}')" class="p-2 hover:bg-dark-700 rounded transition-colors" title="Delete">
+          <i class="ti ti-trash text-gray-400 hover:text-red-400"></i>
+        </button>
+      </div>
+    </td>
+  `;
+  
+  return row;
+}
+
+function openNewBroadcastModal() {
+  const modal = document.getElementById('newBroadcastModal');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  
+  // Set default scheduled time to 1 hour from now
+  const now = new Date();
+  now.setHours(now.getHours() + 1);
+  const dateTimeInput = document.querySelector('input[name="scheduledStartTime"]');
+  if (dateTimeInput) {
+    dateTimeInput.value = now.toISOString().slice(0, 16);
+  }
+}
+
+function closeNewBroadcastModal() {
+  const modal = document.getElementById('newBroadcastModal');
+  modal.classList.add('hidden');
+  document.body.style.overflow = 'auto';
+  document.getElementById('newBroadcastForm').reset();
+}
+
+async function handleCreateBroadcast(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(e.target);
+  const data = {
+    title: formData.get('title'),
+    description: formData.get('description'),
+    privacyStatus: formData.get('privacyStatus'),
+    scheduledStartTime: new Date(formData.get('scheduledStartTime')).toISOString(),
+    streamId: formData.get('streamId') || undefined,
+    enableAutoStart: formData.get('enableAutoStart') === 'on',
+    enableAutoStop: formData.get('enableAutoStop') === 'on',
+  };
+  
+  try {
+    const response = await fetch('/youtube/schedule-live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create broadcast');
+    }
+    
+    // Handle thumbnail upload if provided
+    const thumbnailFile = formData.get('thumbnail');
+    if (thumbnailFile && thumbnailFile.size > 0 && result.broadcast?.id) {
+      await uploadThumbnail(result.broadcast.id, thumbnailFile);
+    }
+    
+    // Handle audience settings
+    const madeForKids = formData.get('madeForKids') === 'yes';
+    const ageRestricted = formData.get('ageRestricted') === 'on';
+    if (result.broadcast?.id) {
+      await setAudience(result.broadcast.id, madeForKids, ageRestricted);
+    }
+    
+    showNotification('Success!', 'Broadcast created successfully', 'success');
+    closeNewBroadcastModal();
+    loadBroadcasts();
+    
+  } catch (error) {
+    console.error('Error creating broadcast:', error);
+    showNotification('Error', error.message, 'error');
+  }
+}
+
+async function uploadThumbnail(broadcastId, file) {
+  const formData = new FormData();
+  formData.append('thumbnail', file);
+  
+  try {
+    const response = await fetch(`/youtube/broadcasts/${broadcastId}/thumbnail`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to upload thumbnail');
+    }
+  } catch (error) {
+    console.error('Error uploading thumbnail:', error);
+  }
+}
+
+async function setAudience(broadcastId, madeForKids, ageRestricted) {
+  try {
+    const response = await fetch(`/youtube/broadcasts/${broadcastId}/audience`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selfDeclaredMadeForKids: madeForKids,
+        ageRestricted: ageRestricted
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to set audience');
+    }
+  } catch (error) {
+    console.error('Error setting audience:', error);
+  }
+}
+
+function editBroadcast(id) {
+  // TODO: Implement edit modal
+  console.log('Edit broadcast:', id);
+}
+
+function duplicateBroadcast(id) {
+  // TODO: Implement duplicate
+  console.log('Duplicate broadcast:', id);
+}
+
+function changeThumbnail(id) {
+  // TODO: Implement thumbnail change
+  console.log('Change thumbnail:', id);
+}
+
+async function deleteBroadcast(id) {
+  if (!confirm('Are you sure you want to delete this broadcast?')) return;
+  
+  try {
+    const response = await fetch(`/youtube/broadcasts/${id}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete broadcast');
+    }
+    
+    showNotification('Success!', 'Broadcast deleted successfully', 'success');
+    loadBroadcasts();
+    
+  } catch (error) {
+    console.error('Error deleting broadcast:', error);
+    showNotification('Error', error.message, 'error');
+  }
+}
+
+function showNotification(title, message, type) {
+  // Simple notification - you can enhance this
+  alert(`${title}: ${message}`);
+}
+</script>

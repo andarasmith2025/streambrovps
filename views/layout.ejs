@@ -216,11 +216,11 @@
         <% if (typeof youtubeConnected !== 'undefined' && youtubeConnected) { %>
         <div class="h-px bg-gray-700 mx-3 my-2"></div>
         <div class="px-2 text-xs uppercase tracking-wider text-gray-400 mb-1">YouTube</div>
-        <button type="button" onclick="openScheduleYouTubeModal()" class="sidebar-item w-full text-left">
+        <a href="/youtube/schedule" class="sidebar-item group <%= active === 'youtube-schedule' ? 'bg-primary' : '' %>">
           <i class="ti ti-brand-youtube text-xl text-red-500"></i>
           <span class="text-sm ml-3">Schedule Live</span>
-        </button>
-        <a href="/youtube/manage" class="sidebar-item">
+        </a>
+        <a href="/youtube/manage" class="sidebar-item group <%= active === 'youtube-manage' ? 'bg-primary' : '' %>">
           <i class="ti ti-calendar-event text-xl"></i>
           <span class="text-sm ml-3">Manage</span>
         </a>
