@@ -226,6 +226,19 @@
                 </button>
               </div>
             </div>
+            
+            <!-- Tab Switcher -->
+            <div class="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-dark-900 border-b border-gray-700">
+              <button type="button" id="tabManual" onclick="switchStreamTab('manual')"
+                class="flex-1 px-4 py-2 text-sm font-medium rounded transition-colors bg-primary text-white">
+                <i class="ti ti-broadcast mr-1.5"></i>Manual RTMP
+              </button>
+              <button type="button" id="tabYouTube" onclick="switchStreamTab('youtube')"
+                class="flex-1 px-4 py-2 text-sm font-medium rounded transition-colors text-gray-400 hover:text-white hover:bg-dark-700">
+                <i class="ti ti-brand-youtube mr-1.5"></i>YouTube API
+              </button>
+            </div>
+            
             <div class="px-4 py-3 overflow-y-auto flex-grow">
               <form id="newStreamForm" class="space-y-3">
                 <input type="hidden" id="selectedVideoId" name="videoId" value="">
@@ -262,7 +275,60 @@
                       class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
                       placeholder="Enter stream title..." name="streamTitle" id="streamTitle" required>
                   </div>
-                  <div class="space-y-3">
+                  
+                  <!-- YouTube API Fields (Hidden by default) -->
+                  <div id="youtubeApiFields" class="hidden space-y-3">
+                    <div>
+                      <label class="text-sm font-medium text-white block mb-2">Description</label>
+                      <textarea name="youtubeDescription" id="youtubeDescription" rows="3"
+                        class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                        placeholder="Stream description..."></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Privacy</label>
+                        <select name="youtubePrivacy" id="youtubePrivacy"
+                          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                          <option value="public">Public</option>
+                          <option value="unlisted" selected>Unlisted</option>
+                          <option value="private">Private</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Thumbnail</label>
+                        <input type="file" name="youtubeThumbnail" id="youtubeThumbnail" accept="image/*"
+                          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded text-sm">
+                      </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Made for Kids</label>
+                        <div class="flex items-center gap-4 pt-2">
+                          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                            <input type="radio" name="youtubeMadeForKids" value="yes" class="w-4 h-4">
+                            <span>Yes</span>
+                          </label>
+                          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                            <input type="radio" name="youtubeMadeForKids" value="no" checked class="w-4 h-4">
+                            <span>No</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Age Restriction</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
+                          <input type="checkbox" name="youtubeAgeRestricted" id="youtubeAgeRestricted" class="w-4 h-4 rounded">
+                          <span>Age-restricted (18+)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div id="manualRtmpFields" class="space-y-3">
                     <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
                     <div class="space-y-2">
                       <div class="relative">
@@ -323,6 +389,8 @@
                       </div>
                     </div>
                   </div>
+                  </div>
+                  <!-- End Manual RTMP Fields -->
                 </div>
                 <!-- Stream Mode Toggle Section -->
                 <div class="pt-3 border-t border-gray-700">

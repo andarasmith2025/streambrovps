@@ -763,3 +763,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 });
+
+
+// Tab switching functionality
+let currentStreamTab = 'manual'; // 'manual' or 'youtube'
+
+function switchStreamTab(tab) {
+  currentStreamTab = tab;
+  
+  const tabManual = document.getElementById('tabManual');
+  const tabYouTube = document.getElementById('tabYouTube');
+  const youtubeApiFields = document.getElementById('youtubeApiFields');
+  const manualRtmpFields = document.getElementById('manualRtmpFields');
+  
+  if (tab === 'manual') {
+    // Activate Manual tab
+    tabManual.classList.add('bg-primary', 'text-white');
+    tabManual.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
+    
+    // Deactivate YouTube tab
+    tabYouTube.classList.remove('bg-primary', 'text-white');
+    tabYouTube.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
+    
+    // Show/Hide fields
+    if (youtubeApiFields) youtubeApiFields.classList.add('hidden');
+    if (manualRtmpFields) manualRtmpFields.classList.remove('hidden');
+    
+  } else if (tab === 'youtube') {
+    // Activate YouTube tab
+    tabYouTube.classList.add('bg-primary', 'text-white');
+    tabYouTube.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
+    
+    // Deactivate Manual tab
+    tabManual.classList.remove('bg-primary', 'text-white');
+    tabManual.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
+    
+    // Show/Hide fields
+    if (youtubeApiFields) youtubeApiFields.classList.remove('hidden');
+    if (manualRtmpFields) manualRtmpFields.classList.add('hidden');
+  }
+}

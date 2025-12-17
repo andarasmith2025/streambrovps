@@ -71,6 +71,7 @@ function createTables() {
     start_time TIMESTAMP,
     end_time TIMESTAMP,
     use_advanced_settings BOOLEAN DEFAULT 0,
+    youtube_broadcast_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     user_id TEXT,
@@ -79,6 +80,13 @@ function createTables() {
   )`, (err) => {
     if (err) {
       console.error('Error creating streams table:', err.message);
+    }
+  });
+  
+  // Add youtube_broadcast_id column if it doesn't exist (migration)
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_broadcast_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_broadcast_id column:', err.message);
     }
   });
   db.run(`CREATE TABLE IF NOT EXISTS stream_history (
