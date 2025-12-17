@@ -20,8 +20,8 @@ router.get('/setup', isAuthenticated, async (req, res) => {
     const host = req.get('host');
     const redirectUri = `${protocol}://${host}/oauth2/callback`;
     
-    res.render('youtube-api-setup', {
-      title: 'YouTube API Setup',
+    res.render('youtube-api-setup-id', {
+      title: 'Konfigurasi YouTube API',
       active: 'settings',
       user: user,
       credentials: credentials,
@@ -146,7 +146,7 @@ router.get('/test-connection', isAuthenticated, async (req, res) => {
     if (!req.session.youtubeTokens) {
       return res.json({
         success: false,
-        error: 'YouTube account not connected. Please connect your YouTube account first.',
+        error: 'Akun YouTube belum terkoneksi. Silakan connect akun YouTube Anda terlebih dahulu di Settings → YouTube Account Connection.',
         needsConnection: true
       });
     }
