@@ -1585,10 +1585,19 @@
                 const startTime = schStart.getHours() * 60 + schStart.getMinutes();
                 const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
                 
-                console.log(`[Highlight] Time check - Now: ${nowTime}, Start: ${startTime}, End: ${endTime}, InWindow: ${nowTime >= startTime && nowTime < endTime}`);
+                // Handle schedules that cross midnight (e.g., 19:15 - 00:29)
+                let inWindow;
+                if (endTime < startTime) {
+                  // Schedule crosses midnight
+                  inWindow = nowTime >= startTime || nowTime < endTime;
+                  console.log(`[Highlight] Time check (CROSS-MIDNIGHT) - Now: ${nowTime}, Start: ${startTime}, End: ${endTime}, InWindow: ${inWindow}`);
+                } else {
+                  // Normal schedule within same day
+                  inWindow = nowTime >= startTime && nowTime < endTime;
+                  console.log(`[Highlight] Time check (SAME-DAY) - Now: ${nowTime}, Start: ${startTime}, End: ${endTime}, InWindow: ${inWindow}`);
+                }
                 
-                // Check if current time is within schedule window
-                return nowTime >= startTime && nowTime < endTime;
+                return inWindow;
               } else {
                 // For one-time schedules
                 const inWindow = now >= schStart && now < schEnd;
