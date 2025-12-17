@@ -1559,11 +1559,34 @@
           
           // Helper function to check if a schedule is currently active
           function isScheduleActive(stream, schedule) {
-            // PRECISE: Check if this schedule ID matches the active_schedule_id in stream
-            // This is set by scheduler when it starts the stream
+            // METHOD 1: PRECISE - Check if this schedule ID matches the active_schedule_id in stream
             if (stream.status === 'live' && stream.active_schedule_id) {
               return stream.active_schedule_id === schedule.id;
             }
+            
+            // METHOD 2: FALLBACK - For streams started before this feature, use time-based detection
+            if (stream.status === 'live') {
+              const now = new Date();
+              const schStart = parseScheduleTime(schedule.schedule_time);
+              const schEnd = new Date(schStart.getTime() + (parseInt(schedule.duration) * 60 * 1000));
+              
+              if (schedule.is_recurring && schedule.recurring_days) {
+                const currentDay = now.getDay();
+                const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
+                if (!allowedDays.includes(currentDay)) return false;
+                
+                const nowTime = now.getHours() * 60 + now.getMinutes();
+                const startTime = schStart.getHours() * 60 + schStart.getMinutes();
+                const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
+                
+                // Check if current time is within schedule window
+                return nowTime >= startTime && nowTime < endTime;
+              } else {
+                // For one-time schedules
+                return now >= schStart && now < schEnd;
+              }
+            }
+            
             return false;
           }
           
