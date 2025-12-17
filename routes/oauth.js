@@ -6,11 +6,33 @@ const { db } = require('../db/database');
 const router = express.Router();
 
 // GET /oauth2/login - start OAuth flow
-router.get('/login', (req, res) => {
-  const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauth_state = state;
-  const url = getAuthUrl(state);
-  return res.redirect(url);
+router.get('/login', async (req, res) => {
+  try {
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    
+    // Check if user has configured their own API credentials
+    if (!userId) {
+      return res.status(401).render('error', { 
+        title: 'Error', 
+        message: 'Anda harus login terlebih dahulu', 
+        error: { message: 'Unauthorized' } 
+      });
+    }
+    
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauth_state = state;
+    
+    // Use user-specific credentials if available
+    const url = await getAuthUrl(state, userId);
+    return res.redirect(url);
+  } catch (error) {
+    console.error('[OAuth] Login error:', error);
+    return res.status(500).render('error', { 
+      title: 'Error', 
+      message: 'Gagal memulai OAuth flow. Pastikan Anda sudah mengkonfigurasi YouTube API credentials di Settings.', 
+      error: error 
+    });
+  }
 });
 
 // GET /oauth2/callback - handle Google OAuth callback
@@ -24,11 +46,15 @@ router.get('/callback', async (req, res) => {
       return res.status(400).render('error', { title: 'OAuth Error', message: 'Invalid state or code', error: { message: 'Invalid state or code' } });
     }
 
-    const tokens = await exchangeCodeForTokens(code);
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    const tokens = await exchangeCodeForTokens(code, userId);
+
+    // Attach user credentials to tokens for later use
+    const { attachUserCredentials } = require('../config/google');
+    await attachUserCredentials(tokens, userId);
 
     // Persist tokens to session for now; also save to DB if userId available
     req.session.youtubeTokens = tokens;
-    const userId = req.session && (req.session.userId || req.session.user_id);
     if (userId) {
       const expiry = tokens.expiry_date || (tokens.expiry_date === 0 ? 0 : null);
       db.run(`INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date)
@@ -47,7 +73,7 @@ router.get('/callback', async (req, res) => {
 
     // Fetch channel basic info for UI badge
     try {
-      const yt = getYouTubeClient(tokens);
+      const yt = getYouTubeClient(tokens, userId);
       const me = await yt.channels.list({ mine: true, part: ['snippet','statistics'] });
       const channel = me?.data?.items?.[0];
       if (channel) {
@@ -76,7 +102,8 @@ router.get('/callback', async (req, res) => {
 router.get('/youtube/me', async (req, res) => {
   try {
     if (!req.session.youtubeTokens) return res.status(401).json({ error: 'Not connected' });
-    const yt = getYouTubeClient(req.session.youtubeTokens);
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    const yt = getYouTubeClient(req.session.youtubeTokens, userId);
     const response = await yt.channels.list({ mine: true, part: ['snippet','statistics'] });
     return res.json(response.data);
   } catch (err) {
