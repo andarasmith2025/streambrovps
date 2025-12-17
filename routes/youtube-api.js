@@ -205,8 +205,7 @@ router.get('/stream-keys', isAuthenticated, async (req, res) => {
     const response = await youtube.liveBroadcasts.list({
       part: ['snippet', 'contentDetails', 'status'],
       mine: true,
-      maxResults: 50,
-      broadcastStatus: 'all'
+      maxResults: 50
     });
     
     const broadcasts = response.data.items || [];
