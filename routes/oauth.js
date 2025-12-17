@@ -112,6 +112,77 @@ router.get('/youtube/me', async (req, res) => {
   }
 });
 
+// GET /oauth2/youtube/stream-keys - fetch available stream keys
+router.get('/youtube/stream-keys', async (req, res) => {
+  try {
+    if (!req.session.youtubeTokens) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not connected to YouTube. Please connect your YouTube account first.' 
+      });
+    }
+    
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    const yt = getYouTubeClient(req.session.youtubeTokens, userId);
+    
+    // Fetch live broadcasts (streams)
+    const response = await yt.liveBroadcasts.list({
+      part: ['snippet', 'contentDetails', 'status'],
+      mine: true,
+      maxResults: 50
+    });
+    
+    const broadcasts = response.data.items || [];
+    
+    // For each broadcast, get the stream details (which contains ingestion info)
+    const streamKeys = [];
+    for (const broadcast of broadcasts) {
+      try {
+        const streamId = broadcast.contentDetails?.boundStreamId;
+        if (streamId) {
+          const streamResponse = await yt.liveStreams.list({
+            part: ['snippet', 'cdn', 'status'],
+            id: [streamId]
+          });
+          
+          const stream = streamResponse.data.items?.[0];
+          if (stream && stream.cdn?.ingestionInfo) {
+            streamKeys.push({
+              id: broadcast.id,
+              streamId: streamId,
+              title: broadcast.snippet?.title || 'Untitled Stream',
+              description: broadcast.snippet?.description || '',
+              scheduledStartTime: broadcast.snippet?.scheduledStartTime,
+              status: broadcast.status?.lifeCycleStatus,
+              ingestionInfo: {
+                rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
+                streamName: stream.cdn.ingestionInfo.streamName,
+                rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
+              }
+            });
+          }
+        }
+      } catch (streamErr) {
+        console.warn('Failed to fetch stream details for broadcast:', broadcast.id, streamErr.message);
+      }
+    }
+    
+    return res.json({
+      success: true,
+      streamKeys: streamKeys,
+      count: streamKeys.length
+    });
+    
+  } catch (err) {
+    console.error('YouTube stream-keys error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch stream keys from YouTube API',
+      details: err.message 
+    });
+  }
+});
+
 module.exports = router;
 
 // GET /oauth2/disconnect - revoke local session (simple disconnect)

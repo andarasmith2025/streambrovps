@@ -767,6 +767,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Tab switching functionality
 let currentStreamTab = 'manual'; // 'manual' or 'youtube'
+let youtubeStreamKeys = [];
 
 function switchStreamTab(tab) {
   currentStreamTab = tab;
@@ -789,6 +790,12 @@ function switchStreamTab(tab) {
     if (youtubeApiFields) youtubeApiFields.classList.add('hidden');
     if (manualRtmpFields) manualRtmpFields.classList.remove('hidden');
     
+    // Make RTMP fields required
+    const rtmpUrl = document.getElementById('rtmpUrl');
+    const streamKey = document.getElementById('streamKey');
+    if (rtmpUrl) rtmpUrl.required = true;
+    if (streamKey) streamKey.required = true;
+    
   } else if (tab === 'youtube') {
     // Activate YouTube tab
     tabYouTube.classList.add('bg-primary', 'text-white');
@@ -801,5 +808,115 @@ function switchStreamTab(tab) {
     // Show/Hide fields
     if (youtubeApiFields) youtubeApiFields.classList.remove('hidden');
     if (manualRtmpFields) manualRtmpFields.classList.add('hidden');
+    
+    // Make RTMP fields not required
+    const rtmpUrl = document.getElementById('rtmpUrl');
+    const streamKey = document.getElementById('streamKey');
+    if (rtmpUrl) rtmpUrl.required = false;
+    if (streamKey) streamKey.required = false;
+    
+    // Load YouTube stream keys
+    loadYouTubeStreamKeys();
   }
+}
+
+// Load YouTube stream keys from OAuth
+async function loadYouTubeStreamKeys() {
+  try {
+    const response = await fetch('/api/youtube/stream-keys');
+    const data = await response.json();
+    
+    if (data.success && data.streamKeys) {
+      youtubeStreamKeys = data.streamKeys;
+      displayYouTubeStreamKeys(data.streamKeys);
+    } else {
+      console.error('Failed to load YouTube stream keys:', data.error);
+      showYouTubeStreamKeysError(data.error || 'Failed to load stream keys');
+    }
+  } catch (error) {
+    console.error('Error loading YouTube stream keys:', error);
+    showYouTubeStreamKeysError('Error connecting to YouTube API');
+  }
+}
+
+// Display YouTube stream keys
+function displayYouTubeStreamKeys(streamKeys) {
+  const container = document.getElementById('youtubeStreamKeysList');
+  if (!container) return;
+  
+  if (streamKeys.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-gray-400">
+        <i class="ti ti-alert-circle text-2xl mb-2"></i>
+        <p class="text-sm">No stream keys found</p>
+        <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = streamKeys.map(key => `
+    <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
+      class="w-full flex items-start gap-3 p-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-colors text-left">
+      <i class="ti ti-key text-red-500 text-xl mt-0.5"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-1">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
+        <p class="text-xs text-gray-500 mt-0.5">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
+      </div>
+      <i class="ti ti-chevron-right text-gray-400"></i>
+    </button>
+  `).join('');
+}
+
+// Show error message for YouTube stream keys
+function showYouTubeStreamKeysError(message) {
+  const container = document.getElementById('youtubeStreamKeysList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="text-center py-4 text-red-400">
+      <i class="ti ti-alert-triangle text-2xl mb-2"></i>
+      <p class="text-sm">${message}</p>
+      <p class="text-xs text-gray-500 mt-1">Make sure you're connected to YouTube</p>
+    </div>
+  `;
+}
+
+// Select YouTube stream key
+function selectYouTubeStreamKey(keyId) {
+  const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+  if (!selectedKey) return;
+  
+  // Auto-fill RTMP URL and Stream Key
+  const rtmpUrl = document.getElementById('rtmpUrl');
+  const streamKey = document.getElementById('streamKey');
+  const streamTitle = document.getElementById('streamTitle');
+  
+  if (rtmpUrl && selectedKey.ingestionInfo?.rtmpsIngestionAddress) {
+    rtmpUrl.value = selectedKey.ingestionInfo.rtmpsIngestionAddress;
+  }
+  
+  if (streamKey && selectedKey.ingestionInfo?.streamName) {
+    streamKey.value = selectedKey.ingestionInfo.streamName;
+  }
+  
+  if (streamTitle && !streamTitle.value && selectedKey.title) {
+    streamTitle.value = selectedKey.title;
+  }
+  
+  // Show notification
+  if (typeof showToast === 'function') {
+    showToast('success', 'YouTube stream key selected');
+  }
+  
+  // Highlight selected key
+  const buttons = document.querySelectorAll('#youtubeStreamKeysList button');
+  buttons.forEach(btn => {
+    if (btn.getAttribute('onclick').includes(keyId)) {
+      btn.classList.add('border-primary', 'bg-primary/10');
+    } else {
+      btn.classList.remove('border-primary', 'bg-primary/10');
+    }
+  });
 }

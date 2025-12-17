@@ -187,4 +187,78 @@ router.get('/test-connection', isAuthenticated, async (req, res) => {
   }
 });
 
+// GET: Fetch YouTube Stream Keys
+router.get('/stream-keys', isAuthenticated, async (req, res) => {
+  try {
+    // Check if user has connected their YouTube account
+    if (!req.session.youtubeTokens) {
+      return res.json({
+        success: false,
+        error: 'YouTube account not connected. Please connect your YouTube account first.'
+      });
+    }
+    
+    const { getYouTubeClient } = require('../config/google');
+    const youtube = getYouTubeClient(req.session.youtubeTokens, req.session.userId);
+    
+    // Fetch live broadcasts (streams)
+    const response = await youtube.liveBroadcasts.list({
+      part: ['snippet', 'contentDetails', 'status'],
+      mine: true,
+      maxResults: 50,
+      broadcastStatus: 'all'
+    });
+    
+    const broadcasts = response.data.items || [];
+    
+    // For each broadcast, get the stream details (which contains ingestion info)
+    const streamKeys = [];
+    for (const broadcast of broadcasts) {
+      try {
+        const streamId = broadcast.contentDetails?.boundStreamId;
+        if (streamId) {
+          const streamResponse = await youtube.liveStreams.list({
+            part: ['snippet', 'cdn', 'status'],
+            id: [streamId]
+          });
+          
+          const stream = streamResponse.data.items?.[0];
+          if (stream && stream.cdn?.ingestionInfo) {
+            streamKeys.push({
+              id: broadcast.id,
+              streamId: streamId,
+              title: broadcast.snippet?.title || 'Untitled Stream',
+              description: broadcast.snippet?.description || '',
+              scheduledStartTime: broadcast.snippet?.scheduledStartTime,
+              status: broadcast.status?.lifeCycleStatus,
+              privacyStatus: broadcast.status?.privacyStatus,
+              ingestionInfo: {
+                rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
+                streamName: stream.cdn.ingestionInfo.streamName,
+                rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
+              }
+            });
+          }
+        }
+      } catch (streamErr) {
+        console.warn('Failed to fetch stream details for broadcast:', broadcast.id, streamErr.message);
+      }
+    }
+    
+    return res.json({
+      success: true,
+      streamKeys: streamKeys,
+      count: streamKeys.length
+    });
+    
+  } catch (error) {
+    console.error('Error fetching YouTube stream keys:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch stream keys from YouTube API',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
