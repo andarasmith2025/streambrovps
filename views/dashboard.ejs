@@ -3017,8 +3017,8 @@
               let scheduleDate = new Date();
               scheduleDate.setHours(hours, minutes, 0, 0);
               
-              // If time has already passed today AND it's not recurring, use tomorrow
-              if (!isRecurring && scheduleDate <= now) {
+              // If time has already passed today, use tomorrow (for both recurring and one-time)
+              if (scheduleDate <= now) {
                 scheduleDate.setDate(scheduleDate.getDate() + 1);
                 console.log(`[Schedule] Time ${time} has passed today, scheduling for tomorrow`);
               }
