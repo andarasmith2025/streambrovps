@@ -193,7 +193,7 @@
     </div>
   </div>
   <div class="flex">
-    <div class="hidden lg:flex lg:fixed lg:flex-col w-48 h-screen pt-2 bg-dark-800 shadow-lg overflow-hidden border-r border-gray-700">
+    <div class="hidden lg:flex lg:fixed lg:flex-col w-56 h-screen pt-2 bg-dark-800 shadow-lg overflow-hidden border-r border-gray-700">
       <div class="flex items-center gap-2 h-14 px-4 mb-2">
         <img src="/images/streamhub.ico" alt="Streambro Light Logo" class="w-6 h-6">
         <span class="font-semibold tracking-tight text-white/90">Streambro</span>
@@ -264,9 +264,9 @@
         <span>Sign Out</span>
       </a>
     </div>
-    <div class="w-full lg:ml-48 flex flex-col min-h-screen">
+    <div class="w-full lg:ml-56 flex flex-col min-h-screen">
       <div
-        class="hidden lg:flex lg:fixed lg:flex top-0 right-0 left-48 items-center justify-end h-14 px-6 bg-dark-800 shadow-md z-10">
+        class="hidden lg:flex lg:fixed lg:flex top-0 right-0 left-56 items-center justify-end h-14 px-6 bg-dark-800 shadow-md z-10">
         <button id="profile-menu-button"
           class="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-gray-700 hover:ring-primary transition-all">
           <%- helpers.getAvatar(req) %>
@@ -295,7 +295,7 @@
       
     </nav>
     <div id="mobile-profile-popup"
-      class="fixed bottom-16 right-2 bg-dark-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden hidden transform transition-all duration-200 ease-out opacity-0 translate-y-4 w-40">
+      class="fixed top-16 right-4 bg-dark-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden hidden transform transition-all duration-200 ease-out opacity-0 translate-y-2 w-48 z-50">
       <div class="py-2 px-3">
         <div class="text-sm font-medium mb-1">
           <%= helpers.getUsername(req) %>
