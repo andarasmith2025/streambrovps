@@ -1048,8 +1048,8 @@ async function recoverActiveStreams() {
     for (const schedule of schedules) {
       try {
         const scheduleTime = new Date(schedule.schedule_time);
-        const scheduleHours = scheduleTime.getUTCHours();
-        const scheduleMinutes = scheduleTime.getUTCMinutes();
+        const scheduleHours = scheduleTime.getHours();
+        const scheduleMinutes = scheduleTime.getMinutes();
         const scheduleTimeStr = `${scheduleHours.toString().padStart(2, '0')}:${scheduleMinutes.toString().padStart(2, '0')}`;
         
         let shouldRecover = false;

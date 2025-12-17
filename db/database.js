@@ -227,7 +227,7 @@ function createTables() {
   });
 
   // Add user_timezone column for timezone-aware scheduling
-  db.run(`ALTER TABLE stream_schedules ADD COLUMN user_timezone TEXT DEFAULT 'UTC'`, (err) => {
+  db.run(`ALTER TABLE stream_schedules ADD COLUMN user_timezone TEXT DEFAULT 'Asia/Jakarta'`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding user_timezone column:', err.message);
     } else if (!err) {

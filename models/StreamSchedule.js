@@ -19,7 +19,7 @@ class StreamSchedule {
           'pending',
           data.is_recurring ? 1 : 0,
           data.recurring_days || null,
-          data.user_timezone || 'UTC',
+          data.user_timezone || 'Asia/Jakarta',
           now
         ],
         function (err) {
