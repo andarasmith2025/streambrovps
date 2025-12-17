@@ -47,9 +47,9 @@
 </div>
 
 <!-- New/Edit Broadcast Modal -->
-<div id="broadcastModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
-  <div class="flex min-h-screen items-center justify-center p-4">
-    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container">
+<div id="broadcastModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center overflow-y-auto p-4" style="z-index: 9999;">
+  <div class="flex min-h-full items-center justify-center">
+    <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl relative" style="z-index: 10000;">
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
         <h3 id="modalTitle" class="text-lg font-semibold">Create YouTube Live Broadcast</h3>
         <button onclick="closeBroadcastModal()" class="text-gray-400 hover:text-white transition-colors">

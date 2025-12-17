@@ -266,6 +266,7 @@ function openNewBroadcastModal() {
     }
     
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
   } catch (error) {
     console.error('Error opening modal:', error);
@@ -276,6 +277,7 @@ function openNewBroadcastModal() {
 function closeBroadcastModal() {
   const modal = document.getElementById('broadcastModal');
   modal.classList.add('hidden');
+  modal.classList.remove('flex');
   document.body.style.overflow = 'auto';
   document.getElementById('videoDropdown').classList.add('hidden');
 }
@@ -395,6 +397,7 @@ async function editBroadcast(id) {
     
     const modal = document.getElementById('broadcastModal');
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
     
   } catch (error) {
@@ -430,6 +433,7 @@ async function duplicateBroadcast(id) {
     
     const modal = document.getElementById('broadcastModal');
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
     
   } catch (error) {
