@@ -1059,18 +1059,35 @@ async function recoverActiveStreams() {
           const allowedDays = schedule.recurring_days ? schedule.recurring_days.split(',').map(d => parseInt(d)) : [];
           
           if (allowedDays.includes(currentDay)) {
-            // Check if we're within the schedule time window
-            const endTime = new Date(scheduleTime.getTime() + (schedule.duration * 60 * 1000));
-            const endHours = endTime.getUTCHours();
-            const endMinutes = endTime.getUTCMinutes();
+            // Parse schedule time as local time (not UTC)
+            let scheduleLocalHours, scheduleLocalMinutes;
             
-            const currentMinutes = now.getHours() * 60 + now.getMinutes();
-            const scheduleStartMinutes = scheduleHours * 60 + scheduleMinutes;
-            const scheduleEndMinutes = endHours * 60 + endMinutes;
+            if (schedule.schedule_time.endsWith('Z')) {
+              // UTC format - convert to local
+              scheduleLocalHours = scheduleTime.getHours();
+              scheduleLocalMinutes = scheduleTime.getMinutes();
+            } else {
+              // Local format - extract directly
+              const timePart = schedule.schedule_time.split('T')[1].split('.')[0];
+              const [h, m] = timePart.split(':').map(Number);
+              scheduleLocalHours = h;
+              scheduleLocalMinutes = m;
+            }
             
-            if (currentMinutes >= scheduleStartMinutes && currentMinutes < scheduleEndMinutes) {
+            // Calculate end time in local
+            const durationMs = schedule.duration * 60 * 1000;
+            const scheduleStartMs = scheduleLocalHours * 60 * 60 * 1000 + scheduleLocalMinutes * 60 * 1000;
+            const scheduleEndMs = scheduleStartMs + durationMs;
+            
+            const currentMs = now.getHours() * 60 * 60 * 1000 + now.getMinutes() * 60 * 1000 + now.getSeconds() * 1000;
+            
+            if (currentMs >= scheduleStartMs && currentMs < scheduleEndMs) {
               shouldRecover = true;
-              console.log(`[Recovery] Recurring schedule ${schedule.id} should be active now (${scheduleTimeStr} - ${endHours}:${endMinutes})`);
+              const endHours = Math.floor(scheduleEndMs / (60 * 60 * 1000));
+              const endMinutes = Math.floor((scheduleEndMs % (60 * 60 * 1000)) / (60 * 1000));
+              console.log(`[Recovery] Recurring schedule ${schedule.id} should be active now (${scheduleLocalHours}:${scheduleLocalMinutes} - ${endHours}:${endMinutes})`);
+            } else {
+              console.log(`[Recovery] Recurring schedule ${schedule.id} NOT in active window. Current: ${now.getHours()}:${now.getMinutes()}, Schedule: ${scheduleLocalHours}:${scheduleLocalMinutes} - ${Math.floor(scheduleEndMs / (60 * 60 * 1000))}:${Math.floor((scheduleEndMs % (60 * 60 * 1000)) / (60 * 1000))}`);
             }
           }
         } else {
