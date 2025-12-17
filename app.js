@@ -778,15 +778,6 @@ app.get('/gallery', isAuthenticated, async (req, res) => {
   }
 });
 
-// YouTube Schedule Live page
-app.get('/youtube/schedule', isAuthenticated, (req, res) => {
-  res.render('youtube-schedule', {
-    title: 'YouTube Schedule Live',
-    active: 'youtube-schedule',
-    user: req.session.user || {},
-    csrfToken: req.csrfToken ? req.csrfToken() : ''
-  });
-});
 app.get('/settings', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
