@@ -328,16 +328,6 @@ app.use('/youtube', youtubeRoutes);
 const youtubeApiRoutes = require('./routes/youtube-api');
 app.use('/api/youtube', youtubeApiRoutes);
 
-// YouTube Schedule Live page
-app.get('/youtube/schedule', isAuthenticated, (req, res) => {
-  res.render('youtube-schedule', {
-    title: 'YouTube Schedule Live',
-    active: 'youtube-schedule',
-    user: req.session.user || {},
-    csrfToken: req.csrfToken ? req.csrfToken() : ''
-  });
-});
-
 // Stream Templates routes
 const templatesRoutes = require('./routes/templates');
 app.use('/api/templates', templatesRoutes);
@@ -782,6 +772,16 @@ app.get('/gallery', isAuthenticated, async (req, res) => {
     console.error('Gallery error:', error);
     res.redirect('/dashboard');
   }
+});
+
+// YouTube Schedule Live page
+app.get('/youtube/schedule', isAuthenticated, (req, res) => {
+  res.render('youtube-schedule', {
+    title: 'YouTube Schedule Live',
+    active: 'youtube-schedule',
+    user: req.session.user || {},
+    csrfToken: req.csrfToken ? req.csrfToken() : ''
+  });
 });
 app.get('/settings', isAuthenticated, async (req, res) => {
   try {
