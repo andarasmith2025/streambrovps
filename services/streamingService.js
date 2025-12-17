@@ -1062,6 +1062,11 @@ async function recoverActiveStreams() {
             // Parse schedule time as local time (not UTC)
             let scheduleLocalHours, scheduleLocalMinutes;
             
+            if (!schedule.schedule_time) {
+              console.log(`[Recovery] Schedule ${schedule.id} has no schedule_time, skipping`);
+              continue;
+            }
+            
             if (schedule.schedule_time.endsWith('Z')) {
               // UTC format - convert to local
               scheduleLocalHours = scheduleTime.getHours();
