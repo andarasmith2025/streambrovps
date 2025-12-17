@@ -187,27 +187,43 @@ function getDayName(day) {
 async function checkStreamDurations() {
   try {
     if (!streamingService) {
-      console.error('StreamingService not initialized in scheduler');
+      console.error('[Duration Check] StreamingService not initialized in scheduler');
       return;
     }
+    
     const liveStreams = await Stream.findAll(null, 'live');
+    console.log(`[Duration Check] Found ${liveStreams.length} live stream(s)`);
+    
     for (const stream of liveStreams) {
-      if (stream.duration && stream.start_time && !scheduledTerminations.has(stream.id)) {
+      console.log(`[Duration Check] Checking stream ${stream.id}: duration=${stream.duration}, start_time=${stream.start_time}`);
+      
+      if (stream.duration && stream.start_time) {
         const startTime = new Date(stream.start_time);
         const durationMs = stream.duration * 60 * 1000;
         const shouldEndAt = new Date(startTime.getTime() + durationMs);
         const now = new Date();
+        
+        const elapsedMs = now.getTime() - startTime.getTime();
+        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+        const remainingMs = shouldEndAt.getTime() - now.getTime();
+        const remainingMinutes = Math.floor(remainingMs / 60000);
+        
+        console.log(`[Duration Check] Stream ${stream.id}: elapsed=${elapsedMinutes}m, remaining=${remainingMinutes}m, shouldEnd=${shouldEndAt.toLocaleString()}`);
+        
         if (shouldEndAt <= now) {
-          console.log(`Stream ${stream.id} exceeded duration, stopping now`);
+          console.log(`[Duration Check] ⚠️ Stream ${stream.id} exceeded duration by ${Math.abs(remainingMinutes)} minutes, stopping now!`);
           await streamingService.stopStream(stream.id);
-        } else {
+          scheduledTerminations.delete(stream.id);
+        } else if (!scheduledTerminations.has(stream.id)) {
           const timeUntilEnd = shouldEndAt.getTime() - now.getTime();
           scheduleStreamTermination(stream.id, timeUntilEnd / 60000);
         }
+      } else {
+        console.log(`[Duration Check] Stream ${stream.id} missing duration or start_time, skipping`);
       }
     }
   } catch (error) {
-    console.error('Error checking stream durations:', error);
+    console.error('[Duration Check] Error checking stream durations:', error);
   }
 }
 function scheduleStreamTermination(streamId, durationMinutes) {
