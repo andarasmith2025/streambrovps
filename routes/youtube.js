@@ -157,14 +157,41 @@ router.post('/broadcasts/:id/thumbnail', upload.single('file'), async (req, res)
   }
 });
 
-function getTokensFromReq(req) {
-  if (req.session && req.session.youtubeTokens) return req.session.youtubeTokens;
+async function getTokensFromReq(req) {
   const userId = req.session && (req.session.userId || req.session.user_id);
+  
+  // If tokens in session, return them (already have _userCredentials from OAuth)
+  if (req.session && req.session.youtubeTokens) {
+    return req.session.youtubeTokens;
+  }
+  
+  // Otherwise fetch from database
+  if (!userId) return null;
+  
   return new Promise((resolve) => {
-    if (!userId) return resolve(null);
+    // Get tokens
     db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], (err, row) => {
       if (err || !row) return resolve(null);
-      resolve({ access_token: row.access_token, refresh_token: row.refresh_token, expiry_date: row.expiry_date });
+      
+      // Get user credentials
+      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], (err2, userRow) => {
+        const tokens = { 
+          access_token: row.access_token, 
+          refresh_token: row.refresh_token, 
+          expiry_date: row.expiry_date 
+        };
+        
+        // Attach user credentials if available
+        if (!err2 && userRow && userRow.youtube_client_id && userRow.youtube_client_secret) {
+          tokens._userCredentials = {
+            client_id: userRow.youtube_client_id,
+            client_secret: userRow.youtube_client_secret,
+            redirect_uri: userRow.youtube_redirect_uri
+          };
+        }
+        
+        resolve(tokens);
+      });
     });
   });
 }
