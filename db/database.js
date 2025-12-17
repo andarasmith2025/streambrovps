@@ -213,6 +213,31 @@ function createTables() {
     }
   });
 
+  // Add YouTube API credentials per user
+  db.run(`ALTER TABLE users ADD COLUMN youtube_client_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_client_id column:', err.message);
+    } else if (!err) {
+      console.log('Added youtube_client_id column to users table');
+    }
+  });
+
+  db.run(`ALTER TABLE users ADD COLUMN youtube_client_secret TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_client_secret column:', err.message);
+    } else if (!err) {
+      console.log('Added youtube_client_secret column to users table');
+    }
+  });
+
+  db.run(`ALTER TABLE users ADD COLUMN youtube_redirect_uri TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_redirect_uri column:', err.message);
+    } else if (!err) {
+      console.log('Added youtube_redirect_uri column to users table');
+    }
+  });
+
   // Add recurring columns to stream_schedules
   db.run(`ALTER TABLE stream_schedules ADD COLUMN is_recurring BOOLEAN DEFAULT 0`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {

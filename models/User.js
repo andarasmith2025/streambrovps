@@ -264,5 +264,51 @@ class User {
       );
     });
   }
+
+  // YouTube API credentials management
+  static updateYouTubeCredentials(userId, credentials) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE users SET 
+          youtube_client_id = ?, 
+          youtube_client_secret = ?, 
+          youtube_redirect_uri = ?,
+          updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?`,
+        [
+          credentials.client_id || null,
+          credentials.client_secret || null,
+          credentials.redirect_uri || null,
+          userId
+        ],
+        function (err) {
+          if (err) {
+            console.error('Database error in updateYouTubeCredentials:', err);
+            return reject(err);
+          }
+          resolve({ 
+            id: userId, 
+            youtube_configured: !!(credentials.client_id && credentials.client_secret)
+          });
+        }
+      );
+    });
+  }
+
+  static getYouTubeCredentials(userId) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?',
+        [userId],
+        (err, row) => {
+          if (err) {
+            console.error('Database error in getYouTubeCredentials:', err);
+            return reject(err);
+          }
+          resolve(row || {});
+        }
+      );
+    });
+  }
 }
 module.exports = User;

@@ -324,6 +324,10 @@ app.use('/oauth2', oauthRoutes);
 const youtubeRoutes = require('./routes/youtube');
 app.use('/youtube', youtubeRoutes);
 
+// YouTube API configuration routes
+const youtubeApiRoutes = require('./routes/youtube-api');
+app.use('/api/youtube', youtubeApiRoutes);
+
 // Stream Templates routes
 const templatesRoutes = require('./routes/templates');
 app.use('/api/templates', templatesRoutes);
