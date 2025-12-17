@@ -148,6 +148,14 @@ module.exports = {
       },
     });
   },
+  async getBroadcast(tokens, { broadcastId }) {
+    const yt = getYouTubeClient(tokens);
+    const response = await yt.liveBroadcasts.list({
+      part: 'snippet,status,contentDetails,cdn',
+      id: broadcastId
+    });
+    return response.data.items?.[0] || null;
+  },
   async deleteBroadcast(tokens, { broadcastId }) {
     const yt = getYouTubeClient(tokens);
     return yt.liveBroadcasts.delete({ id: broadcastId });

@@ -151,6 +151,30 @@ function createTables() {
     }
   });
 
+  // Table for YouTube broadcasts (link broadcast with video and stream)
+  db.run(`CREATE TABLE IF NOT EXISTS youtube_broadcasts (
+    id TEXT PRIMARY KEY,
+    broadcast_id TEXT UNIQUE NOT NULL,
+    user_id TEXT NOT NULL,
+    video_id TEXT,
+    stream_id TEXT,
+    title TEXT,
+    description TEXT,
+    scheduled_start_time TIMESTAMP,
+    stream_key TEXT,
+    rtmp_url TEXT,
+    status TEXT DEFAULT 'upcoming',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (video_id) REFERENCES videos(id),
+    FOREIGN KEY (stream_id) REFERENCES streams(id) ON DELETE SET NULL
+  )`, (err) => {
+    if (err) {
+      console.error('Error creating youtube_broadcasts table:', err.message);
+    }
+  });
+
   // Table for multiple stream schedules
   db.run(`CREATE TABLE IF NOT EXISTS stream_schedules (
     id TEXT PRIMARY KEY,

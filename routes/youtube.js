@@ -27,6 +27,21 @@ router.post('/broadcasts/:id/audience', async (req, res) => {
   }
 });
 
+// Get single broadcast
+router.get('/broadcasts/:id', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: 'id is required' });
+    const broadcast = await youtubeService.getBroadcast(tokens, { broadcastId: id });
+    return res.json({ success: true, broadcast });
+  } catch (err) {
+    console.error('[YouTube] get broadcast error:', err?.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to get broadcast' });
+  }
+});
+
 // Delete a broadcast
 router.delete('/broadcasts/:id', async (req, res) => {
   try {
@@ -108,7 +123,7 @@ router.get('/manage', (req, res) => {
     return res.redirect('/dashboard');
   }
   const youtubeConnected = !!(req.session && req.session.youtubeTokens);
-  return res.render('youtube_manage', { title: 'YouTube', active: '', youtubeConnected });
+  return res.render('youtube_manage', { title: 'YouTube Manage', active: 'youtube-manage', youtubeConnected });
 });
 
 // List user's live streams (ingestion info + masked stream key)

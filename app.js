@@ -328,6 +328,10 @@ app.use('/youtube', youtubeRoutes);
 const youtubeApiRoutes = require('./routes/youtube-api');
 app.use('/api/youtube', youtubeApiRoutes);
 
+// YouTube Broadcasts routes (local database)
+const youtubeBroadcastsRoutes = require('./routes/youtube-broadcasts');
+app.use('/api/youtube-broadcasts', youtubeBroadcastsRoutes);
+
 // Stream Templates routes
 const templatesRoutes = require('./routes/templates');
 app.use('/api/templates', templatesRoutes);
@@ -802,34 +806,66 @@ app.get('/settings', isAuthenticated, async (req, res) => {
 });
 app.get('/history', isAuthenticated, async (req, res) => {
   try {
+    res.render('history', {
+      active: 'history',
+      title: 'Stream History',
+      helpers: app.locals.helpers
+    });
+  } catch (error) {
+    console.error('Error rendering history page:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load stream history',
+      error: error
+    });
+  }
+});
+
+// API endpoint to get history with pagination
+app.get('/api/history', isAuthenticated, async (req, res) => {
+  try {
     const db = require('./db/database').db;
+    const limit = parseInt(req.query.limit) || 1000;
+    
+    // Auto-cleanup: Keep only last 1000 records per user
+    await new Promise((resolve, reject) => {
+      db.run(
+        `DELETE FROM stream_history 
+         WHERE id NOT IN (
+           SELECT id FROM stream_history 
+           WHERE user_id = ? 
+           ORDER BY start_time DESC 
+           LIMIT 1000
+         ) AND user_id = ?`,
+        [req.session.userId, req.session.userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+    
+    // Get history
     const history = await new Promise((resolve, reject) => {
       db.all(
         `SELECT h.*, v.thumbnail_path 
          FROM stream_history h 
          LEFT JOIN videos v ON h.video_id = v.id 
          WHERE h.user_id = ? 
-         ORDER BY h.start_time DESC`,
-        [req.session.userId],
+         ORDER BY h.start_time DESC 
+         LIMIT ?`,
+        [req.session.userId, limit],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows);
         }
       );
     });
-    res.render('history', {
-      active: 'history',
-      title: 'Stream History',
-      history: history,
-      helpers: app.locals.helpers
-    });
+    
+    res.json({ success: true, history: history || [] });
   } catch (error) {
     console.error('Error fetching stream history:', error);
-    res.status(500).render('error', {
-      title: 'Error',
-      message: 'Failed to load stream history',
-      error: error
-    });
+    res.status(500).json({ success: false, error: 'Failed to load history' });
   }
 });
 app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
@@ -868,6 +904,42 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to delete history entry'
+    });
+  }
+});
+
+// Bulk delete history entries
+app.post('/api/history/bulk-delete', isAuthenticated, async (req, res) => {
+  try {
+    const db = require('./db/database').db;
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No IDs provided'
+      });
+    }
+    
+    // Delete only entries that belong to the user
+    const placeholders = ids.map(() => '?').join(',');
+    await new Promise((resolve, reject) => {
+      db.run(
+        `DELETE FROM stream_history WHERE id IN (${placeholders}) AND user_id = ?`,
+        [...ids, req.session.userId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this);
+        }
+      );
+    });
+    
+    res.json({ success: true, message: `${ids.length} history entries deleted` });
+  } catch (error) {
+    console.error('Error bulk deleting history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete history entries'
     });
   }
 });
