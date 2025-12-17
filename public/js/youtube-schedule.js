@@ -230,23 +230,47 @@ function createBroadcastRow(broadcast) {
 }
 
 function openNewBroadcastModal() {
-  currentEditingId = null;
-  document.getElementById('modalTitle').textContent = 'Create YouTube Live Broadcast';
-  document.getElementById('submitButton').textContent = 'Create Broadcast';
-  document.getElementById('broadcastForm').reset();
-  document.getElementById('selectedVideoText').textContent = 'Choose a video...';
-  document.getElementById('selectedVideoText').classList.add('text-gray-400');
-  document.getElementById('selectedVideoText').classList.remove('text-white');
-  document.getElementById('streamKeyInfo').classList.add('hidden');
-  
-  // Set default scheduled time to 1 hour from now
-  const now = new Date();
-  now.setHours(now.getHours() + 1);
-  document.getElementById('broadcastScheduledTime').value = now.toISOString().slice(0, 16);
-  
-  const modal = document.getElementById('broadcastModal');
-  modal.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  try {
+    currentEditingId = null;
+    
+    const modalTitle = document.getElementById('modalTitle');
+    const submitButton = document.getElementById('submitButton');
+    const broadcastForm = document.getElementById('broadcastForm');
+    const selectedVideoText = document.getElementById('selectedVideoText');
+    const streamKeyInfo = document.getElementById('streamKeyInfo');
+    const broadcastScheduledTime = document.getElementById('broadcastScheduledTime');
+    const modal = document.getElementById('broadcastModal');
+    
+    if (!modal) {
+      console.error('Modal element not found');
+      return;
+    }
+    
+    if (modalTitle) modalTitle.textContent = 'Create YouTube Live Broadcast';
+    if (submitButton) submitButton.textContent = 'Create Broadcast';
+    if (broadcastForm) broadcastForm.reset();
+    
+    if (selectedVideoText) {
+      selectedVideoText.textContent = 'Choose a video...';
+      selectedVideoText.classList.add('text-gray-400');
+      selectedVideoText.classList.remove('text-white');
+    }
+    
+    if (streamKeyInfo) streamKeyInfo.classList.add('hidden');
+    
+    // Set default scheduled time to 1 hour from now
+    if (broadcastScheduledTime) {
+      const now = new Date();
+      now.setHours(now.getHours() + 1);
+      broadcastScheduledTime.value = now.toISOString().slice(0, 16);
+    }
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  } catch (error) {
+    console.error('Error opening modal:', error);
+    alert('Error opening modal. Please refresh the page.');
+  }
 }
 
 function closeBroadcastModal() {
