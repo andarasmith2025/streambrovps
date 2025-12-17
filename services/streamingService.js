@@ -697,6 +697,8 @@ async function stopStream(streamId) {
     }
     
     if (stream) {
+      // Clear active_schedule_id when stopping
+      await Stream.update(streamId, { active_schedule_id: null });
       await Stream.updateStatus(streamId, 'offline', stream.user_id);
       const updatedStream = await Stream.findById(streamId);
       await saveStreamHistory(updatedStream);

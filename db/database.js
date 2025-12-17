@@ -260,6 +260,15 @@ function createTables() {
     }
   });
 
+  // Add active_schedule_id to streams table to track which schedule is currently running
+  db.run(`ALTER TABLE streams ADD COLUMN active_schedule_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding active_schedule_id column:', err.message);
+    } else if (!err) {
+      console.log('Added active_schedule_id column to streams table');
+    }
+  });
+
   // Stream Templates table for saving/loading configurations
   db.run(`CREATE TABLE IF NOT EXISTS stream_templates (
     id TEXT PRIMARY KEY,

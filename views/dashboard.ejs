@@ -1559,29 +1559,12 @@
           
           // Helper function to check if a schedule is currently active
           function isScheduleActive(stream, schedule) {
-            if (stream.status !== 'live') return false;
-            
-            const now = new Date();
-            const schStart = parseScheduleTime(schedule.schedule_time);
-            const schEnd = new Date(schStart.getTime() + (parseInt(schedule.duration) * 60 * 1000));
-            
-            if (schedule.is_recurring && schedule.recurring_days) {
-              const currentDay = now.getDay();
-              const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
-              if (!allowedDays.includes(currentDay)) return false;
-              
-              const nowTime = now.getHours() * 60 + now.getMinutes();
-              const startTime = schStart.getHours() * 60 + schStart.getMinutes();
-              const endTime = schEnd.getHours() * 60 + schEnd.getMinutes();
-              
-              // Allow 15 minute tolerance before schedule start (for early starts)
-              const startTimeWithTolerance = startTime - 15;
-              return nowTime >= startTimeWithTolerance && nowTime < endTime;
-            } else {
-              // For one-time schedules, allow 15 minute tolerance before start
-              const startWithTolerance = new Date(schStart.getTime() - (15 * 60 * 1000));
-              return now >= startWithTolerance && now < schEnd;
+            // PRECISE: Check if this schedule ID matches the active_schedule_id in stream
+            // This is set by scheduler when it starts the stream
+            if (stream.status === 'live' && stream.active_schedule_id) {
+              return stream.active_schedule_id === schedule.id;
             }
+            return false;
           }
           
           function _createStreamTableRow(stream) {
