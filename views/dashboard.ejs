@@ -1007,6 +1007,35 @@
         }
       </style>
       <script>
+        // Inline fallback for switchStreamTab (will be overridden by stream-modal.js if loaded)
+        let currentStreamTab = 'manual';
+        
+        function switchStreamTab(tab) {
+          console.log('[switchStreamTab-inline] Switching to tab:', tab);
+          currentStreamTab = tab;
+          
+          const manualTab = document.getElementById('tabManual');
+          const youtubeTab = document.getElementById('tabYouTube');
+          const manualFields = document.getElementById('manualRtmpFields');
+          const youtubeFields = document.getElementById('youtubeApiFields');
+          
+          if (tab === 'manual') {
+            manualTab?.classList.add('bg-primary', 'text-white');
+            manualTab?.classList.remove('text-gray-400', 'hover:bg-dark-700');
+            youtubeTab?.classList.remove('bg-primary', 'text-white');
+            youtubeTab?.classList.add('text-gray-400', 'hover:bg-dark-700');
+            manualFields?.classList.remove('hidden');
+            youtubeFields?.classList.add('hidden');
+          } else if (tab === 'youtube') {
+            youtubeTab?.classList.add('bg-primary', 'text-white');
+            youtubeTab?.classList.remove('text-gray-400', 'hover:bg-dark-700');
+            manualTab?.classList.remove('bg-primary', 'text-white');
+            manualTab?.classList.add('text-gray-400', 'hover:bg-dark-700');
+            youtubeFields?.classList.remove('hidden');
+            manualFields?.classList.add('hidden');
+          }
+        }
+        
         function formatMemory(value) {
           if (!value) return '0 MB';
           // If already formatted string, return as is
