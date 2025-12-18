@@ -960,6 +960,46 @@ async function cleanupOrphanedTempFiles() {
   }
 }
 
+async function recoverStreamsAfterRestart(liveStreams) {
+  console.log(`[Recovery] Starting recovery for ${liveStreams.length} stream(s) that were live before restart...`);
+  
+  const now = new Date();
+  let recoveredCount = 0;
+  let failedCount = 0;
+  
+  for (const streamInfo of liveStreams) {
+    try {
+      const startTime = new Date(streamInfo.start_time);
+      const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+      
+      // Only recover streams that were started less than 24 hours ago
+      if (elapsedMinutes < 1440) { // 24 hours
+        console.log(`[Recovery] Recovering stream ${streamInfo.id} (${streamInfo.title}), elapsed: ${elapsedMinutes} minutes`);
+        
+        const result = await startStream(streamInfo.id, {
+          isRecovery: true,
+          skipStatusCheck: true
+        });
+        
+        if (result.success) {
+          recoveredCount++;
+          console.log(`[Recovery] ✓ Successfully recovered stream ${streamInfo.id}`);
+        } else {
+          failedCount++;
+          console.error(`[Recovery] ✗ Failed to recover stream ${streamInfo.id}: ${result.error}`);
+        }
+      } else {
+        console.log(`[Recovery] Stream ${streamInfo.id} too old (${elapsedMinutes} minutes), skipping`);
+      }
+    } catch (error) {
+      failedCount++;
+      console.error(`[Recovery] ✗ Error recovering stream ${streamInfo.id}:`, error.message);
+    }
+  }
+  
+  console.log(`[Recovery] Recovery complete: ${recoveredCount} succeeded, ${failedCount} failed`);
+}
+
 async function recoverActiveStreams() {
   console.log('[Recovery] Starting auto-recovery for active streams...');
   
@@ -1171,6 +1211,7 @@ module.exports = {
   syncStreamStatuses,
   saveStreamHistory,
   recoverActiveStreams,
+  recoverStreamsAfterRestart,
   cleanupOrphanedTempFiles,
   getStreamLimiterStats
 };

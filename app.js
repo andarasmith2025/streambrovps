@@ -2907,9 +2907,17 @@ const server = app.listen(port, '0.0.0.0', async () => {
   } else {
     console.log(`  http://localhost:${port}`);
   }
+  // Store live streams before resetting for recovery
+  let liveStreamsBeforeReset = [];
   try {
     const streams = await Stream.findAll(null, 'live');
     if (streams && streams.length > 0) {
+      console.log(`Found ${streams.length} live streams before reset`);
+      liveStreamsBeforeReset = streams.map(s => ({
+        id: s.id,
+        title: s.title,
+        start_time: s.start_time
+      }));
       console.log(`Resetting ${streams.length} live streams to offline state...`);
       for (const stream of streams) {
         await Stream.updateStatus(stream.id, 'offline');
@@ -2940,7 +2948,16 @@ const server = app.listen(port, '0.0.0.0', async () => {
   setTimeout(async () => {
     try {
       console.log('[Startup] Initiating auto-recovery for active streams...');
-      await streamingService.recoverActiveStreams();
+      
+      // Pass the list of streams that were live before reset
+      if (liveStreamsBeforeReset.length > 0) {
+        console.log(`[Startup] Attempting to recover ${liveStreamsBeforeReset.length} stream(s) that were live before restart`);
+        await streamingService.recoverStreamsAfterRestart(liveStreamsBeforeReset);
+      } else {
+        // Fallback to normal recovery (for scheduled streams)
+        await streamingService.recoverActiveStreams();
+      }
+      
       console.log('[Startup] Auto-recovery completed');
     } catch (error) {
       console.error('[Startup] Failed to recover active streams:', error);
