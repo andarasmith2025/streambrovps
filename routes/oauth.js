@@ -136,49 +136,45 @@ router.get('/youtube/stream-keys', async (req, res) => {
     console.log('[OAuth] Fetching stream keys for user:', userId);
     const yt = getYouTubeClient(req.session.youtubeTokens, userId);
     
-    // Fetch live broadcasts (streams)
-    console.log('[OAuth] Calling YouTube API liveBroadcasts.list...');
-    const response = await yt.liveBroadcasts.list({
-      part: ['snippet', 'contentDetails', 'status'],
+    // Fetch live streams directly (this contains the stream keys)
+    console.log('[OAuth] Calling YouTube API liveStreams.list...');
+    const response = await yt.liveStreams.list({
+      part: ['snippet', 'cdn', 'status'],
       mine: true,
       maxResults: 50
     });
     
-    const broadcasts = response.data.items || [];
-    console.log('[OAuth] Found', broadcasts.length, 'broadcasts');
+    const streams = response.data.items || [];
+    console.log('[OAuth] Found', streams.length, 'live streams');
     
-    // For each broadcast, get the stream details (which contains ingestion info)
+    // Extract stream keys from streams that have ingestion info
     const streamKeys = [];
-    for (const broadcast of broadcasts) {
+    
+    for (const stream of streams) {
       try {
-        const streamId = broadcast.contentDetails?.boundStreamId;
-        if (streamId) {
-          const streamResponse = await yt.liveStreams.list({
-            part: ['snippet', 'cdn', 'status'],
-            id: [streamId]
+        if (stream.cdn?.ingestionInfo) {
+          streamKeys.push({
+            id: stream.id,
+            streamId: stream.id,
+            title: stream.snippet?.title || 'Untitled Stream',
+            description: stream.snippet?.description || '',
+            status: stream.status?.streamStatus,
+            ingestionInfo: {
+              rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
+              streamName: stream.cdn.ingestionInfo.streamName,
+              rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
+            }
           });
-          
-          const stream = streamResponse.data.items?.[0];
-          if (stream && stream.cdn?.ingestionInfo) {
-            streamKeys.push({
-              id: broadcast.id,
-              streamId: streamId,
-              title: broadcast.snippet?.title || 'Untitled Stream',
-              description: broadcast.snippet?.description || '',
-              scheduledStartTime: broadcast.snippet?.scheduledStartTime,
-              status: broadcast.status?.lifeCycleStatus,
-              ingestionInfo: {
-                rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
-                streamName: stream.cdn.ingestionInfo.streamName,
-                rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
-              }
-            });
-          }
+          console.log(`[OAuth] Added stream key: ${stream.snippet?.title} (${stream.status?.streamStatus})`);
+        } else {
+          console.log(`[OAuth] Stream ${stream.id} has no ingestion info`);
         }
       } catch (streamErr) {
-        console.warn('Failed to fetch stream details for broadcast:', broadcast.id, streamErr.message);
+        console.warn('[OAuth] Failed to process stream:', stream.id, streamErr.message);
       }
     }
+    
+    console.log('[OAuth] Finished processing, found', streamKeys.length, 'stream keys with ingestion info');
     
     return res.json({
       success: true,
