@@ -2329,6 +2329,13 @@
         function editStream(streamId) {
           if (!streamId) return;
 
+          // Check if edit modal exists
+          const editModal = document.getElementById('editStreamModal');
+          if (!editModal) {
+            showNotification('Info', 'Edit feature is currently under development. You can view stream information and use Start/Stop controls to manage your stream.', 'info');
+            return;
+          }
+
           // Show loading notification
           showNotification('Loading', 'Fetching stream data...', 'info');
 
@@ -2470,7 +2477,9 @@
 
             const modal = document.getElementById('editStreamModal');
             if (!modal) {
-              throw new Error('Edit modal not found');
+              console.error('Edit modal element not found in DOM');
+              showNotification('Error', 'Edit modal is not available. This feature is under development. Please use the stream controls to manage your stream.', 'error');
+              return;
             }
             document.body.style.overflow = 'hidden';
             modal.classList.remove('hidden');
