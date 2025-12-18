@@ -349,6 +349,8 @@ function toggleStreamKeyVisibility() {
   const streamKeyInput = document.getElementById('streamKey');
   const streamKeyToggle = document.getElementById('streamKeyToggle');
   
+  if (!streamKeyInput || !streamKeyToggle) return;
+  
   if (streamKeyInput.type === 'password') {
     streamKeyInput.type = 'text';
     streamKeyToggle.className = 'ti ti-eye-off';
@@ -759,14 +761,8 @@ document.addEventListener('DOMContentLoaded', function () {
   window.selectVideo = selectVideo;
   window.setVideoOrientation = setVideoOrientation;
   window.toggleStreamKeyVisibility = toggleStreamKeyVisibility;
-  window.toggleStreamMode = toggleStreamMode;
-  window.calculateDurationFromEndTime = calculateDurationFromEndTime;
-  window.calculateFromDuration = calculateFromDuration;
-  window.calculateEndTimeFromDuration = calculateEndTimeFromDuration;
-  window.selectAllDays = selectAllDays;
-  window.selectAllDaysInSlot = selectAllDaysInSlot;
-  window.addScheduleSlot = addScheduleSlot;
-  window.removeScheduleSlot = removeScheduleSlot;
+  // Note: toggleStreamMode, calculateDurationFromEndTime, calculateFromDuration, calculateEndTimeFromDuration
+  // selectAllDays, selectAllDaysInSlot, addScheduleSlot, removeScheduleSlot are defined in dashboard.ejs inline
   
   console.log('[stream-modal.js] All functions exposed globally');
   
@@ -1104,3 +1100,5 @@ window.toggleScheduleSection = toggleScheduleSection;
 
 console.log('[stream-modal.js] YouTube API functions exposed globally');
 console.log('[stream-modal.js] Loaded successfully');
+
+// Note: YouTube platform selector is handled by event delegation in dashboard.ejs inline JavaScript
