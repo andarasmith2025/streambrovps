@@ -894,8 +894,11 @@ console.log('[stream-modal.js] switchStreamTab function defined and exposed glob
 // Load YouTube stream keys from OAuth
 async function loadYouTubeStreamKeys() {
   try {
-    const response = await fetch('/api/youtube/stream-keys');
+    console.log('[loadYouTubeStreamKeys] Fetching stream keys from YouTube...');
+    const response = await fetch('/oauth2/youtube/stream-keys');
+    console.log('[loadYouTubeStreamKeys] Response status:', response.status);
     const data = await response.json();
+    console.log('[loadYouTubeStreamKeys] Data received:', data);
     
     if (data.success && data.streamKeys) {
       youtubeStreamKeys = data.streamKeys;

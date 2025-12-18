@@ -290,29 +290,49 @@
                         placeholder="Stream description (optional)"></textarea>
                     </div>
                     
-                    <!-- Platform Selection -->
-                    <div>
-                      <label class="text-sm font-medium text-white block mb-2">Platform</label>
-                      <select id="youtubePlatform" onchange="updateYouTubeRtmpUrl()"
-                        class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
-                        <option value="">Select Platform</option>
-                        <option value="rtmps://a.rtmp.youtube.com/live2">YouTube</option>
-                        <option value="rtmps://b.rtmp.youtube.com/live2?backup=1">YouTube (Backup)</option>
-                        <option value="custom">Custom RTMP URL</option>
-                      </select>
-                    </div>
-                    
-                    <!-- RTMP URL -->
-                    <div>
-                      <label class="text-sm font-medium text-white block mb-2">RTMP Server URL</label>
+                    <!-- Stream Configuration (same style as Manual RTMP) -->
+                    <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
+                    <div class="space-y-2">
                       <div class="relative">
                         <input type="text" id="youtubeRtmpUrl"
-                          class="w-full px-4 py-2.5 pl-10 pr-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="Select platform or enter custom RTMP URL"
-                          value="">
-                        <i class="ti ti-link text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                          class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                          placeholder="RTMP URL">
+                        <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <button type="button" id="youtubePlatformSelector"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-600 transition-colors"
+                          aria-label="Select platform">
+                          <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
+                        </button>
+                        <div id="youtubePlatformDropdown"
+                          class="hidden absolute z-10 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
+                          <div class="py-1">
+                            <button type="button"
+                              class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600"
+                              data-url="rtmps://a.rtmp.youtube.com/live2">
+                              <i class="ti ti-brand-youtube text-red-500 text-base mr-2"></i>
+                              <span class="text-sm">YouTube</span>
+                            </button>
+                            <button type="button"
+                              class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600"
+                              data-url="rtmps://b.rtmp.youtube.com/live2?backup=1">
+                              <i class="ti ti-brand-youtube text-red-400 text-base mr-2"></i>
+                              <span class="text-sm">YouTube (Backup)</span>
+                            </button>
+                            <button type="button"
+                              class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600"
+                              data-url="rtmps://live-api-s.facebook.com:443/rtmp">
+                              <i class="ti ti-brand-facebook text-blue-500 text-base mr-2"></i>
+                              <span class="text-sm">Facebook</span>
+                            </button>
+                            <button type="button"
+                              class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600"
+                              data-url="rtmps://ingest.global.live.prod.tiktok.com/live">
+                              <i class="ti ti-brand-tiktok text-black text-base mr-2"></i>
+                              <span class="text-sm">TikTok</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
                     
                     <!-- Stream Key with Load Button -->
                     <div>
@@ -3520,33 +3540,36 @@
           preview.classList.add('hidden');
         }
         
-        // Update YouTube RTMP URL from platform selector
-        function updateYouTubeRtmpUrl() {
-          const platformSelect = document.getElementById('youtubePlatform');
-          const rtmpUrlInput = document.getElementById('youtubeRtmpUrl');
+        // YouTube Platform Selector (same as Manual RTMP)
+        document.addEventListener('DOMContentLoaded', function() {
+          const youtubePlatformSelector = document.getElementById('youtubePlatformSelector');
+          const youtubePlatformDropdown = document.getElementById('youtubePlatformDropdown');
+          const youtubeRtmpUrlInput = document.getElementById('youtubeRtmpUrl');
           
-          if (!platformSelect || !rtmpUrlInput) return;
-          
-          const selectedValue = platformSelect.value;
-          
-          if (selectedValue && selectedValue !== 'custom') {
-            rtmpUrlInput.value = selectedValue;
-            rtmpUrlInput.readOnly = true;
-            rtmpUrlInput.classList.add('bg-dark-800', 'text-gray-400', 'cursor-not-allowed');
-            rtmpUrlInput.classList.remove('bg-dark-700');
-          } else if (selectedValue === 'custom') {
-            rtmpUrlInput.value = '';
-            rtmpUrlInput.readOnly = false;
-            rtmpUrlInput.classList.remove('bg-dark-800', 'text-gray-400', 'cursor-not-allowed');
-            rtmpUrlInput.classList.add('bg-dark-700');
-            rtmpUrlInput.placeholder = 'Enter custom RTMP URL';
-          } else {
-            rtmpUrlInput.value = '';
-            rtmpUrlInput.readOnly = false;
-            rtmpUrlInput.classList.remove('bg-dark-800', 'text-gray-400', 'cursor-not-allowed');
-            rtmpUrlInput.classList.add('bg-dark-700');
+          if (youtubePlatformSelector && youtubePlatformDropdown) {
+            youtubePlatformSelector.addEventListener('click', function(e) {
+              e.stopPropagation();
+              youtubePlatformDropdown.classList.toggle('hidden');
+            });
+            
+            document.addEventListener('click', function(e) {
+              if (!youtubePlatformDropdown.contains(e.target) && e.target !== youtubePlatformSelector) {
+                youtubePlatformDropdown.classList.add('hidden');
+              }
+            });
+            
+            const youtubePlatformOptions = document.querySelectorAll('.youtube-platform-option');
+            youtubePlatformOptions.forEach(option => {
+              option.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                if (youtubeRtmpUrlInput) {
+                  youtubeRtmpUrlInput.value = url;
+                }
+                youtubePlatformDropdown.classList.add('hidden');
+              });
+            });
           }
-        }
+        });
         
         function updateServerTime() {
           fetch('/api/server-time')
