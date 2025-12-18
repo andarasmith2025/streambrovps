@@ -148,33 +148,47 @@ router.get('/youtube/stream-keys', async (req, res) => {
     console.log('[OAuth] Found', streams.length, 'live streams');
     
     // Extract stream keys from streams that have ingestion info
+    // Filter only reusable stream keys (not currently active broadcasts)
     const streamKeys = [];
     
     for (const stream of streams) {
       try {
-        if (stream.cdn?.ingestionInfo) {
+        const streamStatus = stream.status?.streamStatus;
+        const hasIngestionInfo = stream.cdn?.ingestionInfo;
+        
+        console.log(`[OAuth] Processing stream: ${stream.snippet?.title} - Status: ${streamStatus}, Has Ingestion: ${!!hasIngestionInfo}`);
+        
+        if (!hasIngestionInfo) {
+          console.log(`[OAuth] Skipping ${stream.id} - no ingestion info`);
+          continue;
+        }
+        
+        // Only include stream keys that are ready to use (not active broadcasts)
+        // Status can be: 'inactive', 'ready', 'active', 'error', 'created'
+        // We want 'inactive' and 'ready' - these are reusable stream keys
+        if (streamStatus === 'inactive' || streamStatus === 'ready' || streamStatus === 'created') {
           streamKeys.push({
             id: stream.id,
             streamId: stream.id,
             title: stream.snippet?.title || 'Untitled Stream',
             description: stream.snippet?.description || '',
-            status: stream.status?.streamStatus,
+            status: streamStatus,
             ingestionInfo: {
               rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
               streamName: stream.cdn.ingestionInfo.streamName,
               rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
             }
           });
-          console.log(`[OAuth] Added stream key: ${stream.snippet?.title} (${stream.status?.streamStatus})`);
+          console.log(`[OAuth] ✓ Added stream key: ${stream.snippet?.title} (${streamStatus})`);
         } else {
-          console.log(`[OAuth] Stream ${stream.id} has no ingestion info`);
+          console.log(`[OAuth] ✗ Skipped ${stream.snippet?.title} - status: ${streamStatus} (active broadcast)`);
         }
       } catch (streamErr) {
         console.warn('[OAuth] Failed to process stream:', stream.id, streamErr.message);
       }
     }
     
-    console.log('[OAuth] Finished processing, found', streamKeys.length, 'stream keys with ingestion info');
+    console.log('[OAuth] Finished processing, found', streamKeys.length, 'reusable stream keys (inactive/ready)');
     
     return res.json({
       success: true,
