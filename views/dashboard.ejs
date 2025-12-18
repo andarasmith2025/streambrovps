@@ -1826,7 +1826,7 @@
                         <span class="text-xs text-blue-400">${dayLabel}</span>
                         ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
                       </div>
-                      ${stream.status === 'scheduled' ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="Cancel Schedule">
+                      ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                         <i class="ti ti-player-stop text-red-400 text-xs"></i>
                       </button>` : ''}
                     </div>`;
@@ -1837,7 +1837,7 @@
                           ${formatDate(schDate)}
                           ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
                         </div>
-                        ${stream.status === 'scheduled' ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="Cancel Schedule">
+                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                           <i class="ti ti-player-stop text-red-400 text-xs"></i>
                         </button>` : ''}
                       </div>`;
@@ -2300,33 +2300,62 @@
         function stopSchedule(streamId, scheduleId) {
           if (!streamId || !scheduleId) return;
 
-          showConfirmDialog(
-            'Cancel Schedule',
-            'Are you sure you want to cancel this schedule? The stream will not start at the scheduled time.',
-            'Cancel Schedule',
-            'Keep Schedule',
-            () => {
-              fetch(`/api/streams/${streamId}/schedules/${scheduleId}`, {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json'
+          // Get stream info to check status
+          fetch(`/api/streams/${streamId}`)
+            .then(response => response.json())
+            .then(streamData => {
+              const stream = streamData.stream;
+              const isLive = stream.status === 'live';
+              
+              const title = isLive ? 'Stop Stream' : 'Cancel Schedule';
+              const message = isLive 
+                ? 'This stream is currently live. Stopping it will end the broadcast and cancel this schedule. Continue?'
+                : 'Are you sure you want to cancel this schedule? The stream will not start at the scheduled time.';
+              const confirmText = isLive ? 'Stop Stream' : 'Cancel Schedule';
+              
+              showConfirmDialog(
+                title,
+                message,
+                confirmText,
+                'Keep Running',
+                () => {
+                  // If live, stop the stream first
+                  const stopPromise = isLive 
+                    ? fetch(`/api/streams/${streamId}/stop`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                      })
+                    : Promise.resolve();
+                  
+                  stopPromise
+                    .then(() => {
+                      // Then delete the schedule
+                      return fetch(`/api/streams/${streamId}/schedules/${scheduleId}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' }
+                      });
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                      if (data.success) {
+                        const successMsg = isLive ? 'Stream stopped and schedule cancelled' : 'Schedule cancelled successfully';
+                        showNotification('Success', successMsg, 'success');
+                        setTimeout(() => loadStreams(), 500);
+                      } else {
+                        showNotification('Error', data.error || 'Failed to cancel schedule', 'error');
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error stopping schedule:', error);
+                      showNotification('Error', 'An error occurred while stopping the schedule', 'error');
+                    });
                 }
-              })
-                .then(response => response.json())
-                .then(data => {
-                  if (data.success) {
-                    showNotification('Success', 'Schedule cancelled successfully', 'success');
-                    setTimeout(() => loadStreams(), 500);
-                  } else {
-                    showNotification('Error', data.error || 'Failed to cancel schedule', 'error');
-                  }
-                })
-                .catch(error => {
-                  console.error('Error cancelling schedule:', error);
-                  showNotification('Error', 'An error occurred while cancelling the schedule', 'error');
-                });
-            }
-          );
+              );
+            })
+            .catch(error => {
+              console.error('Error fetching stream info:', error);
+              showNotification('Error', 'Failed to fetch stream information', 'error');
+            });
         }
 
         // Bulk Actions
