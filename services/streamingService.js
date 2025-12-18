@@ -394,6 +394,27 @@ async function startStream(streamId, options = {}) {
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     
+    // Transition YouTube broadcast to live if using YouTube API
+    if (stream.use_youtube_api && stream.youtube_broadcast_id) {
+      try {
+        const { getTokensForUser } = require('../routes/youtube');
+        const youtubeService = require('./youtubeService');
+        
+        const tokens = await getTokensForUser(stream.user_id);
+        if (tokens && tokens.access_token) {
+          console.log(`[StreamingService] Transitioning YouTube broadcast ${stream.youtube_broadcast_id} to live`);
+          await youtubeService.transition(tokens, {
+            broadcastId: stream.youtube_broadcast_id,
+            status: 'live'
+          });
+          console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live`);
+        }
+      } catch (ytError) {
+        console.error('[StreamingService] Error transitioning YouTube broadcast to live:', ytError);
+        // Don't fail the stream start, just log the error
+      }
+    }
+    
     // Clear manual_stop flag when stream starts
     try {
       await new Promise((resolve) => {
@@ -732,6 +753,28 @@ async function stopStream(streamId) {
       // Clear active_schedule_id when stopping
       await Stream.update(streamId, { active_schedule_id: null });
       await Stream.updateStatus(streamId, 'offline', stream.user_id);
+      
+      // Transition YouTube broadcast to complete if using YouTube API
+      if (stream.use_youtube_api && stream.youtube_broadcast_id) {
+        try {
+          const { getTokensForUser } = require('../routes/youtube');
+          const youtubeService = require('./youtubeService');
+          
+          const tokens = await getTokensForUser(stream.user_id);
+          if (tokens && tokens.access_token) {
+            console.log(`[StreamingService] Transitioning YouTube broadcast ${stream.youtube_broadcast_id} to complete`);
+            await youtubeService.transition(tokens, {
+              broadcastId: stream.youtube_broadcast_id,
+              status: 'complete'
+            });
+            console.log(`[StreamingService] ✓ YouTube broadcast transitioned to complete`);
+          }
+        } catch (ytError) {
+          console.error('[StreamingService] Error transitioning YouTube broadcast to complete:', ytError);
+          // Don't fail the stream stop, just log the error
+        }
+      }
+      
       const updatedStream = await Stream.findById(streamId);
       await saveStreamHistory(updatedStream);
     }
