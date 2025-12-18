@@ -122,7 +122,10 @@ router.get('/youtube/me', async (req, res) => {
 // GET /oauth2/youtube/stream-keys - fetch available stream keys
 router.get('/youtube/stream-keys', async (req, res) => {
   try {
+    console.log('[OAuth] /youtube/stream-keys called');
+    
     if (!req.session.youtubeTokens) {
+      console.log('[OAuth] No YouTube tokens in session');
       return res.status(401).json({ 
         success: false, 
         error: 'Not connected to YouTube. Please connect your YouTube account first.' 
@@ -130,9 +133,11 @@ router.get('/youtube/stream-keys', async (req, res) => {
     }
     
     const userId = req.session && (req.session.userId || req.session.user_id);
+    console.log('[OAuth] Fetching stream keys for user:', userId);
     const yt = getYouTubeClient(req.session.youtubeTokens, userId);
     
     // Fetch live broadcasts (streams)
+    console.log('[OAuth] Calling YouTube API liveBroadcasts.list...');
     const response = await yt.liveBroadcasts.list({
       part: ['snippet', 'contentDetails', 'status'],
       mine: true,
@@ -140,6 +145,7 @@ router.get('/youtube/stream-keys', async (req, res) => {
     });
     
     const broadcasts = response.data.items || [];
+    console.log('[OAuth] Found', broadcasts.length, 'broadcasts');
     
     // For each broadcast, get the stream details (which contains ingestion info)
     const streamKeys = [];
