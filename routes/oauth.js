@@ -147,19 +147,27 @@ router.get('/youtube/stream-keys', async (req, res) => {
     const streams = response.data.items || [];
     console.log('[OAuth] Found', streams.length, 'live streams');
     
-    // Extract stream keys from streams that have ingestion info
-    // Filter only reusable stream keys (not currently active broadcasts)
+    // Extract unique stream keys (deduplicate by streamName)
+    // Multiple broadcasts can use the same stream key, we only want unique keys
     const streamKeys = [];
+    const seenStreamNames = new Set();
     
     for (const stream of streams) {
       try {
         const streamStatus = stream.status?.streamStatus;
         const hasIngestionInfo = stream.cdn?.ingestionInfo;
+        const streamName = stream.cdn?.ingestionInfo?.streamName;
         
         console.log(`[OAuth] Processing stream: ${stream.snippet?.title} - Status: ${streamStatus}, Has Ingestion: ${!!hasIngestionInfo}`);
         
-        if (!hasIngestionInfo) {
-          console.log(`[OAuth] Skipping ${stream.id} - no ingestion info`);
+        if (!hasIngestionInfo || !streamName) {
+          console.log(`[OAuth] Skipping ${stream.id} - no ingestion info or stream name`);
+          continue;
+        }
+        
+        // Skip if we already have this stream key
+        if (seenStreamNames.has(streamName)) {
+          console.log(`[OAuth] ✗ Skipped ${stream.snippet?.title} - duplicate stream key`);
           continue;
         }
         
@@ -167,6 +175,7 @@ router.get('/youtube/stream-keys', async (req, res) => {
         // Status can be: 'inactive', 'ready', 'active', 'error', 'created'
         // We want 'inactive' and 'ready' - these are reusable stream keys
         if (streamStatus === 'inactive' || streamStatus === 'ready' || streamStatus === 'created') {
+          seenStreamNames.add(streamName);
           streamKeys.push({
             id: stream.id,
             streamId: stream.id,
@@ -175,20 +184,20 @@ router.get('/youtube/stream-keys', async (req, res) => {
             status: streamStatus,
             ingestionInfo: {
               rtmpsIngestionAddress: stream.cdn.ingestionInfo.ingestionAddress,
-              streamName: stream.cdn.ingestionInfo.streamName,
+              streamName: streamName,
               rtmpsBackupIngestionAddress: stream.cdn.ingestionInfo.backupIngestionAddress
             }
           });
-          console.log(`[OAuth] ✓ Added stream key: ${stream.snippet?.title} (${streamStatus})`);
+          console.log(`[OAuth] ✓ Added unique stream key: ${stream.snippet?.title} (${streamStatus})`);
         } else {
-          console.log(`[OAuth] ✗ Skipped ${stream.snippet?.title} - status: ${streamStatus} (active broadcast)`);
+          console.log(`[OAuth] ✗ Skipped ${stream.snippet?.title} - status: ${streamStatus} (active/error)`);
         }
       } catch (streamErr) {
         console.warn('[OAuth] Failed to process stream:', stream.id, streamErr.message);
       }
     }
     
-    console.log('[OAuth] Finished processing, found', streamKeys.length, 'reusable stream keys (inactive/ready)');
+    console.log('[OAuth] Finished processing, found', streamKeys.length, 'unique reusable stream keys');
     
     return res.json({
       success: true,
