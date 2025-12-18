@@ -1138,6 +1138,21 @@
           if (dropdown) dropdown.classList.add('hidden');
         }
         
+        function toggleStreamKeyVisibility() {
+          const streamKeyInput = document.getElementById('streamKey');
+          const streamKeyToggle = document.getElementById('streamKeyToggle');
+          
+          if (!streamKeyInput || !streamKeyToggle) return;
+          
+          if (streamKeyInput.type === 'password') {
+            streamKeyInput.type = 'text';
+            streamKeyToggle.className = 'ti ti-eye-off';
+          } else {
+            streamKeyInput.type = 'password';
+            streamKeyToggle.className = 'ti ti-eye';
+          }
+        }
+        
         function toggleYouTubeStreamKeyVisibility() {
           const streamKeyInput = document.getElementById('youtubeStreamKey');
           const streamKeyToggle = document.getElementById('youtubeStreamKeyToggle');
@@ -3652,34 +3667,52 @@
           preview.classList.add('hidden');
         }
         
-        // YouTube Platform Selector (same as Manual RTMP)
-        document.addEventListener('DOMContentLoaded', function() {
+        // Platform Selectors - Use event delegation to work with dynamically loaded modals
+        document.addEventListener('click', function(e) {
+          // Manual RTMP Platform Selector
+          const platformSelector = document.getElementById('platformSelector');
+          const platformDropdown = document.getElementById('platformDropdown');
+          
+          if (e.target.closest('#platformSelector')) {
+            e.stopPropagation();
+            if (platformDropdown) {
+              platformDropdown.classList.toggle('hidden');
+            }
+          } else if (e.target.closest('.platform-option')) {
+            const option = e.target.closest('.platform-option');
+            const url = option.getAttribute('data-url');
+            const rtmpUrlInput = document.getElementById('rtmpUrl');
+            if (rtmpUrlInput) {
+              rtmpUrlInput.value = url;
+            }
+            if (platformDropdown) {
+              platformDropdown.classList.add('hidden');
+            }
+          } else if (platformDropdown && !platformDropdown.contains(e.target)) {
+            platformDropdown.classList.add('hidden');
+          }
+          
+          // YouTube API Platform Selector
           const youtubePlatformSelector = document.getElementById('youtubePlatformSelector');
           const youtubePlatformDropdown = document.getElementById('youtubePlatformDropdown');
-          const youtubeRtmpUrlInput = document.getElementById('youtubeRtmpUrl');
           
-          if (youtubePlatformSelector && youtubePlatformDropdown) {
-            youtubePlatformSelector.addEventListener('click', function(e) {
-              e.stopPropagation();
+          if (e.target.closest('#youtubePlatformSelector')) {
+            e.stopPropagation();
+            if (youtubePlatformDropdown) {
               youtubePlatformDropdown.classList.toggle('hidden');
-            });
-            
-            document.addEventListener('click', function(e) {
-              if (!youtubePlatformDropdown.contains(e.target) && e.target !== youtubePlatformSelector) {
-                youtubePlatformDropdown.classList.add('hidden');
-              }
-            });
-            
-            const youtubePlatformOptions = document.querySelectorAll('.youtube-platform-option');
-            youtubePlatformOptions.forEach(option => {
-              option.addEventListener('click', function() {
-                const url = this.getAttribute('data-url');
-                if (youtubeRtmpUrlInput) {
-                  youtubeRtmpUrlInput.value = url;
-                }
-                youtubePlatformDropdown.classList.add('hidden');
-              });
-            });
+            }
+          } else if (e.target.closest('.youtube-platform-option')) {
+            const option = e.target.closest('.youtube-platform-option');
+            const url = option.getAttribute('data-url');
+            const youtubeRtmpUrlInput = document.getElementById('youtubeRtmpUrl');
+            if (youtubeRtmpUrlInput) {
+              youtubeRtmpUrlInput.value = url;
+            }
+            if (youtubePlatformDropdown) {
+              youtubePlatformDropdown.classList.add('hidden');
+            }
+          } else if (youtubePlatformDropdown && !youtubePlatformDropdown.contains(e.target)) {
+            youtubePlatformDropdown.classList.add('hidden');
           }
         });
         
