@@ -1027,8 +1027,9 @@
         }
       </style>
       <script>
-        // Inline fallback for switchStreamTab (will be overridden by stream-modal.js if loaded)
+        // Inline fallback functions (will be overridden by stream-modal.js if loaded)
         let currentStreamTab = 'manual';
+        let youtubeStreamKeys = [];
         
         function switchStreamTab(tab) {
           console.log('[switchStreamTab-inline] Switching to tab:', tab);
@@ -1053,6 +1054,113 @@
             manualTab?.classList.add('text-gray-400', 'hover:bg-dark-700');
             youtubeFields?.classList.remove('hidden');
             manualFields?.classList.add('hidden');
+          }
+        }
+        
+        function toggleYouTubeStreamKeysDropdown() {
+          console.log('[toggleYouTubeStreamKeysDropdown-inline] Called');
+          const dropdown = document.getElementById('youtubeStreamKeysDropdown');
+          if (!dropdown) return;
+          
+          if (dropdown.classList.contains('hidden')) {
+            dropdown.classList.remove('hidden');
+            // Load stream keys if not already loaded
+            if (!youtubeStreamKeys || youtubeStreamKeys.length === 0) {
+              loadYouTubeStreamKeys();
+            }
+          } else {
+            dropdown.classList.add('hidden');
+          }
+        }
+        
+        async function loadYouTubeStreamKeys() {
+          console.log('[loadYouTubeStreamKeys-inline] Loading...');
+          const container = document.getElementById('youtubeStreamKeysList');
+          if (!container) return;
+          
+          container.innerHTML = '<div class="text-center py-4 text-gray-400"><i class="ti ti-loader animate-spin text-xl mb-2"></i><p class="text-xs">Loading...</p></div>';
+          
+          try {
+            const response = await fetch('/oauth2/youtube/stream-keys');
+            const data = await response.json();
+            
+            if (data.success && data.streamKeys) {
+              youtubeStreamKeys = data.streamKeys;
+              if (data.streamKeys.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-gray-400"><i class="ti ti-alert-circle text-2xl mb-2"></i><p class="text-sm">No stream keys found</p><p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p></div>';
+              } else {
+                container.innerHTML = data.streamKeys.map(key => `
+                  <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
+                    class="w-full flex items-start gap-3 p-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-colors text-left">
+                    <i class="ti ti-key text-red-500 text-xl mt-0.5"></i>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</p>
+                      <p class="text-xs text-gray-400 mt-1">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
+                      <p class="text-xs text-gray-500 mt-0.5">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
+                    </div>
+                    <i class="ti ti-chevron-right text-gray-400"></i>
+                  </button>
+                `).join('');
+              }
+            } else {
+              container.innerHTML = '<div class="text-center py-4 text-red-400"><i class="ti ti-alert-triangle text-2xl mb-2"></i><p class="text-sm">' + (data.error || 'Failed to load') + '</p></div>';
+            }
+          } catch (error) {
+            console.error('[loadYouTubeStreamKeys-inline] Error:', error);
+            container.innerHTML = '<div class="text-center py-4 text-red-400"><i class="ti ti-alert-triangle text-2xl mb-2"></i><p class="text-sm">Error loading stream keys</p></div>';
+          }
+        }
+        
+        function selectYouTubeStreamKey(keyId) {
+          console.log('[selectYouTubeStreamKey-inline] Selected:', keyId);
+          const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+          if (!selectedKey) return;
+          
+          const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl');
+          const youtubeStreamKey = document.getElementById('youtubeStreamKey');
+          const streamTitle = document.getElementById('streamTitle');
+          
+          if (youtubeRtmpUrl && selectedKey.ingestionInfo?.rtmpsIngestionAddress) {
+            youtubeRtmpUrl.value = selectedKey.ingestionInfo.rtmpsIngestionAddress;
+          }
+          if (youtubeStreamKey && selectedKey.ingestionInfo?.streamName) {
+            youtubeStreamKey.value = selectedKey.ingestionInfo.streamName;
+          }
+          if (streamTitle && !streamTitle.value && selectedKey.title) {
+            streamTitle.value = selectedKey.title;
+          }
+          
+          const dropdown = document.getElementById('youtubeStreamKeysDropdown');
+          if (dropdown) dropdown.classList.add('hidden');
+        }
+        
+        function toggleYouTubeStreamKeyVisibility() {
+          const streamKeyInput = document.getElementById('youtubeStreamKey');
+          const streamKeyToggle = document.getElementById('youtubeStreamKeyToggle');
+          
+          if (!streamKeyInput || !streamKeyToggle) return;
+          
+          if (streamKeyInput.type === 'password') {
+            streamKeyInput.type = 'text';
+            streamKeyToggle.className = 'ti ti-eye-off';
+          } else {
+            streamKeyInput.type = 'password';
+            streamKeyToggle.className = 'ti ti-eye';
+          }
+        }
+        
+        function toggleYouTubeAdditionalSettings() {
+          const settings = document.getElementById('youtubeAdditionalSettings');
+          const icon = document.getElementById('youtubeAdditionalSettingsIcon');
+          
+          if (!settings || !icon) return;
+          
+          if (settings.classList.contains('hidden')) {
+            settings.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+          } else {
+            settings.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
           }
         }
         
