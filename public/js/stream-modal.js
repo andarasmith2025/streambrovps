@@ -836,6 +836,9 @@ window.scrollModalToTop = scrollModalToTop;
 let currentStreamTab = 'manual'; // 'manual' or 'youtube'
 window.currentStreamTab = currentStreamTab; // Expose globally
 let youtubeStreamKeys = [];
+let youtubeStreamKeysCache = null; // Cache for stream keys
+let youtubeStreamKeysCacheTime = null; // Cache timestamp
+const STREAM_KEYS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
 function switchStreamTab(tab) {
   console.log('[switchStreamTab] Switching to tab:', tab);
@@ -894,17 +897,36 @@ function switchStreamTab(tab) {
 window.switchStreamTab = switchStreamTab;
 console.log('[stream-modal.js] switchStreamTab function defined and exposed globally:', typeof window.switchStreamTab);
 
-// Load YouTube stream keys from OAuth
-async function loadYouTubeStreamKeys() {
+// Load YouTube stream keys from OAuth (with caching)
+async function loadYouTubeStreamKeys(forceRefresh = false) {
   try {
-    console.log('[loadYouTubeStreamKeys] Fetching stream keys from YouTube...');
+    // Check cache first (unless force refresh)
+    const now = Date.now();
+    if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime) {
+      const cacheAge = now - youtubeStreamKeysCacheTime;
+      if (cacheAge < STREAM_KEYS_CACHE_DURATION) {
+        console.log('[loadYouTubeStreamKeys] Using cached stream keys (age:', Math.round(cacheAge / 1000), 'seconds)');
+        youtubeStreamKeys = youtubeStreamKeysCache;
+        displayYouTubeStreamKeys(youtubeStreamKeysCache);
+        return;
+      } else {
+        console.log('[loadYouTubeStreamKeys] Cache expired (age:', Math.round(cacheAge / 1000), 'seconds), fetching fresh data...');
+      }
+    }
+    
+    console.log('[loadYouTubeStreamKeys] Fetching stream keys from YouTube API...');
     const response = await fetch('/oauth2/youtube/stream-keys');
     console.log('[loadYouTubeStreamKeys] Response status:', response.status);
     const data = await response.json();
     console.log('[loadYouTubeStreamKeys] Data received:', data);
     
     if (data.success && data.streamKeys) {
+      // Update cache
       youtubeStreamKeys = data.streamKeys;
+      youtubeStreamKeysCache = data.streamKeys;
+      youtubeStreamKeysCacheTime = now;
+      console.log('[loadYouTubeStreamKeys] Stream keys cached for', STREAM_KEYS_CACHE_DURATION / 1000, 'seconds');
+      
       displayYouTubeStreamKeys(data.streamKeys);
     } else {
       console.error('Failed to load YouTube stream keys:', data.error);
@@ -1044,13 +1066,17 @@ function toggleYouTubeStreamKeysDropdown() {
   
   if (dropdown.classList.contains('hidden')) {
     dropdown.classList.remove('hidden');
-    // Load stream keys if not already loaded
-    if (!youtubeStreamKeys || youtubeStreamKeys.length === 0) {
-      loadYouTubeStreamKeys();
-    }
+    // Load stream keys (will use cache if available)
+    loadYouTubeStreamKeys();
   } else {
     dropdown.classList.add('hidden');
   }
+}
+
+// Force refresh YouTube stream keys (bypass cache)
+function refreshYouTubeStreamKeys() {
+  console.log('[refreshYouTubeStreamKeys] Force refreshing stream keys...');
+  loadYouTubeStreamKeys(true); // Force refresh
 }
 
 // Toggle YouTube additional settings
@@ -1104,6 +1130,7 @@ function toggleScheduleSection() {
 window.selectYouTubeStreamKey = selectYouTubeStreamKey;
 window.toggleYouTubeStreamKeyVisibility = toggleYouTubeStreamKeyVisibility;
 window.toggleYouTubeStreamKeysDropdown = toggleYouTubeStreamKeysDropdown;
+window.refreshYouTubeStreamKeys = refreshYouTubeStreamKeys;
 window.toggleYouTubeAdditionalSettings = toggleYouTubeAdditionalSettings;
 window.toggleScheduleSection = toggleScheduleSection;
 

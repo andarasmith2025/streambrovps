@@ -241,7 +241,7 @@
 
             
             <div class="flex-1 overflow-y-auto">
-              <form id="newStreamForm" class="px-4 pt-3 pb-3 space-y-3">
+              <form id="newStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate></form>
                 <input type="hidden" id="selectedVideoId" name="videoId" value="">
 
                 <!-- Form Fields (Single Column) -->
@@ -363,12 +363,18 @@
                         <div class="p-2">
                           <div class="flex items-center justify-between mb-2 px-2">
                             <span class="text-xs font-medium text-gray-400">Select from your channel:</span>
-                            <button type="button" onclick="toggleYouTubeStreamKeysDropdown()"
-                              class="text-gray-400 hover:text-white">
-                              <i class="ti ti-x text-sm"></i>
-                            </button>
+                            <div class="flex items-center gap-2">
+                              <button type="button" onclick="refreshYouTubeStreamKeys()"
+                                class="text-gray-400 hover:text-primary transition-colors" title="Refresh stream keys">
+                                <i class="ti ti-refresh text-sm"></i>
+                              </button>
+                              <button type="button" onclick="toggleYouTubeStreamKeysDropdown()"
+                                class="text-gray-400 hover:text-white">
+                                <i class="ti ti-x text-sm"></i>
+                              </button>
+                            </div>
                           </div>
-                          <div id="youtubeStreamKeysList" class="space-y-1">
+                          <div id="youtubeStreamKeysList" class="space-y-1"></div>
                             <div class="text-center py-4 text-gray-400">
                               <i class="ti ti-loader animate-spin text-xl mb-2"></i>
                               <p class="text-xs">Loading...</p>
@@ -661,7 +667,7 @@
               </button>
             </div>
             <div class="flex-1 overflow-y-auto">
-              <form id="editStreamForm" class="px-4 pt-3 pb-3 space-y-3">
+              <form id="editStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate></form>
                 <input type="hidden" id="editStreamId" name="streamId" value="">
                 <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
 
@@ -695,7 +701,7 @@
                     <label class="text-sm font-medium text-white block mb-2">Stream Title</label>
                     <input type="text"
                       class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                      placeholder="Enter stream title..." name="streamTitle" id="editStreamTitle" required>
+                      placeholder="Enter stream title..." name="streamTitle" id="editStreamTitle">
                   </div>
                   <div class="space-y-4">
                     <label class="text-sm font-medium text-white block mb-3">Stream Configuration</label>
@@ -703,7 +709,7 @@
                       <div class="relative">
                         <input type="text" id="editRtmpUrl" name="rtmpUrl"
                           class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="RTMP URL" required>
+                          placeholder="RTMP URL">
                         <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         <button type="button" id="editPlatformSelector"
                           class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-600 transition-colors"
@@ -749,7 +755,7 @@
                       <div class="relative">
                         <input type="password" id="editStreamKey" name="streamKey"
                           class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="Stream Key" required>
+                          placeholder="Stream Key">
                         <i class="ti ti-key absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         <button type="button" onclick="toggleEditStreamKeyVisibility()"
                           class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
@@ -1163,6 +1169,14 @@
           const isYouTubeMode = window.currentStreamTab === 'youtube';
           console.log('[Form Submit] Current tab:', window.currentStreamTab, 'isYouTubeMode:', isYouTubeMode);
           
+          // Validate stream title
+          const streamTitle = document.getElementById('streamTitle').value.trim();
+          if (!streamTitle) {
+            showNotification('Warning', 'Please enter a stream title', 'warning');
+            document.getElementById('streamTitle').focus();
+            return;
+          }
+          
           const videoId = document.getElementById('selectedVideoId').value;
           if (!videoId) {
             showNotification('Warning', 'Please select a video before creating the stream', 'warning');
@@ -1182,10 +1196,43 @@
             return;
           }
           
-          // Only validate stream key for Manual RTMP mode
-          if (!isYouTubeMode && !isStreamKeyValid) {
-            showNotification('Warning', 'Please use a different stream key. This one is already in use.', 'warning');
-            return;
+          // Validate fields based on mode
+          if (isYouTubeMode) {
+            // YouTube API mode validation
+            const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl')?.value.trim();
+            const youtubeStreamKey = document.getElementById('youtubeStreamKey')?.value.trim();
+            
+            if (!youtubeRtmpUrl) {
+              showNotification('Warning', 'Please enter RTMP URL', 'warning');
+              document.getElementById('youtubeRtmpUrl')?.focus();
+              return;
+            }
+            if (!youtubeStreamKey) {
+              showNotification('Warning', 'Please enter Stream Key', 'warning');
+              document.getElementById('youtubeStreamKey')?.focus();
+              return;
+            }
+          } else {
+            // Manual RTMP mode validation
+            const rtmpUrl = document.getElementById('rtmpUrl')?.value.trim();
+            const streamKey = document.getElementById('streamKey')?.value.trim();
+            
+            if (!rtmpUrl) {
+              showNotification('Warning', 'Please enter RTMP URL', 'warning');
+              document.getElementById('rtmpUrl')?.focus();
+              return;
+            }
+            if (!streamKey) {
+              showNotification('Warning', 'Please enter Stream Key', 'warning');
+              document.getElementById('streamKey')?.focus();
+              return;
+            }
+            
+            // Validate stream key uniqueness
+            if (!isStreamKeyValid) {
+              showNotification('Warning', 'Please use a different stream key. This one is already in use.', 'warning');
+              return;
+            }
           }
           
           const formData = {
