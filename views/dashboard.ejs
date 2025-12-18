@@ -1158,6 +1158,11 @@
         setInterval(updateSystemStats, 5000);
         document.getElementById('newStreamForm').addEventListener('submit', function (e) {
           e.preventDefault();
+          
+          // Check which tab is active
+          const isYouTubeMode = window.currentStreamTab === 'youtube';
+          console.log('[Form Submit] Current tab:', window.currentStreamTab, 'isYouTubeMode:', isYouTubeMode);
+          
           const videoId = document.getElementById('selectedVideoId').value;
           if (!videoId) {
             showNotification('Warning', 'Please select a video before creating the stream', 'warning');
@@ -1176,22 +1181,48 @@
             });
             return;
           }
-          if (!isStreamKeyValid) {
+          
+          // Only validate stream key for Manual RTMP mode
+          if (!isYouTubeMode && !isStreamKeyValid) {
             showNotification('Warning', 'Please use a different stream key. This one is already in use.', 'warning');
             return;
           }
+          
           const formData = {
             streamTitle: document.getElementById('streamTitle').value,
             videoId: document.getElementById('selectedVideoId').value,
-            rtmpUrl: document.getElementById('rtmpUrl').value,
-            streamKey: document.getElementById('streamKey').value,
-            bitrate: document.querySelector('select[name="bitrate"]').value,
-            fps: document.querySelector('select[name="fps"]').value,
             loopVideo: document.querySelector('input[name="loopVideo"]').checked,
-            orientation: currentOrientation,
-            resolution: document.getElementById('currentResolution').textContent.split(' ')[0],
-            useAdvancedSettings: document.getElementById('advancedSettingsToggle').checked
           };
+          
+          // Add fields based on mode
+          if (isYouTubeMode) {
+            // YouTube API mode
+            formData.useYouTubeApi = true;
+            formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
+            formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
+            formData.youtubeDescription = document.getElementById('youtubeDescription')?.value || '';
+            formData.youtubePrivacy = document.getElementById('youtubePrivacy')?.value || 'unlisted';
+            formData.youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
+            formData.youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked || false;
+            formData.youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked || false;
+            formData.youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked || false;
+            
+            // Thumbnail if uploaded
+            const thumbnailInput = document.getElementById('youtubeThumbnail');
+            if (thumbnailInput && thumbnailInput.files && thumbnailInput.files[0]) {
+              // Will be handled separately via FormData if needed
+              formData.hasThumbnail = true;
+            }
+          } else {
+            // Manual RTMP mode
+            formData.rtmpUrl = document.getElementById('rtmpUrl').value;
+            formData.streamKey = document.getElementById('streamKey').value;
+            formData.bitrate = document.querySelector('select[name="bitrate"]').value;
+            formData.fps = document.querySelector('select[name="fps"]').value;
+            formData.orientation = currentOrientation;
+            formData.resolution = document.getElementById('currentResolution').textContent.split(' ')[0];
+            formData.useAdvancedSettings = document.getElementById('advancedSettingsToggle').checked;
+          }
           // Collect schedules based on stream mode
           if (currentStreamMode === 'schedule') {
             const schedules = collectSchedules();

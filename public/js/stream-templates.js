@@ -104,32 +104,79 @@ async function loadTemplate(templateId) {
     
     // Wait for modal to open before populating
     setTimeout(() => {
-      // Populate form fields
-    if (template.video_id) {
-      // Find and select video
-      const video = window.allStreamVideos?.find(v => v.id === template.video_id);
-      if (video) {
-        selectVideo(video);
+      // Switch to correct tab first
+      const isYouTubeMode = template.use_youtube_api === true || template.use_youtube_api === 1;
+      if (isYouTubeMode) {
+        switchStreamTab('youtube');
+      } else {
+        switchStreamTab('manual');
       }
-    }
-    
-    // Set stream title
-    if (template.stream_title) {
-      document.getElementById('streamTitle').value = template.stream_title;
-    }
-    
-    // Set RTMP URL and Stream Key
-    if (template.rtmp_url) {
-      document.getElementById('rtmpUrl').value = template.rtmp_url;
-    }
-    if (template.stream_key) {
-      document.getElementById('streamKey').value = template.stream_key;
-    }
-    
-    // Set loop video
-    if (template.loop_video !== undefined) {
-      document.getElementById('loopVideo').checked = template.loop_video;
-    }
+      
+      // Populate form fields
+      if (template.video_id) {
+        // Find and select video
+        const video = window.allStreamVideos?.find(v => v.id === template.video_id);
+        if (video) {
+          selectVideo(video);
+        }
+      }
+      
+      // Set stream title
+      if (template.stream_title) {
+        document.getElementById('streamTitle').value = template.stream_title;
+      }
+      
+      // Set RTMP URL and Stream Key based on mode
+      if (isYouTubeMode) {
+        // YouTube API mode
+        if (template.rtmp_url) {
+          const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl');
+          if (youtubeRtmpUrl) youtubeRtmpUrl.value = template.rtmp_url;
+        }
+        if (template.stream_key) {
+          const youtubeStreamKey = document.getElementById('youtubeStreamKey');
+          if (youtubeStreamKey) youtubeStreamKey.value = template.stream_key;
+        }
+        if (template.youtube_description) {
+          const youtubeDescription = document.getElementById('youtubeDescription');
+          if (youtubeDescription) youtubeDescription.value = template.youtube_description;
+        }
+        if (template.youtube_privacy) {
+          const youtubePrivacy = document.getElementById('youtubePrivacy');
+          if (youtubePrivacy) youtubePrivacy.value = template.youtube_privacy;
+        }
+        if (template.youtube_made_for_kids !== undefined) {
+          const madeForKidsRadio = document.querySelector(`input[name="youtubeMadeForKids"][value="${template.youtube_made_for_kids ? 'yes' : 'no'}"]`);
+          if (madeForKidsRadio) madeForKidsRadio.checked = true;
+        }
+        if (template.youtube_age_restricted !== undefined) {
+          const ageRestricted = document.getElementById('youtubeAgeRestricted');
+          if (ageRestricted) ageRestricted.checked = template.youtube_age_restricted;
+        }
+        if (template.youtube_auto_start !== undefined) {
+          const autoStart = document.getElementById('youtubeAutoStart');
+          if (autoStart) autoStart.checked = template.youtube_auto_start;
+        }
+        if (template.youtube_auto_end !== undefined) {
+          const autoEnd = document.getElementById('youtubeAutoEnd');
+          if (autoEnd) autoEnd.checked = template.youtube_auto_end;
+        }
+      } else {
+        // Manual RTMP mode
+        if (template.rtmp_url) {
+          const rtmpUrl = document.getElementById('rtmpUrl');
+          if (rtmpUrl) rtmpUrl.value = template.rtmp_url;
+        }
+        if (template.stream_key) {
+          const streamKey = document.getElementById('streamKey');
+          if (streamKey) streamKey.value = template.stream_key;
+        }
+      }
+      
+      // Set loop video
+      if (template.loop_video !== undefined) {
+        document.getElementById('loopVideo').checked = template.loop_video;
+      }
     
     // Load schedules
     if (template.schedules && template.schedules.length > 0) {
@@ -182,13 +229,32 @@ async function loadTemplate(templateId) {
 
 // Save current configuration as template
 async function saveAsTemplate() {
+  // Check which tab is active
+  const isYouTubeMode = window.currentStreamTab === 'youtube';
+  console.log('[saveAsTemplate] Current tab:', window.currentStreamTab, 'isYouTubeMode:', isYouTubeMode);
+  
   // Get current form data
   const videoId = document.getElementById('selectedVideoId')?.value;
   const videoName = document.getElementById('selectedVideo')?.textContent;
   const streamTitle = document.getElementById('streamTitle')?.value;
-  const rtmpUrl = document.getElementById('rtmpUrl')?.value;
-  const streamKey = document.getElementById('streamKey')?.value;
   const loopVideo = document.getElementById('loopVideo')?.checked;
+  
+  // Get RTMP URL and Stream Key based on mode
+  let rtmpUrl, streamKey, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd;
+  
+  if (isYouTubeMode) {
+    rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value;
+    streamKey = document.getElementById('youtubeStreamKey')?.value;
+    youtubeDescription = document.getElementById('youtubeDescription')?.value;
+    youtubePrivacy = document.getElementById('youtubePrivacy')?.value;
+    youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
+    youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked;
+    youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked;
+    youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked;
+  } else {
+    rtmpUrl = document.getElementById('rtmpUrl')?.value;
+    streamKey = document.getElementById('streamKey')?.value;
+  }
   
   // Get schedules
   const schedules = [];
@@ -254,7 +320,14 @@ async function saveAsTemplate() {
     stream_key: streamKey || '',
     platform: platform,
     loop_video: loopVideo,
-    schedules: schedules
+    schedules: schedules,
+    use_youtube_api: isYouTubeMode,
+    youtube_description: youtubeDescription || '',
+    youtube_privacy: youtubePrivacy || 'unlisted',
+    youtube_made_for_kids: youtubeMadeForKids || false,
+    youtube_age_restricted: youtubeAgeRestricted || false,
+    youtube_auto_start: youtubeAutoStart || false,
+    youtube_auto_end: youtubeAutoEnd || false
   };
   
   // Show modal

@@ -831,11 +831,13 @@ window.scrollModalToTop = scrollModalToTop;
 
 // Tab switching functionality
 let currentStreamTab = 'manual'; // 'manual' or 'youtube'
+window.currentStreamTab = currentStreamTab; // Expose globally
 let youtubeStreamKeys = [];
 
 function switchStreamTab(tab) {
   console.log('[switchStreamTab] Switching to tab:', tab);
   currentStreamTab = tab;
+  window.currentStreamTab = tab; // Update global reference
   
   const tabManual = document.getElementById('tabManual');
   const tabYouTube = document.getElementById('tabYouTube');
