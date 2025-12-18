@@ -353,10 +353,12 @@ function toggleStreamKeyVisibility() {
   
   if (streamKeyInput.type === 'password') {
     streamKeyInput.type = 'text';
-    streamKeyToggle.className = 'ti ti-eye-off';
+    streamKeyToggle.classList.remove('ti-eye');
+    streamKeyToggle.classList.add('ti-eye-off');
   } else {
     streamKeyInput.type = 'password';
-    streamKeyToggle.className = 'ti ti-eye';
+    streamKeyToggle.classList.remove('ti-eye-off');
+    streamKeyToggle.classList.add('ti-eye');
   }
 }
 
@@ -1021,10 +1023,12 @@ function toggleYouTubeStreamKeyVisibility() {
   
   if (streamKeyInput.type === 'password') {
     streamKeyInput.type = 'text';
-    streamKeyToggle.className = 'ti ti-eye-off';
+    streamKeyToggle.classList.remove('ti-eye');
+    streamKeyToggle.classList.add('ti-eye-off');
   } else {
     streamKeyInput.type = 'password';
-    streamKeyToggle.className = 'ti ti-eye';
+    streamKeyToggle.classList.remove('ti-eye-off');
+    streamKeyToggle.classList.add('ti-eye');
   }
 }
 
