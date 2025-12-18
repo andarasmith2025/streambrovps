@@ -1061,14 +1061,17 @@ async function recoverStreamsAfterRestart(liveStreams) {
         console.log(`[Recovery] ⏭️  Skipping stream ${streamInfo.id} (${streamInfo.title}) - was manually stopped by user`);
         skippedCount++;
         
-        // Clear the manual_stop flag for next time
+        // Update status to offline if still marked as live
         await new Promise((resolve) => {
           db.run(
-            `UPDATE streams SET manual_stop = 0 WHERE id = ?`,
+            `UPDATE streams SET status = 'offline', status_updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'live'`,
             [streamInfo.id],
             () => resolve()
           );
         });
+        
+        // DON'T clear manual_stop flag - keep it until user manually starts stream again
+        // This prevents auto-recovery on subsequent restarts
         continue;
       }
       
@@ -1115,7 +1118,7 @@ async function recoverActiveStreams() {
     console.log('[Recovery] Checking for manual streams to recover...');
     const manualStreams = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT * FROM streams 
+        `SELECT *, COALESCE(manual_stop, 0) as manual_stop FROM streams 
          WHERE status = 'live' 
          AND start_time IS NOT NULL
          ORDER BY start_time DESC`,
@@ -1128,8 +1131,19 @@ async function recoverActiveStreams() {
     });
     
     let manualRecoveredCount = 0;
+    let manualSkippedCount = 0;
     for (const stream of manualStreams) {
       try {
+        // Check if stream was manually stopped
+        if (stream.manual_stop === 1) {
+          console.log(`[Recovery] ⏭️  Skipping stream ${stream.id} (${stream.title}) - was manually stopped by user`);
+          manualSkippedCount++;
+          
+          // Update status to offline if still marked as live
+          await Stream.updateStatus(stream.id, 'offline');
+          continue;
+        }
+        
         const startTime = new Date(stream.start_time);
         const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
         
@@ -1155,6 +1169,10 @@ async function recoverActiveStreams() {
         // Mark as offline if recovery fails
         await Stream.updateStatus(stream.id, 'offline').catch(() => {});
       }
+    }
+    
+    if (manualSkippedCount > 0) {
+      console.log(`[Recovery] ⏭️  Skipped ${manualSkippedCount} manually stopped stream(s)`);
     }
     
     if (manualRecoveredCount > 0) {
