@@ -22,8 +22,14 @@ router.get('/login', async (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     req.session.oauth_state = state;
     
+    // Store current redirect URI in session for callback verification
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const redirectUri = `${protocol}://${host}/oauth2/callback`;
+    req.session.oauth_redirect_uri = redirectUri;
+    
     // Use user-specific credentials if available
-    const url = await getAuthUrl(state, userId);
+    const url = await getAuthUrl(state, userId, redirectUri);
     return res.redirect(url);
   } catch (error) {
     console.error('[OAuth] Login error:', error);
@@ -47,7 +53,8 @@ router.get('/callback', async (req, res) => {
     }
 
     const userId = req.session && (req.session.userId || req.session.user_id);
-    const tokens = await exchangeCodeForTokens(code, userId);
+    const redirectUri = req.session.oauth_redirect_uri;
+    const tokens = await exchangeCodeForTokens(code, userId, redirectUri);
 
     // Attach user credentials to tokens for later use
     const { attachUserCredentials } = require('../config/google');

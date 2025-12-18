@@ -1,0 +1,15 @@
+<div class="px-4 py-2 bg-dark-800 border-b border-gray-600/50">
+  <div class="flex items-center gap-6">
+    <span class="text-xs font-medium text-gray-400">Stream Mode:</span>
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="radio" name="streamMode" value="now" id="streamNowBtn" onclick="toggleStreamMode('now')" checked 
+        class="w-4 h-4 text-primary bg-dark-700 border-gray-600 focus:ring-primary focus:ring-2">
+      <span class="text-sm text-gray-300">Stream Now</span>
+    </label>
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="radio" name="streamMode" value="schedule" id="streamScheduleBtn" onclick="toggleStreamMode('schedule')" 
+        class="w-4 h-4 text-primary bg-dark-700 border-gray-600 focus:ring-primary focus:ring-2">
+      <span class="text-sm text-gray-300">Schedule</span>
+    </label>
+  </div>
+</div>

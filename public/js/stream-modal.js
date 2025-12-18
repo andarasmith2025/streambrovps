@@ -453,47 +453,23 @@ function calculateFromDuration(input) {
 
 
 
-function toggleStreamMode(mode) {
-  const streamNowBtn = document.getElementById('streamNowBtn');
-  const streamScheduleBtn = document.getElementById('streamScheduleBtn');
+function toggleScheduleSettings() {
   const scheduleSection = document.getElementById('scheduleSettingsSection');
-  const scheduleSlotsContainer = document.getElementById('scheduleSlotsContainer');
-  const modeDescription = document.getElementById('streamModeDescription');
+  const toggleIcon = document.getElementById('scheduleToggleIcon');
   
-  if (mode === 'now') {
-    // Activate Stream Now
-    streamNowBtn.classList.add('bg-primary', 'text-white');
-    streamNowBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
-    
-    streamScheduleBtn.classList.remove('bg-primary', 'text-white');
-    streamScheduleBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
-    
-    // Hide schedule section
-    if (scheduleSection) scheduleSection.classList.add('hidden');
-    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.add('hidden');
-    
-    // Update description
-    if (modeDescription) {
-      modeDescription.textContent = 'Stream will start immediately after creation';
-    }
-  } else {
-    // Activate Schedule
-    streamScheduleBtn.classList.add('bg-primary', 'text-white');
-    streamScheduleBtn.classList.remove('text-gray-400', 'hover:bg-dark-600');
-    
-    streamNowBtn.classList.remove('bg-primary', 'text-white');
-    streamNowBtn.classList.add('text-gray-400', 'hover:bg-dark-600');
-    
-    // Show schedule section
-    if (scheduleSection) scheduleSection.classList.remove('hidden');
-    if (scheduleSlotsContainer) scheduleSlotsContainer.classList.remove('hidden');
-    
-    // Update description
-    if (modeDescription) {
-      modeDescription.textContent = 'Schedule your stream to start automatically at specific times';
+  if (scheduleSection && toggleIcon) {
+    if (scheduleSection.classList.contains('hidden')) {
+      scheduleSection.classList.remove('hidden');
+      toggleIcon.style.transform = 'rotate(180deg)';
+    } else {
+      scheduleSection.classList.add('hidden');
+      toggleIcon.style.transform = 'rotate(0deg)';
     }
   }
 }
+
+// Expose to window for onclick
+window.toggleScheduleSettings = toggleScheduleSettings;
 
 function updateServerTime() {
   const serverTimeDisplay = document.getElementById('serverTimeDisplay');
@@ -593,45 +569,48 @@ function addScheduleSlot() {
 
   const slotHTML = `
     <div class="schedule-slot p-3 bg-dark-700/50 rounded-lg border border-gray-600">
-      <div class="flex gap-3 items-start mb-3">
-        <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1.5 block">Start</label>
-          <input type="time" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Start</label>
+          <input type="time" class="schedule-time w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
         </div>
-        <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1.5 block">End</label>
-          <input type="time" class="schedule-endtime w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">End</label>
+          <input type="time" class="schedule-endtime w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
         </div>
-        <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1.5 block">Duration</label>
-          <div class="flex gap-1.5">
-            <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm text-center" placeholder="H" onchange="calculateFromDuration(this)">
-            <span class="text-sm text-gray-400 flex items-center">:</span>
-            <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm text-center" placeholder="M" onchange="calculateFromDuration(this)">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Duration</label>
+          <div class="flex gap-1">
+            <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[36px] px-1 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs text-center" placeholder="H" onchange="calculateFromDuration(this)">
+            <span class="text-xs text-gray-400 flex items-center">:</span>
+            <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[36px] px-1 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs text-center" placeholder="M" onchange="calculateFromDuration(this)">
           </div>
           <input type="hidden" class="schedule-duration" value="60">
         </div>
-        <div class="pt-6">
-          <button type="button" onclick="removeScheduleSlot(this)" class="h-[36px] w-[36px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded-lg transition-colors">
-            <i class="ti ti-trash text-base"></i>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block opacity-0">Del</label>
+          <button type="button" onclick="removeScheduleSlot(this)" class="w-full h-[36px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded-lg transition-colors">
+            <i class="ti ti-trash text-sm"></i>
           </button>
         </div>
       </div>
       
-      <div class="flex gap-3 items-center flex-wrap">
-        <label class="text-xs text-gray-400 flex-shrink-0">Recurring:</label>
-        <div class="flex gap-1.5 flex-wrap flex-1">
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
-          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-gray-400">Recurring Days:</label>
+          <button type="button" onclick="selectAllDaysInSlot(this)" class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+            All Days
+          </button>
         </div>
-        <button type="button" onclick="selectAllDaysInSlot(this)" class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex-shrink-0">
-          All Days
-        </button>
+        <div class="flex gap-1 flex-wrap">
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
+          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
+        </div>
       </div>
     </div>
   `;
@@ -903,8 +882,8 @@ function switchStreamTab(tab) {
     if (rtmpUrl) rtmpUrl.required = false;
     if (streamKey) streamKey.required = false;
     
-    // Load YouTube stream keys
-    loadYouTubeStreamKeys();
+    // Don't auto-load stream keys - user will click Load button
+    // loadYouTubeStreamKeys();
   }
 }
 
@@ -980,26 +959,41 @@ function selectYouTubeStreamKey(keyId) {
   const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
   if (!selectedKey) return;
   
-  // Auto-fill RTMP URL and Stream Key
-  const rtmpUrl = document.getElementById('rtmpUrl');
-  const streamKey = document.getElementById('streamKey');
+  // Auto-fill YouTube API specific fields
+  const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl');
+  const youtubeStreamKey = document.getElementById('youtubeStreamKey');
+  const youtubeStreamTitle = document.getElementById('youtubeStreamTitle');
+  const youtubeDescription = document.getElementById('youtubeDescription');
+  
+  // Fill RTMP URL (read-only)
+  if (youtubeRtmpUrl && selectedKey.ingestionInfo?.rtmpsIngestionAddress) {
+    youtubeRtmpUrl.value = selectedKey.ingestionInfo.rtmpsIngestionAddress;
+  }
+  
+  // Fill Stream Key (read-only)
+  if (youtubeStreamKey && selectedKey.ingestionInfo?.streamName) {
+    youtubeStreamKey.value = selectedKey.ingestionInfo.streamName;
+  }
+  
+  // Fill Stream Title (editable)
+  if (youtubeStreamTitle && selectedKey.title) {
+    youtubeStreamTitle.value = selectedKey.title;
+  }
+  
+  // Fill Description if available (editable)
+  if (youtubeDescription && selectedKey.snippet?.description) {
+    youtubeDescription.value = selectedKey.snippet.description;
+  }
+  
+  // Also fill the main stream title field
   const streamTitle = document.getElementById('streamTitle');
-  
-  if (rtmpUrl && selectedKey.ingestionInfo?.rtmpsIngestionAddress) {
-    rtmpUrl.value = selectedKey.ingestionInfo.rtmpsIngestionAddress;
-  }
-  
-  if (streamKey && selectedKey.ingestionInfo?.streamName) {
-    streamKey.value = selectedKey.ingestionInfo.streamName;
-  }
-  
   if (streamTitle && !streamTitle.value && selectedKey.title) {
     streamTitle.value = selectedKey.title;
   }
   
   // Show notification
   if (typeof showToast === 'function') {
-    showToast('success', 'YouTube stream key selected');
+    showToast('success', 'YouTube stream key loaded from your channel');
   }
   
   // Highlight selected key
@@ -1011,10 +1005,99 @@ function selectYouTubeStreamKey(keyId) {
       btn.classList.remove('border-primary', 'bg-primary/10');
     }
   });
+  
+  // Close dropdown after selection
+  const dropdown = document.getElementById('youtubeStreamKeysDropdown');
+  if (dropdown) {
+    dropdown.classList.add('hidden');
+  }
+}
+
+// Toggle YouTube stream key visibility
+function toggleYouTubeStreamKeyVisibility() {
+  const streamKeyInput = document.getElementById('youtubeStreamKey');
+  const streamKeyToggle = document.getElementById('youtubeStreamKeyToggle');
+  
+  if (!streamKeyInput || !streamKeyToggle) return;
+  
+  if (streamKeyInput.type === 'password') {
+    streamKeyInput.type = 'text';
+    streamKeyToggle.className = 'ti ti-eye-off';
+  } else {
+    streamKeyInput.type = 'password';
+    streamKeyToggle.className = 'ti ti-eye';
+  }
+}
+
+// Toggle YouTube stream keys dropdown
+function toggleYouTubeStreamKeysDropdown() {
+  const dropdown = document.getElementById('youtubeStreamKeysDropdown');
+  if (!dropdown) return;
+  
+  if (dropdown.classList.contains('hidden')) {
+    dropdown.classList.remove('hidden');
+    // Load stream keys if not already loaded
+    if (!youtubeStreamKeys || youtubeStreamKeys.length === 0) {
+      loadYouTubeStreamKeys();
+    }
+  } else {
+    dropdown.classList.add('hidden');
+  }
+}
+
+// Toggle YouTube additional settings
+function toggleYouTubeAdditionalSettings() {
+  console.log('[toggleYouTubeAdditionalSettings] Called');
+  const settings = document.getElementById('youtubeAdditionalSettings');
+  const icon = document.getElementById('youtubeAdditionalSettingsIcon');
+  
+  console.log('[toggleYouTubeAdditionalSettings] Settings:', settings);
+  console.log('[toggleYouTubeAdditionalSettings] Icon:', icon);
+  
+  if (!settings || !icon) {
+    console.log('[toggleYouTubeAdditionalSettings] Settings or icon not found!');
+    return;
+  }
+  
+  if (settings.classList.contains('hidden')) {
+    console.log('[toggleYouTubeAdditionalSettings] Showing settings');
+    settings.classList.remove('hidden');
+    icon.style.transform = 'rotate(180deg)';
+  } else {
+    console.log('[toggleYouTubeAdditionalSettings] Hiding settings');
+    settings.classList.add('hidden');
+    icon.style.transform = '';
+  }
+}
+
+// Toggle schedule section (Stream Mode & Schedule Settings)
+function toggleScheduleSection() {
+  console.log('[toggleScheduleSection] Called');
+  const content = document.getElementById('scheduleSectionContent');
+  const icon = document.getElementById('scheduleSectionIcon');
+  
+  if (!content || !icon) {
+    console.log('[toggleScheduleSection] Content or icon not found!');
+    return;
+  }
+  
+  if (content.classList.contains('hidden')) {
+    console.log('[toggleScheduleSection] Showing schedule section');
+    content.classList.remove('hidden');
+    icon.style.transform = 'rotate(180deg)';
+  } else {
+    console.log('[toggleScheduleSection] Hiding schedule section');
+    content.classList.add('hidden');
+    icon.style.transform = '';
+  }
 }
 
 // Expose YouTube API functions globally
 window.selectYouTubeStreamKey = selectYouTubeStreamKey;
+window.toggleYouTubeStreamKeyVisibility = toggleYouTubeStreamKeyVisibility;
+window.toggleYouTubeStreamKeysDropdown = toggleYouTubeStreamKeysDropdown;
+window.toggleYouTubeAdditionalSettings = toggleYouTubeAdditionalSettings;
+window.toggleScheduleSection = toggleScheduleSection;
 
 console.log('[stream-modal.js] YouTube API functions exposed globally');
 console.log('[stream-modal.js] Loaded successfully');

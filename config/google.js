@@ -19,31 +19,46 @@ const YT_SCOPES = [
 ];
 
 // Create OAuth client for specific user
-async function getUserOAuthClient(userId) {
+async function getUserOAuthClient(userId, redirectUri = null) {
   try {
     const credentials = await User.getYouTubeCredentials(userId);
     
-    if (credentials.youtube_client_id && credentials.youtube_client_secret && credentials.youtube_redirect_uri) {
+    if (credentials.youtube_client_id && credentials.youtube_client_secret) {
       // User has their own credentials
       console.log(`[OAuth] Using user-specific credentials for user ${userId}`);
+      const userRedirectUri = redirectUri || credentials.youtube_redirect_uri || process.env.GOOGLE_REDIRECT_URI;
       return new google.auth.OAuth2(
         credentials.youtube_client_id,
         credentials.youtube_client_secret,
-        credentials.youtube_redirect_uri
+        userRedirectUri
       );
     } else {
       // Fallback to default credentials
       console.log(`[OAuth] Using default credentials for user ${userId}`);
+      if (redirectUri) {
+        return new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          redirectUri
+        );
+      }
       return oauth2Client;
     }
   } catch (error) {
     console.error(`[OAuth] Error getting user credentials for ${userId}:`, error);
+    if (redirectUri) {
+      return new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri
+      );
+    }
     return oauth2Client;
   }
 }
 
-async function getAuthUrl(state, userId = null) {
-  const client = userId ? await getUserOAuthClient(userId) : oauth2Client;
+async function getAuthUrl(state, userId = null, redirectUri = null) {
+  const client = userId ? await getUserOAuthClient(userId, redirectUri) : oauth2Client;
   
   const url = client.generateAuthUrl({
     access_type: 'offline',
@@ -53,12 +68,12 @@ async function getAuthUrl(state, userId = null) {
     include_granted_scopes: true,
   });
   
-  console.log(`[OAuth] Generated auth URL for user ${userId || 'default'}`);
+  console.log(`[OAuth] Generated auth URL for user ${userId || 'default'} with redirect: ${redirectUri || 'default'}`);
   return url;
 }
 
-async function exchangeCodeForTokens(code, userId = null) {
-  const client = userId ? await getUserOAuthClient(userId) : oauth2Client;
+async function exchangeCodeForTokens(code, userId = null, redirectUri = null) {
+  const client = userId ? await getUserOAuthClient(userId, redirectUri) : oauth2Client;
   const { tokens } = await client.getToken(code);
   return tokens;
 }
