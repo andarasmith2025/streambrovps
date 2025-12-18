@@ -241,7 +241,7 @@
 
             
             <div class="flex-1 overflow-y-auto">
-              <form id="newStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate></form>
+              <form id="newStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate>
                 <input type="hidden" id="selectedVideoId" name="videoId" value="">
 
                 <!-- Form Fields (Single Column) -->
@@ -633,7 +633,8 @@
                   </div>
                 </div>
                 <!-- End of schedule settings -->
-                </div><!-- Close Form Fields w
+                </div><!-- Close Form Fields -->
+              </form>
             </div>
             
             <!-- Modal Footer -->
@@ -1821,16 +1822,26 @@
                         dayLabel = days.join(', ');
                       }
                       
-                      recurringInfo = `<div class="flex items-center gap-1 mt-0.5">
-                      <i class="ti ti-repeat text-blue-400 text-xs"></i>
-                      <span class="text-xs text-blue-400">${dayLabel}</span>
-                      ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
+                      recurringInfo = `<div class="flex items-center justify-between gap-2 mt-0.5">
+                      <div class="flex items-center gap-1">
+                        <i class="ti ti-repeat text-blue-400 text-xs"></i>
+                        <span class="text-xs text-blue-400">${dayLabel}</span>
+                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
+                      </div>
+                      ${stream.status === 'scheduled' ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="Cancel Schedule">
+                        <i class="ti ti-player-stop text-red-400 text-xs"></i>
+                      </button>` : ''}
                     </div>`;
                     } else {
                       const schDate = new Date(sch.schedule_time);
-                      recurringInfo = `<div class="flex items-center gap-1 text-xs text-gray-500">
-                        ${formatDate(schDate)}
-                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
+                      recurringInfo = `<div class="flex items-center justify-between gap-2 text-xs text-gray-500">
+                        <div class="flex items-center gap-1">
+                          ${formatDate(schDate)}
+                          ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
+                        </div>
+                        ${stream.status === 'scheduled' ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="Cancel Schedule">
+                          <i class="ti ti-player-stop text-red-400 text-xs"></i>
+                        </button>` : ''}
                       </div>`;
                     }
                     return `<div class="${idx > 0 ? 'mt-2 pt-2 border-t border-gray-700' : ''}">
@@ -2282,6 +2293,39 @@
                 .catch(error => {
                   console.error('Error deleting stream:', error);
                   showNotification('Error', 'An error occurred while deleting the stream', 'error');
+                });
+            }
+          );
+        }
+
+        // Stop/Cancel a specific schedule
+        function stopSchedule(streamId, scheduleId) {
+          if (!streamId || !scheduleId) return;
+
+          showConfirmDialog(
+            'Cancel Schedule',
+            'Are you sure you want to cancel this schedule? The stream will not start at the scheduled time.',
+            'Cancel Schedule',
+            'Keep Schedule',
+            () => {
+              fetch(`/api/streams/${streamId}/schedules/${scheduleId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success) {
+                    showNotification('Success', 'Schedule cancelled successfully', 'success');
+                    setTimeout(() => loadStreams(), 500);
+                  } else {
+                    showNotification('Error', data.error || 'Failed to cancel schedule', 'error');
+                  }
+                })
+                .catch(error => {
+                  console.error('Error cancelling schedule:', error);
+                  showNotification('Error', 'An error occurred while cancelling the schedule', 'error');
                 });
             }
           );

@@ -2314,6 +2314,40 @@ app.get('/api/streams/:id/schedules', isAuthenticated, async (req, res) => {
   }
 });
 
+// Delete a specific schedule
+app.delete('/api/streams/:id/schedules/:scheduleId', isAuthenticated, async (req, res) => {
+  try {
+    const StreamSchedule = require('./models/StreamSchedule');
+    const stream = await Stream.findById(req.params.id);
+    
+    if (!stream) {
+      return res.status(404).json({ success: false, error: 'Stream not found' });
+    }
+    
+    // Check if user owns this stream
+    if (stream.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    // Delete the schedule
+    await StreamSchedule.delete(req.params.scheduleId);
+    
+    // Check if there are any remaining schedules
+    const remainingSchedules = await StreamSchedule.findByStreamId(req.params.id);
+    
+    // If no schedules left and stream is scheduled, update status to offline
+    if (remainingSchedules.length === 0 && stream.status === 'scheduled') {
+      await Stream.updateStatus(req.params.id, 'offline');
+    }
+    
+    console.log(`[Schedule] Deleted schedule ${req.params.scheduleId} for stream ${req.params.id}`);
+    res.json({ success: true, message: 'Schedule cancelled successfully' });
+  } catch (error) {
+    console.error('Error deleting schedule:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete schedule' });
+  }
+});
+
 app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
