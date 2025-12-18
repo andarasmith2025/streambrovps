@@ -1270,15 +1270,16 @@
             formData.resolution = document.getElementById('currentResolution').textContent.split(' ')[0];
             formData.useAdvancedSettings = document.getElementById('advancedSettingsToggle').checked;
           }
-          // Collect schedules based on stream mode
-          if (currentStreamMode === 'schedule') {
-            const schedules = collectSchedules();
-            if (schedules.length > 0) {
-              formData.schedules = schedules;
-            }
+          // Collect schedules - if no schedules filled, treat as Stream Now
+          const schedules = collectSchedules();
+          if (schedules && schedules.length > 0) {
+            // Has schedules - will be scheduled
+            formData.schedules = schedules;
+            console.log('[Form Submit] Stream will be scheduled with', schedules.length, 'schedule(s)');
           } else {
-            // Stream Now mode - no schedules, will start immediately
+            // No schedules - Stream Now mode (start immediately)
             formData.streamNow = true;
+            console.log('[Form Submit] No schedules found - Stream Now mode activated');
           }
           const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
           fetch('/api/streams', {
