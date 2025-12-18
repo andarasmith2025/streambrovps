@@ -1,3 +1,5 @@
+console.log('[stream-modal.js] Loading...');
+
 let selectedVideoData = null;
 let currentOrientation = 'horizontal';
 let isDropdownOpen = false;
@@ -6,6 +8,8 @@ let desktopVideoPlayer = null;
 let streamKeyTimeout = null;
 let isStreamKeyValid = true;
 let currentPlatform = 'Custom';
+
+console.log('[stream-modal.js] Variables initialized');
 
 function openNewStreamModal() {
   const modal = document.getElementById('newStreamModal');
@@ -582,44 +586,44 @@ function addScheduleSlot() {
   const slotCount = container.querySelectorAll('.schedule-slot').length;
 
   const slotHTML = `
-    <div class="schedule-slot p-2.5 bg-dark-700/50 rounded border border-gray-600">
-      <div class="flex gap-2 items-start mb-2">
+    <div class="schedule-slot p-3 bg-dark-700/50 rounded-lg border border-gray-600">
+      <div class="flex gap-3 items-start mb-3">
         <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1 block">Start</label>
-          <input type="time" class="schedule-time w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+          <label class="text-xs text-gray-400 mb-1.5 block">Start</label>
+          <input type="time" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
         </div>
         <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1 block">End</label>
-          <input type="time" class="schedule-endtime w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
+          <label class="text-xs text-gray-400 mb-1.5 block">End</label>
+          <input type="time" class="schedule-endtime w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
         </div>
         <div class="flex-1">
-          <label class="text-xs text-gray-400 mb-1 block">Duration</label>
-          <div class="flex gap-1">
-            <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="H" onchange="calculateFromDuration(this)">
-            <span class="text-xs text-gray-400 flex items-center">:</span>
-            <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[32px] px-2 bg-dark-700 border border-gray-600 rounded focus:border-primary text-xs text-center" placeholder="M" onchange="calculateFromDuration(this)">
+          <label class="text-xs text-gray-400 mb-1.5 block">Duration</label>
+          <div class="flex gap-1.5">
+            <input type="number" min="0" max="23" value="1" class="duration-hours w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm text-center" placeholder="H" onchange="calculateFromDuration(this)">
+            <span class="text-sm text-gray-400 flex items-center">:</span>
+            <input type="number" min="0" max="59" value="0" class="duration-minutes w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-sm text-center" placeholder="M" onchange="calculateFromDuration(this)">
           </div>
           <input type="hidden" class="schedule-duration" value="60">
         </div>
-        <div class="pt-5">
-          <button type="button" onclick="removeScheduleSlot(this)" class="h-[32px] w-[32px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded transition-colors">
-            <i class="ti ti-trash text-sm"></i>
+        <div class="pt-6">
+          <button type="button" onclick="removeScheduleSlot(this)" class="h-[36px] w-[36px] flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 rounded-lg transition-colors">
+            <i class="ti ti-trash text-base"></i>
           </button>
         </div>
       </div>
       
-      <div class="flex gap-2 items-center">
+      <div class="flex gap-3 items-center flex-wrap">
         <label class="text-xs text-gray-400 flex-shrink-0">Recurring:</label>
-        <div class="flex gap-1 flex-wrap">
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
-          <button type="button" class="recurring-day px-2 py-1 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
+        <div class="flex gap-1.5 flex-wrap flex-1">
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="0">Sun</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="1">Mon</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="2">Tue</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="3">Wed</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="4">Thu</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="5">Fri</button>
+          <button type="button" class="recurring-day px-2.5 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded transition-colors" data-day="6">Sat</button>
         </div>
-        <button type="button" onclick="selectAllDaysInSlot(this)" class="ml-auto px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+        <button type="button" onclick="selectAllDaysInSlot(this)" class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex-shrink-0">
           All Days
         </button>
       </div>
@@ -762,6 +766,24 @@ document.addEventListener('DOMContentLoaded', function () {
       console.log(`${type}: ${message}`);
     }
   }
+  
+  // Expose functions globally for onclick handlers
+  window.openNewStreamModal = openNewStreamModal;
+  window.closeNewStreamModal = closeNewStreamModal;
+  window.toggleVideoSelector = toggleVideoSelector;
+  window.selectVideo = selectVideo;
+  window.setVideoOrientation = setVideoOrientation;
+  window.toggleStreamKeyVisibility = toggleStreamKeyVisibility;
+  window.toggleStreamMode = toggleStreamMode;
+  window.calculateDurationFromEndTime = calculateDurationFromEndTime;
+  window.calculateFromDuration = calculateFromDuration;
+  window.calculateEndTimeFromDuration = calculateEndTimeFromDuration;
+  window.selectAllDays = selectAllDays;
+  window.selectAllDaysInSlot = selectAllDaysInSlot;
+  window.addScheduleSlot = addScheduleSlot;
+  window.removeScheduleSlot = removeScheduleSlot;
+  
+  console.log('[stream-modal.js] All functions exposed globally');
 });
 
 
@@ -770,6 +792,7 @@ let currentStreamTab = 'manual'; // 'manual' or 'youtube'
 let youtubeStreamKeys = [];
 
 function switchStreamTab(tab) {
+  console.log('[switchStreamTab] Switching to tab:', tab);
   currentStreamTab = tab;
   
   const tabManual = document.getElementById('tabManual');
@@ -819,6 +842,10 @@ function switchStreamTab(tab) {
     loadYouTubeStreamKeys();
   }
 }
+
+// Make sure switchStreamTab is available globally
+window.switchStreamTab = switchStreamTab;
+console.log('[stream-modal.js] switchStreamTab function defined and exposed globally:', typeof window.switchStreamTab);
 
 // Load YouTube stream keys from OAuth
 async function loadYouTubeStreamKeys() {
@@ -920,3 +947,9 @@ function selectYouTubeStreamKey(keyId) {
     }
   });
 }
+
+// Expose YouTube API functions globally
+window.selectYouTubeStreamKey = selectYouTubeStreamKey;
+
+console.log('[stream-modal.js] YouTube API functions exposed globally');
+console.log('[stream-modal.js] Loaded successfully');
