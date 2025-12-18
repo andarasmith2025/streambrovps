@@ -34,6 +34,9 @@ function openNewStreamModal() {
     modalContent.scrollTop = 0;
   }
   
+  // Set default tab to Manual and set required fields
+  switchStreamTab('manual');
+  
   loadGalleryVideos();
 }
 
