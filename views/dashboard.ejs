@@ -204,9 +204,9 @@
       </div>
       </div>
       <div id="newStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
-        <div class="flex min-h-screen items-center justify-center p-4">
-          <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div class="flex min-h-screen items-center justify-center p-2 md:p-4">
+          <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container flex flex-col max-h-[95vh] md:max-h-[92vh]">
+            <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700 sticky top-0 bg-dark-800 z-10 rounded-t-lg">
               <h3 class="text-base font-semibold">Create New Stream</h3>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="saveAsTemplate()"
@@ -227,8 +227,8 @@
               </div>
             </div>
             
-            <!-- Tab Switcher -->
-            <div class="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-dark-900 border-b border-gray-700">
+            <!-- Tab Switcher (Sticky) -->
+            <div class="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-dark-900 border-b border-gray-700 sticky top-[57px] z-10">
               <button type="button" id="tabManual" onclick="switchStreamTab('manual')"
                 class="flex-1 px-4 py-2 text-sm font-medium rounded transition-colors bg-primary text-white">
                 <i class="ti ti-broadcast mr-1.5"></i>Manual RTMP
@@ -239,8 +239,8 @@
               </button>
             </div>
             
-            <div class="px-4 py-3 overflow-y-auto flex-grow min-h-0">
-              <form id="newStreamForm" class="space-y-3">
+            <div class="px-4 py-3 overflow-y-auto flex-grow min-h-0 scroll-smooth">
+              <form id="newStreamForm" class="space-y-3 pb-4">
                 <input type="hidden" id="selectedVideoId" name="videoId" value="">
 
                 <!-- Form Fields (Single Column) -->
@@ -645,6 +645,13 @@
                     </div>
                   </div>
               </form>
+              
+              <!-- Scroll to Top Button -->
+              <button type="button" id="scrollToTopBtn" onclick="scrollModalToTop('newStreamModal')"
+                class="hidden fixed bottom-24 right-4 md:right-8 w-12 h-12 bg-primary hover:bg-blue-600 active:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-20 items-center justify-center"
+                title="Scroll to top">
+                <i class="ti ti-arrow-up text-xl"></i>
+              </button>
             </div>
             <div class="sticky bottom-0 z-10 flex-shrink-0 px-4 py-3 border-t border-gray-700 bg-dark-900 shadow-lg">
               <div class="grid grid-cols-2 gap-3">
@@ -662,16 +669,16 @@
         </div>
       </div>
       <div id="editStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
-        <div class="flex min-h-screen items-center justify-center p-4">
-          <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div class="flex min-h-screen items-center justify-center p-2 md:p-4">
+          <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container flex flex-col max-h-[95vh] md:max-h-[92vh]">
+            <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-700 sticky top-0 bg-dark-800 z-10 rounded-t-lg">
               <h3 class="text-base font-semibold">Edit Stream</h3>
               <button onclick="closeEditStreamModal()" class="text-gray-400 hover:text-white transition-colors">
                 <i class="ti ti-x text-xl"></i>
               </button>
             </div>
-            <div class="px-4 py-3 overflow-y-auto flex-grow">
-              <form id="editStreamForm" class="space-y-3">
+            <div class="px-4 py-3 overflow-y-auto flex-grow scroll-smooth">
+              <form id="editStreamForm" class="space-y-3 pb-4">
                 <input type="hidden" id="editStreamId" name="streamId" value="">
                 <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
 
@@ -896,6 +903,13 @@
                   </div>
                 </div>
               </form>
+              
+              <!-- Scroll to Top Button for Edit Modal -->
+              <button type="button" id="scrollToTopBtnEdit" onclick="scrollModalToTop('editStreamModal')"
+                class="hidden fixed bottom-24 right-4 md:right-8 w-12 h-12 bg-primary hover:bg-blue-600 active:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-20 items-center justify-center"
+                title="Scroll to top">
+                <i class="ti ti-arrow-up text-xl"></i>
+              </button>
             </div>
             <div class="sticky bottom-0 z-10 flex-shrink-0 px-4 py-3 border-t border-gray-700 bg-dark-900 shadow-lg">
               <div class="grid grid-cols-2 gap-3">

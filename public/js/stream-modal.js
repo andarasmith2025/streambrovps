@@ -28,6 +28,12 @@ function openNewStreamModal() {
     modal.classList.add('active');
   });
   
+  // Scroll to top when opening
+  const modalContent = modal.querySelector('.overflow-y-auto');
+  if (modalContent) {
+    modalContent.scrollTop = 0;
+  }
+  
   loadGalleryVideos();
 }
 
@@ -784,8 +790,67 @@ document.addEventListener('DOMContentLoaded', function () {
   window.removeScheduleSlot = removeScheduleSlot;
   
   console.log('[stream-modal.js] All functions exposed globally');
+  
+  // Setup scroll to top button for modals
+  setupScrollToTopButton();
 });
 
+// Scroll to top functionality
+function scrollModalToTop(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  const modalContent = modal.querySelector('.overflow-y-auto');
+  if (modalContent) {
+    modalContent.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+}
+
+function setupScrollToTopButton() {
+  // Setup for New Stream Modal
+  const newStreamModal = document.getElementById('newStreamModal');
+  const scrollBtn = document.getElementById('scrollToTopBtn');
+  
+  if (newStreamModal && scrollBtn) {
+    const modalContent = newStreamModal.querySelector('.overflow-y-auto');
+    if (modalContent) {
+      modalContent.addEventListener('scroll', function() {
+        if (this.scrollTop > 300) {
+          scrollBtn.classList.remove('hidden');
+          scrollBtn.classList.add('flex');
+        } else {
+          scrollBtn.classList.add('hidden');
+          scrollBtn.classList.remove('flex');
+        }
+      });
+    }
+  }
+  
+  // Setup for Edit Stream Modal
+  const editStreamModal = document.getElementById('editStreamModal');
+  const scrollBtnEdit = document.getElementById('scrollToTopBtnEdit');
+  
+  if (editStreamModal && scrollBtnEdit) {
+    const modalContentEdit = editStreamModal.querySelector('.overflow-y-auto');
+    if (modalContentEdit) {
+      modalContentEdit.addEventListener('scroll', function() {
+        if (this.scrollTop > 300) {
+          scrollBtnEdit.classList.remove('hidden');
+          scrollBtnEdit.classList.add('flex');
+        } else {
+          scrollBtnEdit.classList.add('hidden');
+          scrollBtnEdit.classList.remove('flex');
+        }
+      });
+    }
+  }
+}
+
+// Expose scroll function globally
+window.scrollModalToTop = scrollModalToTop;
 
 // Tab switching functionality
 let currentStreamTab = 'manual'; // 'manual' or 'youtube'
