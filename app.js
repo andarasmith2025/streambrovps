@@ -2939,9 +2939,12 @@ const server = app.listen(port, '0.0.0.0', async () => {
   // Auto-recovery: Restart streams that should still be active
   setTimeout(async () => {
     try {
+      console.log('[Startup] Initiating auto-recovery for active streams...');
       await streamingService.recoverActiveStreams();
+      console.log('[Startup] Auto-recovery completed');
     } catch (error) {
-      console.error('Failed to recover active streams:', error);
+      console.error('[Startup] Failed to recover active streams:', error);
+      console.error('[Startup] Error stack:', error.stack);
     }
   }, 3000); // Wait 3 seconds after server start to allow everything to initialize
   
