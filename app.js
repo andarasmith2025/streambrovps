@@ -2215,6 +2215,9 @@ app.post('/api/streams', isAuthenticated, [
       platform = 'Restream.io';
       platform_icon = 'ti-live-photo';
     }
+    // Check if using YouTube API mode
+    const useYouTubeAPI = req.body.useYouTubeAPI === 'true' || req.body.useYouTubeAPI === true;
+    
     const streamData = {
       title: req.body.streamTitle,
       video_id: req.body.videoId || null,
@@ -2228,8 +2231,19 @@ app.post('/api/streams', isAuthenticated, [
       orientation: req.body.orientation || 'horizontal',
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
       use_advanced_settings: req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true,
+      use_youtube_api: useYouTubeAPI,
       user_id: req.session.userId
     };
+    
+    // Add YouTube API specific fields if using YouTube API
+    if (useYouTubeAPI) {
+      streamData.youtube_description = req.body.youtubeDescription || '';
+      streamData.youtube_privacy = req.body.youtubePrivacy || 'unlisted';
+      streamData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
+      streamData.youtube_age_restricted = req.body.youtubeAgeRestricted === 'true' || req.body.youtubeAgeRestricted === true;
+      streamData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
+      streamData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+    }
     // Handle Stream Now vs Schedule mode
     const streamNow = req.body.streamNow === true;
     const schedules = req.body.schedules;
@@ -2272,6 +2286,65 @@ app.post('/api/streams', isAuthenticated, [
         }
       }
       console.log(`[CREATE STREAM] Created ${schedules.length} schedule(s) for stream ${stream.id}`);
+    }
+    
+    // Create YouTube broadcast if using YouTube API
+    if (useYouTubeAPI && platform === 'YouTube') {
+      try {
+        const youtubeService = require('./services/youtubeService');
+        const { getTokensForUser } = require('./routes/youtube');
+        
+        // Get user's YouTube tokens
+        const tokens = await getTokensForUser(req.session.userId);
+        
+        if (tokens && tokens.access_token) {
+          // Determine scheduled start time
+          let scheduledStartTime;
+          if (hasSchedules && !streamNow) {
+            // Use first schedule time
+            scheduledStartTime = parseScheduleTime(schedules[0].schedule_time).toISOString();
+          } else {
+            // Stream now - set to current time
+            scheduledStartTime = new Date().toISOString();
+          }
+          
+          // Extract stream key from RTMP URL or use provided stream key
+          const streamKeyMatch = req.body.rtmpUrl.match(/\/([^\/]+)$/);
+          const extractedStreamKey = streamKeyMatch ? streamKeyMatch[1] : req.body.streamKey;
+          
+          console.log(`[CREATE STREAM] Creating YouTube broadcast for stream ${stream.id}`);
+          console.log(`[CREATE STREAM] - Title: ${req.body.streamTitle}`);
+          console.log(`[CREATE STREAM] - Scheduled: ${scheduledStartTime}`);
+          console.log(`[CREATE STREAM] - Privacy: ${streamData.youtube_privacy}`);
+          
+          // Create broadcast via YouTube API
+          const broadcastResult = await youtubeService.scheduleLive(tokens, {
+            title: req.body.streamTitle,
+            description: streamData.youtube_description || '',
+            privacyStatus: streamData.youtube_privacy || 'unlisted',
+            scheduledStartTime: scheduledStartTime,
+            streamId: extractedStreamKey, // Use the stream key user selected
+            enableAutoStart: streamData.youtube_auto_start || false,
+            enableAutoStop: streamData.youtube_auto_end || false
+          });
+          
+          // Update stream with broadcast ID
+          if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
+            await Stream.update(stream.id, {
+              youtube_broadcast_id: broadcastResult.broadcast.id
+            });
+            
+            console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
+            stream.youtube_broadcast_id = broadcastResult.broadcast.id;
+          }
+        } else {
+          console.warn(`[CREATE STREAM] YouTube tokens not found for user ${req.session.userId}, broadcast not created`);
+        }
+      } catch (broadcastError) {
+        console.error('[CREATE STREAM] Error creating YouTube broadcast:', broadcastError);
+        // Don't fail the stream creation, just log the error
+        // User can still stream manually
+      }
     }
     
     res.json({ success: true, stream, streamNow });

@@ -350,5 +350,38 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
   }
 });
 
-// Export router
+// Helper function to get tokens for a specific user (for use in other modules)
+async function getTokensForUser(userId) {
+  if (!userId) return null;
+  
+  return new Promise((resolve) => {
+    // Get tokens
+    db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], (err, row) => {
+      if (err || !row) return resolve(null);
+      
+      // Get user credentials
+      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], (err2, userRow) => {
+        const tokens = { 
+          access_token: row.access_token, 
+          refresh_token: row.refresh_token, 
+          expiry_date: row.expiry_date 
+        };
+        
+        // Attach user credentials if available
+        if (!err2 && userRow && userRow.youtube_client_id && userRow.youtube_client_secret) {
+          tokens._userCredentials = {
+            client_id: userRow.youtube_client_id,
+            client_secret: userRow.youtube_client_secret,
+            redirect_uri: userRow.youtube_redirect_uri
+          };
+        }
+        
+        resolve(tokens);
+      });
+    });
+  });
+}
+
+// Export router and helper function
 module.exports = router;
+module.exports.getTokensForUser = getTokensForUser;

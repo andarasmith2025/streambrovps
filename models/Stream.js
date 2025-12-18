@@ -18,10 +18,22 @@ class Stream {
       schedule_time = null,
       duration = null,
       use_advanced_settings = false,
+      use_youtube_api = false,
+      youtube_description = null,
+      youtube_privacy = 'unlisted',
+      youtube_made_for_kids = false,
+      youtube_age_restricted = false,
+      youtube_auto_start = false,
+      youtube_auto_end = false,
       user_id
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
     const use_advanced_settings_int = use_advanced_settings ? 1 : 0;
+    const use_youtube_api_int = use_youtube_api ? 1 : 0;
+    const youtube_made_for_kids_int = youtube_made_for_kids ? 1 : 0;
+    const youtube_age_restricted_int = youtube_age_restricted ? 1 : 0;
+    const youtube_auto_start_int = youtube_auto_start ? 1 : 0;
+    const youtube_auto_end_int = youtube_auto_end ? 1 : 0;
     const status = schedule_time ? 'scheduled' : 'offline';
     const status_updated_at = new Date().toISOString();
     return new Promise((resolve, reject) => {
@@ -29,12 +41,18 @@ class Stream {
         `INSERT INTO streams (
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video,
-          schedule_time, duration, status, status_updated_at, use_advanced_settings, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          schedule_time, duration, status, status_updated_at, use_advanced_settings, 
+          use_youtube_api, youtube_description, youtube_privacy, 
+          youtube_made_for_kids, youtube_age_restricted, youtube_auto_start, youtube_auto_end,
+          user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video_int,
-          schedule_time, duration, status, status_updated_at, use_advanced_settings_int, user_id
+          schedule_time, duration, status, status_updated_at, use_advanced_settings_int,
+          use_youtube_api_int, youtube_description, youtube_privacy,
+          youtube_made_for_kids_int, youtube_age_restricted_int, youtube_auto_start_int, youtube_auto_end_int,
+          user_id
         ],
         function (err) {
           if (err) {
