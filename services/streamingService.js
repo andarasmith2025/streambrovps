@@ -736,8 +736,10 @@ async function stopStream(streamId) {
       console.error(`[StreamingService] Error killing FFmpeg process: ${killError.message}`);
       // Keep in manuallyStoppingStreams to prevent restart attempts
     }
+    
+    // DON'T delete from activeStreams here - let the exit handler do cleanup
+    // This prevents race condition where UI shows offline but FFmpeg still running
     const stream = await Stream.findById(streamId);
-    activeStreams.delete(streamId);
     
     const tempConcatFile = path.join(__dirname, '..', 'temp', `playlist_${streamId}.txt`);
     try {
@@ -782,44 +784,16 @@ async function stopStream(streamId) {
       schedulerService.handleStreamStopped(streamId);
     }
     
-    // Cleanup memory: logs, retry counts, and manual stop flag
-    const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
-    const hadRetryCount = streamRetryCount.has(streamId);
-    const hadForceKillTimeout = forceKillTimeouts.has(streamId);
+    // NOTE: Cleanup is handled by the exit handler to prevent race conditions
+    // Don't delete from activeStreams, streamLogs, etc. here
+    // The exit handler will properly cleanup after FFmpeg process terminates
+    console.log(`[StreamingService] Stop request completed for stream ${streamId}, waiting for FFmpeg to terminate...`);
     
-    streamLogs.delete(streamId);
-    streamRetryCount.delete(streamId);
-    manuallyStoppingStreams.delete(streamId);
-    
-    // Clear force kill timeout if exists
-    if (forceKillTimeouts.has(streamId)) {
-      clearTimeout(forceKillTimeouts.get(streamId));
-      forceKillTimeouts.delete(streamId);
-    }
-    
-    // Unregister from limiter
-    streamLimiter.unregisterStream(streamId);
-    
-    // Stop resource monitoring
-    resourceMonitor.stopMonitoring(streamId);
-    
-    // Log detailed cleanup information
-    console.log(`[StreamingService] Memory cleanup completed for stream ${streamId}:`);
-    console.log(`  - Removed ${logCount} log entries from streamLogs`);
-    console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
-    console.log(`  - Cleared force kill timeout: ${hadForceKillTimeout ? 'yes' : 'no'}`);
-    console.log(`  - Unregistered from stream limiter`);
-    console.log(`  - Stopped resource monitoring`);
-    
-    return { success: true, message: 'Stream stopped successfully' };
+    return { success: true, message: 'Stream stop initiated, waiting for FFmpeg to terminate' };
   } catch (error) {
-    // Ensure cleanup even on error
-    const logCount = streamLogs.has(streamId) ? streamLogs.get(streamId).length : 0;
-    const hadRetryCount = streamRetryCount.has(streamId);
-    const hadForceKillTimeout = forceKillTimeouts.has(streamId);
+    console.error(`[StreamingService] Error in stopStream for ${streamId}:`, error);
     
-    streamLogs.delete(streamId);
-    streamRetryCount.delete(streamId);
+    // Remove from manual stop set on error
     manuallyStoppingStreams.delete(streamId);
     
     // Clear force kill timeout if exists
@@ -828,20 +802,6 @@ async function stopStream(streamId) {
       forceKillTimeouts.delete(streamId);
     }
     
-    streamLimiter.unregisterStream(streamId);
-    
-    // Stop resource monitoring
-    resourceMonitor.stopMonitoring(streamId);
-    
-    // Log detailed cleanup information even on error
-    console.log(`[StreamingService] Memory cleanup completed (after error) for stream ${streamId}:`);
-    console.log(`  - Removed ${logCount} log entries from streamLogs`);
-    console.log(`  - Removed retry count: ${hadRetryCount ? 'yes' : 'no'}`);
-    console.log(`  - Cleared force kill timeout: ${hadForceKillTimeout ? 'yes' : 'no'}`);
-    console.log(`  - Unregistered from stream limiter`);
-    console.log(`  - Stopped resource monitoring`);
-    
-    console.error(`[StreamingService] Error stopping stream ${streamId}:`, error);
     return { success: false, error: error.message };
   }
 }
