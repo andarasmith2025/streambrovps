@@ -301,6 +301,15 @@ function createTables() {
     }
   });
 
+  // Add manual_stop flag to prevent auto-recovery of manually stopped streams
+  db.run(`ALTER TABLE streams ADD COLUMN manual_stop INTEGER DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding manual_stop column:', err.message);
+    } else if (!err) {
+      console.log('Added manual_stop column to streams table');
+    }
+  });
+
   // Stream Templates table for saving/loading configurations
   db.run(`CREATE TABLE IF NOT EXISTS stream_templates (
     id TEXT PRIMARY KEY,

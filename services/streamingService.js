@@ -394,6 +394,19 @@ async function startStream(streamId, options = {}) {
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     
+    // Clear manual_stop flag when stream starts
+    try {
+      await new Promise((resolve) => {
+        db.run(
+          `UPDATE streams SET manual_stop = 0 WHERE id = ?`,
+          [streamId],
+          () => resolve()
+        );
+      });
+    } catch (err) {
+      // Ignore error if column doesn't exist
+    }
+    
     // Register stream in limiter
     streamLimiter.registerStream(streamId, stream.user_id);
     
@@ -654,8 +667,27 @@ async function stopStream(streamId) {
       return { success: false, error: 'Stream is not active' };
     }
     addStreamLog(streamId, 'Stopping stream...');
-    console.log(`[StreamingService] Stopping active stream ${streamId}`);
+    console.log(`[StreamingService] Stopping active stream ${streamId} (manual stop)`);
     manuallyStoppingStreams.add(streamId);
+    
+    // Mark stream as manually stopped in database to prevent auto-recovery
+    try {
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE streams SET manual_stop = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [streamId],
+          (err) => {
+            if (err) {
+              // Column might not exist yet, ignore error
+              console.log(`[StreamingService] Note: manual_stop flag not set (column may not exist yet)`);
+            }
+            resolve();
+          }
+        );
+      });
+    } catch (err) {
+      // Ignore error if column doesn't exist
+    }
     
     try {
       ffmpegProcess.kill('SIGTERM');
@@ -966,9 +998,37 @@ async function recoverStreamsAfterRestart(liveStreams) {
   const now = new Date();
   let recoveredCount = 0;
   let failedCount = 0;
+  let skippedCount = 0;
   
   for (const streamInfo of liveStreams) {
     try {
+      // Check if stream was manually stopped (check database for manual_stop flag)
+      const streamData = await new Promise((resolve, reject) => {
+        db.get(
+          `SELECT manual_stop, start_time FROM streams WHERE id = ?`,
+          [streamInfo.id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+      
+      if (streamData && streamData.manual_stop === 1) {
+        console.log(`[Recovery] ⏭️  Skipping stream ${streamInfo.id} (${streamInfo.title}) - was manually stopped by user`);
+        skippedCount++;
+        
+        // Clear the manual_stop flag for next time
+        await new Promise((resolve) => {
+          db.run(
+            `UPDATE streams SET manual_stop = 0 WHERE id = ?`,
+            [streamInfo.id],
+            () => resolve()
+          );
+        });
+        continue;
+      }
+      
       const startTime = new Date(streamInfo.start_time);
       const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
       
@@ -990,6 +1050,7 @@ async function recoverStreamsAfterRestart(liveStreams) {
         }
       } else {
         console.log(`[Recovery] Stream ${streamInfo.id} too old (${elapsedMinutes} minutes), skipping`);
+        skippedCount++;
       }
     } catch (error) {
       failedCount++;
@@ -997,7 +1058,7 @@ async function recoverStreamsAfterRestart(liveStreams) {
     }
   }
   
-  console.log(`[Recovery] Recovery complete: ${recoveredCount} succeeded, ${failedCount} failed`);
+  console.log(`[Recovery] Recovery complete: ${recoveredCount} succeeded, ${failedCount} failed, ${skippedCount} skipped`);
 }
 
 async function recoverActiveStreams() {
