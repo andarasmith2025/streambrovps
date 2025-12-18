@@ -2530,11 +2530,59 @@
               else console.warn(`Element not found: ${id}`);
             };
 
+            // Store stream data for later use
+            window.currentEditStream = stream;
+            
             originalStreamKey = stream.stream_key;
             safeSetValue('editStreamId', stream.id);
             safeSetValue('editStreamTitle', stream.title);
             safeSetValue('editRtmpUrl', stream.rtmp_url || '');
             safeSetValue('editStreamKey', stream.stream_key || '');
+
+            // Check if using YouTube API
+            const isYouTubeAPI = stream.use_youtube_api === 1 || stream.use_youtube_api === true;
+            
+            // Disable RTMP fields if using YouTube API (managed by broadcast)
+            const rtmpUrlField = document.getElementById('editRtmpUrl');
+            const streamKeyField = document.getElementById('editStreamKey');
+            
+            if (isYouTubeAPI) {
+              if (rtmpUrlField) {
+                rtmpUrlField.disabled = true;
+                rtmpUrlField.classList.add('opacity-50', 'cursor-not-allowed');
+                rtmpUrlField.title = 'RTMP URL is managed by YouTube broadcast';
+              }
+              if (streamKeyField) {
+                streamKeyField.disabled = true;
+                streamKeyField.classList.add('opacity-50', 'cursor-not-allowed');
+                streamKeyField.title = 'Stream Key is managed by YouTube broadcast';
+              }
+              
+              // Add info badge
+              const rtmpUrlContainer = rtmpUrlField?.parentElement;
+              if (rtmpUrlContainer && !rtmpUrlContainer.querySelector('.youtube-api-badge')) {
+                const badge = document.createElement('div');
+                badge.className = 'youtube-api-badge mt-2 text-xs text-blue-400 flex items-center gap-1';
+                badge.innerHTML = '<i class="ti ti-info-circle"></i><span>This stream uses YouTube API. RTMP settings are managed automatically.</span>';
+                rtmpUrlContainer.appendChild(badge);
+              }
+            } else {
+              // Enable fields for manual RTMP
+              if (rtmpUrlField) {
+                rtmpUrlField.disabled = false;
+                rtmpUrlField.classList.remove('opacity-50', 'cursor-not-allowed');
+                rtmpUrlField.title = '';
+              }
+              if (streamKeyField) {
+                streamKeyField.disabled = false;
+                streamKeyField.classList.remove('opacity-50', 'cursor-not-allowed');
+                streamKeyField.title = '';
+              }
+              
+              // Remove info badge if exists
+              const badge = document.querySelector('.youtube-api-badge');
+              if (badge) badge.remove();
+            }
 
             if (stream.video_id) {
               safeSetValue('editSelectedVideoId', stream.video_id);

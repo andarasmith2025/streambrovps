@@ -2430,11 +2430,22 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
     if (stream.user_id !== req.session.userId) {
       return res.status(403).json({ success: false, error: 'Not authorized to update this stream' });
     }
+    
+    const isYouTubeAPI = stream.use_youtube_api === 1 || stream.use_youtube_api === true;
+    
     const updateData = {};
     if (req.body.streamTitle) updateData.title = req.body.streamTitle;
     if (req.body.videoId) updateData.video_id = req.body.videoId;
-    if (req.body.rtmpUrl) updateData.rtmp_url = req.body.rtmpUrl;
-    if (req.body.streamKey) updateData.stream_key = req.body.streamKey;
+    
+    // Only update RTMP URL and Stream Key if NOT using YouTube API
+    // (YouTube API streams have these managed by broadcast)
+    if (!isYouTubeAPI) {
+      if (req.body.rtmpUrl) updateData.rtmp_url = req.body.rtmpUrl;
+      if (req.body.streamKey) updateData.stream_key = req.body.streamKey;
+    } else {
+      console.log(`[UPDATE STREAM] Preserving RTMP settings for YouTube API stream ${req.params.id}`);
+    }
+    
     if (req.body.bitrate) updateData.bitrate = parseInt(req.body.bitrate);
     if (req.body.resolution) updateData.resolution = req.body.resolution;
     if (req.body.fps) updateData.fps = parseInt(req.body.fps);
@@ -2445,6 +2456,10 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
     if (req.body.useAdvancedSettings !== undefined) {
       updateData.use_advanced_settings = req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true;
     }
+    
+    // Preserve YouTube API settings (don't allow changing these via edit)
+    // These are set during stream creation and managed by YouTube broadcast
+    // If needed to change, user should delete and recreate the stream
     // Handle multiple schedules
     const schedules = req.body.schedules;
     const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;
