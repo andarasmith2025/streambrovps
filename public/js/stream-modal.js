@@ -38,6 +38,66 @@ function openNewStreamModal() {
   switchStreamTab('manual');
   
   loadGalleryVideos();
+  
+  // Check if there's a selected YouTube stream from sessionStorage
+  const selectedStreamId = sessionStorage.getItem('selectedYouTubeStreamId');
+  if (selectedStreamId) {
+    console.log('[openNewStreamModal] Found selected YouTube stream in sessionStorage:', selectedStreamId);
+    
+    // Switch to YouTube tab
+    switchStreamTab('youtube');
+    
+    // Fill in the form fields
+    const youtubeStreamKey = document.getElementById('youtubeStreamKey');
+    const youtubeStreamTitle = document.getElementById('youtubeStreamTitle');
+    const youtubeDescription = document.getElementById('youtubeDescription');
+    const streamTitle = document.getElementById('streamTitle');
+    
+    const streamKey = sessionStorage.getItem('selectedYouTubeStreamKey');
+    const streamTitleValue = sessionStorage.getItem('selectedYouTubeStreamTitle');
+    const description = sessionStorage.getItem('selectedYouTubeStreamDescription');
+    
+    if (youtubeStreamKey && streamKey) {
+      youtubeStreamKey.value = streamKey;
+    }
+    if (youtubeStreamTitle && streamTitleValue) {
+      youtubeStreamTitle.value = streamTitleValue;
+    }
+    if (youtubeDescription && description) {
+      youtubeDescription.value = description;
+    }
+    if (streamTitle && streamTitleValue) {
+      streamTitle.value = streamTitleValue;
+    }
+    
+    // Create hidden input for YouTube stream ID
+    let youtubeStreamIdInput = document.getElementById('youtubeStreamId');
+    if (!youtubeStreamIdInput) {
+      const form = document.getElementById('newStreamForm');
+      if (form) {
+        youtubeStreamIdInput = document.createElement('input');
+        youtubeStreamIdInput.type = 'hidden';
+        youtubeStreamIdInput.id = 'youtubeStreamId';
+        youtubeStreamIdInput.name = 'youtubeStreamId';
+        form.appendChild(youtubeStreamIdInput);
+      }
+    }
+    if (youtubeStreamIdInput) {
+      youtubeStreamIdInput.value = selectedStreamId;
+      console.log('[openNewStreamModal] Set youtubeStreamId to:', selectedStreamId);
+    }
+    
+    // Clear sessionStorage after loading
+    sessionStorage.removeItem('selectedYouTubeStreamId');
+    sessionStorage.removeItem('selectedYouTubeStreamKey');
+    sessionStorage.removeItem('selectedYouTubeStreamTitle');
+    sessionStorage.removeItem('selectedYouTubeStreamDescription');
+    
+    // Show success message
+    if (typeof showToast === 'function') {
+      showToast('success', 'YouTube stream key loaded successfully');
+    }
+  }
 }
 
 function closeNewStreamModal() {
@@ -1014,7 +1074,22 @@ function selectYouTubeStreamKey(keyId) {
     // Create hidden input if doesn't exist
     const form = document.getElementById('newStreamForm');
     if (!form) {
-      console.error('[selectYouTubeStreamKey] Form not found! Cannot store YouTube stream ID');
+      console.warn('[selectYouTubeStreamKey] Form not found! Storing in sessionStorage for later');
+      // Store in sessionStorage to be retrieved when form is opened
+      sessionStorage.setItem('selectedYouTubeStreamId', selectedKey.id);
+      sessionStorage.setItem('selectedYouTubeStreamKey', selectedKey.ingestionInfo?.streamName || '');
+      sessionStorage.setItem('selectedYouTubeStreamTitle', selectedKey.title || '');
+      sessionStorage.setItem('selectedYouTubeStreamDescription', selectedKey.snippet?.description || '');
+      console.log('[selectYouTubeStreamKey] Stored in sessionStorage - ID:', selectedKey.id);
+      
+      // Close the list modal and show success message
+      const listModal = document.getElementById('youtubeStreamKeysModal');
+      if (listModal) {
+        listModal.classList.add('hidden');
+      }
+      if (typeof showToast === 'function') {
+        showToast('success', 'YouTube stream key selected. Open "New Stream" to use it.');
+      }
       return;
     }
     youtubeStreamIdInput = document.createElement('input');
