@@ -2575,9 +2575,19 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
       updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
     }
     
-    // Preserve YouTube API settings (don't allow changing these via edit)
-    // These are set during stream creation and managed by YouTube broadcast
-    // If needed to change, user should delete and recreate the stream
+    // Update YouTube Additional Settings if stream uses YouTube API
+    if (isYouTubeAPI && req.body.useYouTubeAPI) {
+      if (req.body.youtubeDescription !== undefined) updateData.youtube_description = req.body.youtubeDescription;
+      if (req.body.youtubePrivacy !== undefined) updateData.youtube_privacy = req.body.youtubePrivacy;
+      if (req.body.youtubeMadeForKids !== undefined) updateData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
+      if (req.body.youtubeAgeRestricted !== undefined) updateData.youtube_age_restricted = req.body.youtubeAgeRestricted === 'true' || req.body.youtubeAgeRestricted === true;
+      if (req.body.youtubeSyntheticContent !== undefined) updateData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
+      if (req.body.youtubeAutoStart !== undefined) updateData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
+      if (req.body.youtubeAutoEnd !== undefined) updateData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+      
+      console.log(`[UPDATE STREAM] Updating YouTube Additional Settings for stream ${req.params.id}`);
+    }
+    
     // Handle multiple schedules
     const schedules = req.body.schedules;
     const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;

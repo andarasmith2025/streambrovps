@@ -801,7 +801,74 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- YouTube Additional Settings (only shown for YouTube API streams) -->
+                  <div id="editYouTubeAdditionalSettings" class="hidden space-y-3 pt-3 border-t border-gray-700">
+                    <button type="button" onclick="toggleEditYouTubeAdditionalSettings()" 
+                      class="w-full flex items-center justify-between px-3 py-2 bg-dark-700/50 hover:bg-dark-700 rounded-lg transition-colors">
+                      <div class="flex items-center gap-2">
+                        <i class="ti ti-brand-youtube text-red-500"></i>
+                        <span class="text-sm font-medium text-white">YouTube Additional Settings</span>
+                      </div>
+                      <i class="ti ti-chevron-down text-gray-400 transition-transform duration-200" id="editYouTubeAdditionalSettingsIcon"></i>
+                    </button>
+                    
+                    <div id="editYouTubeAdditionalSettingsContent" class="hidden space-y-3">
+                      <!-- Description -->
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Description (Optional)</label>
+                        <textarea id="editYoutubeDescription" name="youtubeDescription"
+                          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                          rows="3" placeholder="Enter broadcast description..."></textarea>
+                      </div>
+
+                      <!-- Privacy -->
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Privacy</label>
+                        <select id="editYoutubePrivacy" name="youtubePrivacy"
+                          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary">
+                          <option value="public">Public</option>
+                          <option value="unlisted" selected>Unlisted</option>
+                          <option value="private">Private</option>
+                        </select>
+                      </div>
+
+                      <!-- Checkboxes -->
+                      <div class="space-y-2">
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-dark-700/50 rounded-lg transition-colors">
+                          <input type="checkbox" id="editYoutubeMadeForKids" name="youtubeMadeForKids"
+                            class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary focus:ring-primary focus:ring-offset-0">
+                          <span class="text-sm text-gray-300">Made for Kids</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-dark-700/50 rounded-lg transition-colors">
+                          <input type="checkbox" id="editYoutubeAgeRestricted" name="youtubeAgeRestricted"
+                            class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary focus:ring-primary focus:ring-offset-0">
+                          <span class="text-sm text-gray-300">Age Restricted (18+)</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-dark-700/50 rounded-lg transition-colors">
+                          <input type="checkbox" id="editYoutubeSyntheticContent" name="youtubeSyntheticContent"
+                            class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary focus:ring-primary focus:ring-offset-0">
+                          <span class="text-sm text-gray-300">Altered or Synthetic Content</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-dark-700/50 rounded-lg transition-colors">
+                          <input type="checkbox" id="editYoutubeAutoStart" name="youtubeAutoStart"
+                            class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary focus:ring-primary focus:ring-offset-0">
+                          <span class="text-sm text-gray-300">Auto-start Broadcast</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-dark-700/50 rounded-lg transition-colors">
+                          <input type="checkbox" id="editYoutubeAutoEnd" name="youtubeAutoEnd"
+                            class="w-4 h-4 rounded border-gray-600 bg-dark-700 text-primary focus:ring-primary focus:ring-offset-0">
+                          <span class="text-sm text-gray-300">Auto-end Broadcast</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
                 <div class="space-y-2 pt-2 border-t border-gray-700">
                   <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between px-2">
@@ -2711,6 +2778,25 @@
               if (badge) badge.remove();
             }
 
+            // Show/hide YouTube Additional Settings based on mode
+            const youtubeAdditionalSettings = document.getElementById('editYouTubeAdditionalSettings');
+            if (youtubeAdditionalSettings) {
+              if (isYouTubeAPI) {
+                youtubeAdditionalSettings.classList.remove('hidden');
+                
+                // Populate YouTube Additional Settings
+                safeSetValue('editYoutubeDescription', stream.youtube_description || '');
+                safeSetValue('editYoutubePrivacy', stream.youtube_privacy || 'unlisted');
+                safeSetChecked('editYoutubeMadeForKids', stream.youtube_made_for_kids === 1 || stream.youtube_made_for_kids === true);
+                safeSetChecked('editYoutubeAgeRestricted', stream.youtube_age_restricted === 1 || stream.youtube_age_restricted === true);
+                safeSetChecked('editYoutubeSyntheticContent', stream.youtube_synthetic_content === 1 || stream.youtube_synthetic_content === true);
+                safeSetChecked('editYoutubeAutoStart', stream.youtube_auto_start === 1 || stream.youtube_auto_start === true);
+                safeSetChecked('editYoutubeAutoEnd', stream.youtube_auto_end === 1 || stream.youtube_auto_end === true);
+              } else {
+                youtubeAdditionalSettings.classList.add('hidden');
+              }
+            }
+
             if (stream.video_id) {
               safeSetValue('editSelectedVideoId', stream.video_id);
               const displayName = stream.video_type === 'playlist' ? (stream.playlist_name || stream.video_title) : stream.video_title;
@@ -2956,6 +3042,21 @@
             eyeIcon.classList.add('ti-eye');
           }
         }
+
+        function toggleEditYouTubeAdditionalSettings() {
+          const content = document.getElementById('editYouTubeAdditionalSettingsContent');
+          const icon = document.getElementById('editYouTubeAdditionalSettingsIcon');
+          
+          if (content && icon) {
+            if (content.classList.contains('hidden')) {
+              content.classList.remove('hidden');
+              icon.style.transform = 'rotate(180deg)';
+            } else {
+              content.classList.add('hidden');
+              icon.style.transform = 'rotate(0deg)';
+            }
+          }
+        }
         document.addEventListener('DOMContentLoaded', function () {
           const editResolutionSelect = document.getElementById('editResolutionSelect');
           if (editResolutionSelect) {
@@ -2982,6 +3083,21 @@
                 streamKey: document.getElementById('editStreamKey').value,
                 loopVideo: document.getElementById('editLoopVideo').checked
               };
+
+              // Add YouTube Additional Settings if stream uses YouTube API
+              const stream = window.currentEditStream;
+              const isYouTubeAPI = stream && (stream.use_youtube_api === 1 || stream.use_youtube_api === true);
+              if (isYouTubeAPI) {
+                formData.useYouTubeAPI = true;
+                formData.youtubeDescription = document.getElementById('editYoutubeDescription')?.value || '';
+                formData.youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value || 'unlisted';
+                formData.youtubeMadeForKids = document.getElementById('editYoutubeMadeForKids')?.checked || false;
+                formData.youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked || false;
+                formData.youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked || false;
+                formData.youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked || false;
+                formData.youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked || false;
+              }
+
               // Collect multiple schedules
               const schedules = collectEditSchedules();
               if (schedules.length > 0) {
