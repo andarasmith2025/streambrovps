@@ -366,17 +366,18 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
 });
 
 // Helper function to get tokens for a specific user (for use in other modules)
+// Automatically refreshes expired tokens using refresh_token
 async function getTokensForUser(userId) {
   if (!userId) return null;
   
   return new Promise((resolve) => {
     // Get tokens
-    db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], (err, row) => {
+    db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], async (err, row) => {
       if (err || !row) return resolve(null);
       
       // Get user credentials
-      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], (err2, userRow) => {
-        const tokens = { 
+      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], async (err2, userRow) => {
+        let tokens = { 
           access_token: row.access_token, 
           refresh_token: row.refresh_token, 
           expiry_date: row.expiry_date 
@@ -389,6 +390,46 @@ async function getTokensForUser(userId) {
             client_secret: userRow.youtube_client_secret,
             redirect_uri: userRow.youtube_redirect_uri
           };
+        }
+        
+        // ⭐ AUTO-REFRESH: Check if token is expired or about to expire (within 5 minutes)
+        const now = Date.now();
+        const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+        const isExpired = expiry && now > expiry - (5 * 60 * 1000); // 5 minutes buffer
+        
+        if (isExpired && tokens.refresh_token) {
+          console.log(`[getTokensForUser] Token expired/expiring for user ${userId}, auto-refreshing...`);
+          try {
+            const { getFreshClient } = require('../services/googleAuth');
+            const { oauth2, tokens: freshTokens } = await getFreshClient(tokens);
+            
+            // Update tokens in database
+            const newExpiry = freshTokens.expiry_date || null;
+            db.run(
+              `UPDATE youtube_tokens 
+               SET access_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+               WHERE user_id = ?`,
+              [freshTokens.access_token, newExpiry, userId],
+              (updateErr) => {
+                if (updateErr) {
+                  console.error(`[getTokensForUser] Failed to update refreshed tokens:`, updateErr);
+                } else {
+                  console.log(`[getTokensForUser] ✓ Token refreshed and saved for user ${userId}`);
+                }
+              }
+            );
+            
+            // Return fresh tokens
+            tokens.access_token = freshTokens.access_token;
+            tokens.expiry_date = freshTokens.expiry_date;
+            console.log(`[getTokensForUser] ✓ Returning fresh token (expires: ${new Date(freshTokens.expiry_date).toISOString()})`);
+          } catch (refreshErr) {
+            console.error(`[getTokensForUser] Failed to refresh token:`, refreshErr.message);
+            // Return old tokens anyway, let caller handle the error
+          }
+        } else if (expiry) {
+          const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+          console.log(`[getTokensForUser] Token valid for user ${userId} (expires in ${minutesUntilExpiry} minutes)`);
         }
         
         resolve(tokens);
