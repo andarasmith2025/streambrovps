@@ -45,15 +45,30 @@ router.get('/broadcasts/:id', async (req, res) => {
 // Delete a broadcast
 router.delete('/broadcasts/:id', async (req, res) => {
   try {
+    console.log(`[YouTube] Attempting to delete broadcast: ${req.params.id}`);
     const tokens = await getTokensFromReq(req);
-    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    if (!tokens) {
+      console.warn('[YouTube] Delete failed - YouTube not connected');
+      return res.status(401).json({ error: 'YouTube not connected' });
+    }
     const id = req.params.id;
-    if (!id) return res.status(400).json({ error: 'id is required' });
+    if (!id) {
+      console.warn('[YouTube] Delete failed - no broadcast ID provided');
+      return res.status(400).json({ error: 'id is required' });
+    }
+    
+    console.log(`[YouTube] Calling YouTube API to delete broadcast ${id}`);
     await youtubeService.deleteBroadcast(tokens, { broadcastId: id });
-    return res.json({ success: true });
+    console.log(`[YouTube] ✓ Broadcast ${id} deleted successfully from YouTube`);
+    
+    return res.json({ success: true, message: 'Broadcast deleted from YouTube' });
   } catch (err) {
-    console.error('[YouTube] delete broadcast error:', err?.response?.data || err.message);
-    return res.status(500).json({ error: 'Failed to delete broadcast' });
+    console.error('[YouTube] Delete broadcast error:', err?.response?.data || err.message);
+    console.error('[YouTube] Full error:', err);
+    return res.status(500).json({ 
+      error: 'Failed to delete broadcast from YouTube', 
+      details: err?.response?.data?.error?.message || err.message 
+    });
   }
 });
 
