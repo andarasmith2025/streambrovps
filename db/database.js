@@ -353,6 +353,26 @@ function createTables() {
     }
   });
 
+  // OAuth states table for callback validation (no session dependency!)
+  db.run(`CREATE TABLE IF NOT EXISTS oauth_states (
+    state TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`, (err) => {
+    if (err) {
+      console.error('Error creating oauth_states table:', err.message);
+    }
+  });
+
+  // Cleanup old oauth states (older than 1 hour)
+  db.run(`DELETE FROM oauth_states WHERE datetime(created_at) < datetime('now', '-1 hour')`, (err) => {
+    if (err && !err.message.includes('no such table')) {
+      console.error('Error cleaning oauth_states:', err.message);
+    }
+  });
+
   // Stream Templates table for saving/loading configurations
   db.run(`CREATE TABLE IF NOT EXISTS stream_templates (
     id TEXT PRIMARY KEY,

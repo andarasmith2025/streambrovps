@@ -1008,6 +1008,20 @@ function selectYouTubeStreamKey(keyId) {
     youtubeStreamTitle.value = selectedKey.title;
   }
   
+  // Store YouTube stream ID in hidden field for backend
+  let youtubeStreamIdInput = document.getElementById('youtubeStreamId');
+  if (!youtubeStreamIdInput) {
+    // Create hidden input if doesn't exist
+    youtubeStreamIdInput = document.createElement('input');
+    youtubeStreamIdInput.type = 'hidden';
+    youtubeStreamIdInput.id = 'youtubeStreamId';
+    youtubeStreamIdInput.name = 'youtubeStreamId';
+    document.getElementById('streamForm').appendChild(youtubeStreamIdInput);
+  }
+  youtubeStreamIdInput.value = selectedKey.id; // Store YouTube stream ID
+  
+  console.log('[selectYouTubeStreamKey] Selected stream ID:', selectedKey.id);
+  
   // Fill Description if available (editable)
   if (youtubeDescription && selectedKey.snippet?.description) {
     youtubeDescription.value = selectedKey.snippet.description;

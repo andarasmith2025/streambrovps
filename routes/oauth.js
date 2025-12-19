@@ -20,13 +20,25 @@ router.get('/login', async (req, res) => {
     }
     
     const state = crypto.randomBytes(16).toString('hex');
-    req.session.oauth_state = state;
     
-    // Store current redirect URI in session for callback verification
+    // Store current redirect URI
     const protocol = req.protocol;
     const host = req.get('host');
     const redirectUri = `${protocol}://${host}/oauth2/callback`;
-    req.session.oauth_redirect_uri = redirectUri;
+    
+    // ⭐ SAVE STATE TO DATABASE (not session!)
+    await new Promise((resolve, reject) => {
+      db.run(`INSERT OR REPLACE INTO oauth_states (state, user_id, redirect_uri, created_at) 
+              VALUES (?, ?, ?, datetime('now'))`,
+        [state, userId, redirectUri],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+    
+    console.log('[OAuth] State saved to database:', state, 'for user:', userId);
     
     // Use user-specific credentials if available
     const url = await getAuthUrl(state, userId, redirectUri);
@@ -43,17 +55,35 @@ router.get('/login', async (req, res) => {
 
 // GET /oauth2/callback - handle Google OAuth callback
 router.get('/callback', async (req, res) => {
+  console.log('[OAuth] Callback received:', { code: !!req.query.code, state: !!req.query.state, error: req.query.error });
   try {
     const { code, state, error } = req.query;
     if (error) {
+      console.error('[OAuth] Callback error from Google:', error);
       return res.status(400).render('error', { title: 'OAuth Error', message: error, error: { message: String(error) } });
     }
-    if (!code || !state || state !== req.session.oauth_state) {
+    if (!code || !state) {
+      console.error('[OAuth] Missing code or state');
       return res.status(400).render('error', { title: 'OAuth Error', message: 'Invalid state or code', error: { message: 'Invalid state or code' } });
     }
 
-    const userId = req.session && (req.session.userId || req.session.user_id);
-    const redirectUri = req.session.oauth_redirect_uri;
+    // ⭐ LOAD STATE FROM DATABASE (not session!)
+    const stateData = await new Promise((resolve, reject) => {
+      db.get(`SELECT user_id, redirect_uri FROM oauth_states WHERE state = ?`, [state], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (!stateData) {
+      console.error('[OAuth] State not found in database:', state);
+      return res.status(400).render('error', { title: 'OAuth Error', message: 'Invalid or expired state', error: { message: 'State not found' } });
+    }
+    
+    const userId = stateData.user_id;
+    const redirectUri = stateData.redirect_uri;
+    console.log('[OAuth] State validated from database. User ID:', userId);
+    console.log('[OAuth] Exchanging code for tokens. User ID:', userId);
     const tokens = await exchangeCodeForTokens(code, userId, redirectUri);
 
     // Attach user credentials to tokens for later use
@@ -62,8 +92,10 @@ router.get('/callback', async (req, res) => {
 
     // Persist tokens to session for now; also save to DB if userId available
     req.session.youtubeTokens = tokens;
+    console.log('[OAuth] Tokens saved to session. Has access_token:', !!tokens.access_token, 'Has refresh_token:', !!tokens.refresh_token);
     if (userId) {
       const expiry = tokens.expiry_date || (tokens.expiry_date === 0 ? 0 : null);
+      console.log('[OAuth] Saving tokens to database for user:', userId);
       db.run(`INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date)
               VALUES(?, ?, ?, ?)
               ON CONFLICT(user_id) DO UPDATE SET
@@ -73,13 +105,20 @@ router.get('/callback', async (req, res) => {
                 updated_at=CURRENT_TIMESTAMP`,
         [userId, tokens.access_token || null, tokens.refresh_token || null, expiry],
         (err) => {
-          if (err) console.warn('[OAuth] Failed to persist youtube_tokens:', err.message);
+          if (err) {
+            console.error('[OAuth] Failed to persist youtube_tokens:', err.message);
+          } else {
+            console.log('[OAuth] ✓ Tokens successfully saved to database for user:', userId);
+          }
         }
       );
+    } else {
+      console.warn('[OAuth] No userId in session, tokens not saved to database');
     }
 
     // Fetch channel basic info for UI badge
     try {
+      console.log('[OAuth] Fetching YouTube channel info...');
       const yt = getYouTubeClient(tokens, userId);
       const me = await yt.channels.list({ mine: true, part: ['snippet','statistics'] });
       const channel = me?.data?.items?.[0];
@@ -90,14 +129,18 @@ router.get('/callback', async (req, res) => {
           avatar: channel.snippet?.thumbnails?.default?.url || channel.snippet?.thumbnails?.high?.url || null,
           subs: channel.statistics?.subscriberCount || null
         };
+        console.log('[OAuth] ✓ Channel info saved:', channel.snippet?.title);
+      } else {
+        console.warn('[OAuth] No channel found for this account');
       }
     } catch (apiErr) {
       // ignore here; tokens may still be valid
-      console.warn('YouTube API test failed:', apiErr?.message);
+      console.warn('[OAuth] YouTube API test failed:', apiErr?.message);
     }
 
     // Flash success and redirect to dashboard
     req.session.flash = { type: 'success', message: 'YouTube connected' };
+    console.log('[OAuth] ✓ OAuth callback completed successfully, redirecting to dashboard');
     return res.redirect('/dashboard');
   } catch (err) {
     console.error('OAuth callback error:', err);

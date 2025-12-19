@@ -219,9 +219,9 @@ app.use(session({
   rolling: true,
   cookie: {
     httpOnly: true,
-    secure: false, // Set to false for HTTP connections
+    secure: true, // Always use secure for production HTTPS
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: 'lax'
+    sameSite: 'none' // Required for cross-site OAuth redirects with secure cookies
   }
 }));
 app.use(async (req, res, next) => {
@@ -414,6 +414,64 @@ const isAdmin = async (req, res, next) => {
     res.redirect('/dashboard');
   }
 };
+
+// TEMP: debug users endpoint (admin only)
+app.get('/debug/users', isAuthenticated, isAdmin, (req, res) => {
+  db.all('SELECT id, username, user_role, status, created_at, youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users ORDER BY created_at DESC', [], (err, users) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    db.all('SELECT user_id, access_token, refresh_token, expiry_date, created_at, updated_at FROM youtube_tokens', [], (err2, tokens) => {
+      if (err2) {
+        return res.status(500).json({ error: err2.message });
+      }
+      
+      res.json({
+        total_users: users.length,
+        users: users.map(u => ({
+          id: u.id,
+          username: u.username,
+          role: u.user_role,
+          status: u.status,
+          created: u.created_at,
+          has_youtube_credentials: !!(u.youtube_client_id && u.youtube_client_secret),
+          redirect_uri: u.youtube_redirect_uri
+        })),
+        total_tokens: tokens.length,
+        tokens: tokens.map(t => ({
+          user_id: t.user_id,
+          has_access_token: !!t.access_token,
+          has_refresh_token: !!t.refresh_token,
+          expiry_date: t.expiry_date,
+          updated: t.updated_at
+        }))
+      });
+    });
+  });
+});
+
+// TEMP: debug session endpoint
+app.get('/debug/session', isAuthenticated, (req, res) => {
+  res.json({
+    session_id: req.sessionID,
+    user_id: req.session.userId,
+    username: req.session.username,
+    has_youtube_tokens_in_session: !!req.session.youtubeTokens,
+    youtube_tokens: req.session.youtubeTokens ? {
+      has_access_token: !!req.session.youtubeTokens.access_token,
+      has_refresh_token: !!req.session.youtubeTokens.refresh_token,
+      expiry_date: req.session.youtubeTokens.expiry_date
+    } : null,
+    has_youtube_channel_in_session: !!req.session.youtubeChannel,
+    youtube_channel: req.session.youtubeChannel,
+    res_locals: {
+      youtubeConnected: res.locals.youtubeConnected,
+      youtubeChannel: res.locals.youtubeChannel
+    }
+  });
+});
+
 app.use('/uploads', function (req, res, next) {
   res.header('Cache-Control', 'no-cache');
   res.header('Pragma', 'no-cache');
@@ -2308,14 +2366,14 @@ app.post('/api/streams', isAuthenticated, [
             scheduledStartTime = new Date().toISOString();
           }
           
-          // Extract stream key from RTMP URL or use provided stream key
-          const streamKeyMatch = req.body.rtmpUrl.match(/\/([^\/]+)$/);
-          const extractedStreamKey = streamKeyMatch ? streamKeyMatch[1] : req.body.streamKey;
+          // Get YouTube stream ID from request body (sent from frontend)
+          const youtubeStreamId = req.body.youtubeStreamId; // This is the actual YouTube stream ID, not stream key
           
           console.log(`[CREATE STREAM] Creating YouTube broadcast for stream ${stream.id}`);
           console.log(`[CREATE STREAM] - Title: ${req.body.streamTitle}`);
           console.log(`[CREATE STREAM] - Scheduled: ${scheduledStartTime}`);
           console.log(`[CREATE STREAM] - Privacy: ${streamData.youtube_privacy}`);
+          console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED - will create new'}`);
           
           // Create broadcast via YouTube API
           const broadcastResult = await youtubeService.scheduleLive(tokens, {
@@ -2323,7 +2381,7 @@ app.post('/api/streams', isAuthenticated, [
             description: streamData.youtube_description || '',
             privacyStatus: streamData.youtube_privacy || 'unlisted',
             scheduledStartTime: scheduledStartTime,
-            streamId: extractedStreamKey, // Use the stream key user selected
+            streamId: youtubeStreamId || null, // Use YouTube stream ID if provided, otherwise create new
             enableAutoStart: streamData.youtube_auto_start || false,
             enableAutoStop: streamData.youtube_auto_end || false
           });
