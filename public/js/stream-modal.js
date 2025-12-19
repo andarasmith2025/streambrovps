@@ -1215,7 +1215,8 @@ function selectYouTubeStreamKey(keyId) {
   // Store YouTube stream ID in hidden field for backend
   let youtubeStreamIdInput = document.getElementById('youtubeStreamId');
   if (!youtubeStreamIdInput) {
-    // Create hidden input if doesn't exist
+    console.error('[selectYouTubeStreamKey] ❌ Hidden field #youtubeStreamId not found! This should not happen.');
+    // Create hidden input as fallback
     const form = document.getElementById('newStreamForm');
     if (!form) {
       console.warn('[selectYouTubeStreamKey] Form not found! Storing in sessionStorage for later');
@@ -1244,7 +1245,11 @@ function selectYouTubeStreamKey(keyId) {
   }
   youtubeStreamIdInput.value = selectedKey.id; // Store YouTube stream ID
   
-  console.log('[selectYouTubeStreamKey] Selected stream ID:', selectedKey.id, 'for stream key:', selectedKey.ingestionInfo?.streamName);
+  // Also store in sessionStorage as backup
+  sessionStorage.setItem('selectedYouTubeStreamId', selectedKey.id);
+  
+  console.log('[selectYouTubeStreamKey] ✓ Selected stream ID:', selectedKey.id, 'for stream key:', selectedKey.ingestionInfo?.streamName);
+  console.log('[selectYouTubeStreamKey] ✓ Hidden field value set to:', youtubeStreamIdInput.value);
   
   // Fill Description if available (editable)
   if (youtubeDescription && selectedKey.snippet?.description) {

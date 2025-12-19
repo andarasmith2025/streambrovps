@@ -2386,7 +2386,9 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           // Get YouTube stream ID from request body (sent from frontend)
           // Handle both null and string "null" from frontend
           let youtubeStreamId = req.body.youtubeStreamId;
-          if (youtubeStreamId === 'null' || youtubeStreamId === 'undefined' || !youtubeStreamId) {
+          console.log(`[CREATE STREAM] Raw youtubeStreamId from request:`, youtubeStreamId, `(type: ${typeof youtubeStreamId})`);
+          
+          if (youtubeStreamId === 'null' || youtubeStreamId === 'undefined' || youtubeStreamId === '' || !youtubeStreamId) {
             youtubeStreamId = null;
           }
           

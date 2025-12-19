@@ -3,6 +3,12 @@ const fs = require('fs');
 
 async function scheduleLive(tokens, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false }) {
   const yt = getYouTubeClient(tokens);
+  
+  console.log(`[YouTubeService.scheduleLive] Called with:`);
+  console.log(`[YouTubeService.scheduleLive] - Title: ${title}`);
+  console.log(`[YouTubeService.scheduleLive] - Existing Stream ID: ${existingStreamId || 'NOT PROVIDED'}`);
+  console.log(`[YouTubeService.scheduleLive] - Will create new stream: ${!existingStreamId ? 'YES ❌' : 'NO ✓'}`);
+  
   const broadcastRes = await yt.liveBroadcasts.insert({
     part: 'snippet,status,contentDetails',
     requestBody: {
@@ -20,9 +26,13 @@ async function scheduleLive(tokens, { title, description, privacyStatus, schedul
       },
     },
   });
+  
+  console.log(`[YouTubeService.scheduleLive] ✓ Broadcast created: ${broadcastRes.data?.id}`);
+  
   let streamRes = null;
   let streamId = existingStreamId || null;
   if (!streamId) {
+    console.log(`[YouTubeService.scheduleLive] ⚠️ Creating NEW stream because streamId was not provided...`);
     streamRes = await yt.liveStreams.insert({
       part: 'snippet,cdn,contentDetails,status',
       requestBody: {
@@ -37,17 +47,22 @@ async function scheduleLive(tokens, { title, description, privacyStatus, schedul
       },
     });
     streamId = streamRes.data?.id;
+    console.log(`[YouTubeService.scheduleLive] ❌ NEW stream created: ${streamId}`);
+  } else {
+    console.log(`[YouTubeService.scheduleLive] ✓ Using existing stream: ${streamId}`);
   }
 
   const broadcastId = broadcastRes.data?.id;
   const createdStreamId = streamId;
 
   if (broadcastId && createdStreamId) {
+    console.log(`[YouTubeService.scheduleLive] Binding broadcast ${broadcastId} to stream ${createdStreamId}...`);
     await yt.liveBroadcasts.bind({
       id: broadcastId,
       part: 'id,contentDetails',
       streamId: createdStreamId,
     });
+    console.log(`[YouTubeService.scheduleLive] ✓ Broadcast bound to stream successfully`);
   }
 
   return {
