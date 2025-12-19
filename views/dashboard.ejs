@@ -1248,15 +1248,22 @@
             formData.useYouTubeAPI = true;
             formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
             formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
-            formData.youtubeStreamId = document.getElementById('youtubeStreamId')?.value || null; // YouTube stream ID for binding
+            
+            // Get YouTube stream ID from hidden field
+            const youtubeStreamIdInput = document.getElementById('youtubeStreamId');
+            formData.youtubeStreamId = youtubeStreamIdInput?.value || null;
+            
+            console.log('[Form Submit] YouTube Stream ID input element:', youtubeStreamIdInput);
+            console.log('[Form Submit] YouTube Stream ID value:', formData.youtubeStreamId);
+            console.log('[Form Submit] RTMP URL:', formData.rtmpUrl);
+            console.log('[Form Submit] Stream Key:', formData.streamKey);
+            
             formData.youtubeDescription = document.getElementById('youtubeDescription')?.value || '';
             formData.youtubePrivacy = document.getElementById('youtubePrivacy')?.value || 'unlisted';
             formData.youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
             formData.youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked || false;
             formData.youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked || false;
             formData.youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked || false;
-            
-            console.log('[Form Submit] YouTube Stream ID:', formData.youtubeStreamId);
             
             // Thumbnail if uploaded
             const thumbnailInput = document.getElementById('youtubeThumbnail');

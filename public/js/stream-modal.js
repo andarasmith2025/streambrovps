@@ -1016,11 +1016,11 @@ function selectYouTubeStreamKey(keyId) {
     youtubeStreamIdInput.type = 'hidden';
     youtubeStreamIdInput.id = 'youtubeStreamId';
     youtubeStreamIdInput.name = 'youtubeStreamId';
-    document.getElementById('streamForm').appendChild(youtubeStreamIdInput);
+    document.getElementById('newStreamForm').appendChild(youtubeStreamIdInput);
   }
   youtubeStreamIdInput.value = selectedKey.id; // Store YouTube stream ID
   
-  console.log('[selectYouTubeStreamKey] Selected stream ID:', selectedKey.id);
+  console.log('[selectYouTubeStreamKey] Selected stream ID:', selectedKey.id, 'for stream key:', selectedKey.ingestionInfo?.streamName);
   
   // Fill Description if available (editable)
   if (youtubeDescription && selectedKey.snippet?.description) {
