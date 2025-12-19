@@ -190,40 +190,53 @@ router.post('/broadcasts/:id/thumbnail', upload.single('file'), async (req, res)
 async function getTokensFromReq(req) {
   const userId = req.session && (req.session.userId || req.session.user_id);
   
-  // If tokens in session, return them (already have _userCredentials from OAuth)
+  // If tokens in session, check if expired and refresh if needed
   if (req.session && req.session.youtubeTokens) {
-    return req.session.youtubeTokens;
+    const tokens = req.session.youtubeTokens;
+    const now = Date.now();
+    const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+    const isExpired = expiry && now > expiry - (5 * 60 * 1000); // 5 minutes buffer
+    
+    if (isExpired && tokens.refresh_token && userId) {
+      console.log(`[getTokensFromReq] Session token expired/expiring, auto-refreshing...`);
+      try {
+        const { getFreshClient } = require('../services/googleAuth');
+        const { oauth2, tokens: freshTokens } = await getFreshClient(tokens);
+        
+        // Update session
+        req.session.youtubeTokens.access_token = freshTokens.access_token;
+        req.session.youtubeTokens.expiry_date = freshTokens.expiry_date;
+        
+        // Update database
+        db.run(
+          `UPDATE youtube_tokens 
+           SET access_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+           WHERE user_id = ?`,
+          [freshTokens.access_token, freshTokens.expiry_date || null, userId],
+          (updateErr) => {
+            if (updateErr) {
+              console.error(`[getTokensFromReq] Failed to update refreshed tokens:`, updateErr);
+            } else {
+              console.log(`[getTokensFromReq] ✓ Token refreshed and saved`);
+            }
+          }
+        );
+        
+        return req.session.youtubeTokens;
+      } catch (refreshErr) {
+        console.error(`[getTokensFromReq] Failed to refresh token:`, refreshErr.message);
+        // Continue with old token, let caller handle the error
+      }
+    }
+    
+    return tokens;
   }
   
-  // Otherwise fetch from database
+  // Otherwise fetch from database (with auto-refresh)
   if (!userId) return null;
   
-  return new Promise((resolve) => {
-    // Get tokens
-    db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], (err, row) => {
-      if (err || !row) return resolve(null);
-      
-      // Get user credentials
-      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], (err2, userRow) => {
-        const tokens = { 
-          access_token: row.access_token, 
-          refresh_token: row.refresh_token, 
-          expiry_date: row.expiry_date 
-        };
-        
-        // Attach user credentials if available
-        if (!err2 && userRow && userRow.youtube_client_id && userRow.youtube_client_secret) {
-          tokens._userCredentials = {
-            client_id: userRow.youtube_client_id,
-            client_secret: userRow.youtube_client_secret,
-            redirect_uri: userRow.youtube_redirect_uri
-          };
-        }
-        
-        resolve(tokens);
-      });
-    });
-  });
+  // Use getTokensForUser which has auto-refresh built-in
+  return await getTokensForUser(userId);
 }
 
 router.post('/schedule-live', async (req, res) => {
@@ -246,8 +259,24 @@ router.post('/schedule-live', async (req, res) => {
 // List upcoming broadcasts (JSON)
 router.get('/api/broadcasts', async (req, res) => {
   try {
+    console.log('[YouTube API] /api/broadcasts called');
     const tokens = await getTokensFromReq(req);
-    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    if (!tokens) {
+      console.log('[YouTube API] No tokens found - user not connected');
+      return res.status(401).json({ error: 'YouTube not connected' });
+    }
+    
+    // Log token status
+    const now = Date.now();
+    const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+    if (expiry) {
+      const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+      if (minutesUntilExpiry < 0) {
+        console.log(`[YouTube API] ⚠️  Token EXPIRED ${Math.abs(minutesUntilExpiry)} minutes ago`);
+      } else {
+        console.log(`[YouTube API] Token valid (expires in ${minutesUntilExpiry} minutes)`);
+      }
+    }
     const status = ['all','upcoming','active','completed'].includes(String(req.query.status || '').toLowerCase())
       ? String(req.query.status).toLowerCase() : 'upcoming';
     const all = await youtubeService.listBroadcasts(tokens, { maxResults: 50 });
