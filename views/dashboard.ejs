@@ -1286,6 +1286,18 @@
             console.log('[Form Submit] No schedules found - Stream Now mode activated');
           }
           const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+          
+          // Disable submit button and show loading
+          const submitBtn = document.querySelector('button[type="submit"][form="newStreamForm"]');
+          const originalBtnText = submitBtn.innerHTML;
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i class="ti ti-loader animate-spin mr-2"></i>Creating...';
+          
+          // Show loading notification for YouTube API mode
+          if (isYouTubeMode) {
+            showNotification('Creating', 'Creating YouTube broadcast, please wait...', 'info');
+          }
+          
           fetch('/api/streams', {
             method: 'POST',
             headers: {
@@ -1296,6 +1308,10 @@
           })
             .then(response => response.json())
             .then(data => {
+              // Re-enable button
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = originalBtnText;
+              
               if (data.success) {
                 if (data.streamNow) {
                   // Stream Now mode - auto start the stream
@@ -1318,6 +1334,9 @@
             })
             .catch(error => {
               console.error('Error:', error);
+              // Re-enable button on error
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = originalBtnText;
               showNotification('Error', 'An error occurred while creating the stream', 'error');
             });
         });
