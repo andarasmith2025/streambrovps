@@ -1015,26 +1015,23 @@ function displayYouTubeStreamKeys(streamKeys) {
   }
   
   container.innerHTML = streamKeys.map(key => `
-    <div class="bg-dark-700 border border-gray-600 rounded-lg p-3">
-      <div class="flex items-start gap-3">
-        <i class="ti ti-key text-red-500 text-xl mt-0.5"></i>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</p>
-          <p class="text-xs text-gray-400 mt-1">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
-          <p class="text-xs text-gray-500 mt-0.5">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
-        </div>
+    <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
+      class="w-full flex items-center gap-3 p-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-key text-red-500 text-xl"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
+        <p class="text-xs text-gray-500 mt-0.5 truncate">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
       </div>
-      <div class="flex gap-2 mt-3">
-        <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
-          class="flex-1 px-3 py-2 bg-primary hover:bg-primary/80 text-white text-xs rounded transition-colors">
-          <i class="ti ti-check mr-1"></i>Use for YouTube API
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="event.stopPropagation(); copyToManualRTMP('${key.id}')" 
+          class="p-2 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy to Manual RTMP">
+          <i class="ti ti-copy text-gray-400 hover:text-white"></i>
         </button>
-        <button type="button" onclick="copyToManualRTMP('${key.id}')" 
-          class="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors">
-          <i class="ti ti-copy mr-1"></i>Copy to Manual
-        </button>
+        <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors"></i>
       </div>
-    </div>
+    </button>
   `).join('');
 }
 
