@@ -1362,6 +1362,14 @@
               submitBtn.innerHTML = originalBtnText;
               
               if (data.success) {
+                // Trigger event for YouTube Manage tab to refresh
+                if (data.stream && data.stream.use_youtube_api) {
+                  window.dispatchEvent(new CustomEvent('youtubeStreamCreated', { 
+                    detail: { streamId: data.stream.id } 
+                  }));
+                  console.log('[Dashboard] YouTube stream created, event dispatched');
+                }
+                
                 if (data.streamNow) {
                   // Stream Now mode - auto start the stream
                   showNotification('Success!', 'Stream created! Starting stream now...', 'success');

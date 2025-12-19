@@ -2375,8 +2375,9 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           // Determine scheduled start time
           let scheduledStartTime;
           if (hasSchedules && !streamNow) {
-            // Use first schedule time
-            scheduledStartTime = parseScheduleTime(schedules[0].schedule_time).toISOString();
+            // Use first schedule time - parseScheduleTime returns string, convert to Date first
+            const parsedTime = parseScheduleTime(schedules[0].schedule_time);
+            scheduledStartTime = new Date(parsedTime).toISOString();
           } else {
             // Stream now - set to current time
             scheduledStartTime = new Date().toISOString();

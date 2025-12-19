@@ -7,10 +7,13 @@
         <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
         <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
       </div>
+      <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
+        <i class="ti ti-refresh text-gray-300"></i>
+      </button>
       <label for="yt-status" class="text-sm text-gray-400">Status</label>
       <select id="yt-status" class="bg-dark-700 border border-gray-600 text-sm rounded px-2 py-1">
         <option value="upcoming" selected>Upcoming</option>
-        <option value="active">Active</option>
+        <option value="active">Active (Live)</option>
         <option value="completed">Completed</option>
       </select>
     </div>
@@ -378,7 +381,28 @@
   document.addEventListener('DOMContentLoaded', ()=>{ 
     const statusSel = document.getElementById('yt-status');
     if (statusSel) statusSel.addEventListener('change', loadList);
-    loadList(); 
+    
+    // Initial load
+    loadList();
+    
+    // Auto-refresh every 30 seconds
+    let autoRefreshInterval = setInterval(() => {
+      console.log('[YouTube Manage] Auto-refreshing broadcasts...');
+      loadList();
+    }, 30000); // 30 seconds
+    
+    // Listen for custom event from dashboard (when stream created)
+    window.addEventListener('youtubeStreamCreated', () => {
+      console.log('[YouTube Manage] Stream created, refreshing list...');
+      loadList();
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+      }
+    }); 
     // Bulk selection controls
     const selAll = document.getElementById('yt-select-all');
     const bulkBtn = document.getElementById('yt-bulk-delete');
