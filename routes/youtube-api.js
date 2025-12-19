@@ -42,7 +42,12 @@ router.post('/credentials', isAuthenticated, async (req, res) => {
   try {
     const { client_id, client_secret, redirect_uri } = req.body;
     
+    console.log(`[YouTube API SAVE] User ${req.session.userId} attempting to save credentials`);
+    console.log(`[YouTube API SAVE] Client ID length: ${client_id ? client_id.length : 0}`);
+    console.log(`[YouTube API SAVE] Client Secret length: ${client_secret ? client_secret.length : 0}`);
+    
     if (!client_id || !client_secret) {
+      console.log(`[YouTube API SAVE] ❌ Missing required fields`);
       return res.status(400).json({
         success: false,
         error: 'Client ID and Client Secret are required'
@@ -51,6 +56,7 @@ router.post('/credentials', isAuthenticated, async (req, res) => {
     
     // Validate format
     if (!client_id.includes('.apps.googleusercontent.com')) {
+      console.log(`[YouTube API SAVE] ❌ Invalid Client ID format`);
       return res.status(400).json({
         success: false,
         error: 'Invalid Client ID format. Should end with .apps.googleusercontent.com'
@@ -58,11 +64,14 @@ router.post('/credentials', isAuthenticated, async (req, res) => {
     }
     
     if (!client_secret.startsWith('GOCSPX-')) {
+      console.log(`[YouTube API SAVE] ❌ Invalid Client Secret format`);
       return res.status(400).json({
         success: false,
         error: 'Invalid Client Secret format. Should start with GOCSPX-'
       });
     }
+    
+    console.log(`[YouTube API SAVE] ✓ Validation passed, saving to database...`);
     
     await User.updateYouTubeCredentials(req.session.userId, {
       client_id: client_id.trim(),
@@ -70,14 +79,14 @@ router.post('/credentials', isAuthenticated, async (req, res) => {
       redirect_uri: redirect_uri.trim()
     });
     
-    console.log(`[YouTube API] User ${req.session.userId} configured YouTube API credentials`);
+    console.log(`[YouTube API SAVE] ✓ User ${req.session.userId} successfully saved YouTube API credentials`);
     
     res.json({
       success: true,
       message: 'YouTube API credentials saved successfully'
     });
   } catch (error) {
-    console.error('Error saving YouTube API credentials:', error);
+    console.error('[YouTube API SAVE] ❌ Error saving YouTube API credentials:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to save credentials'
@@ -88,6 +97,10 @@ router.post('/credentials', isAuthenticated, async (req, res) => {
 // DELETE: Clear YouTube API Credentials
 router.delete('/credentials', isAuthenticated, async (req, res) => {
   try {
+    console.log(`[YouTube API DELETE] ⚠️ User ${req.session.userId} is clearing YouTube API credentials`);
+    console.log(`[YouTube API DELETE] Request method: ${req.method}`);
+    console.log(`[YouTube API DELETE] Request path: ${req.path}`);
+    
     await User.updateYouTubeCredentials(req.session.userId, {
       client_id: null,
       client_secret: null,
@@ -115,14 +128,14 @@ router.delete('/credentials', isAuthenticated, async (req, res) => {
       delete req.session.youtubeChannel;
     }
     
-    console.log(`[YouTube API] User ${req.session.userId} cleared YouTube API credentials`);
+    console.log(`[YouTube API DELETE] ✓ User ${req.session.userId} cleared YouTube API credentials`);
     
     res.json({
       success: true,
       message: 'YouTube API credentials cleared successfully'
     });
   } catch (error) {
-    console.error('Error clearing YouTube API credentials:', error);
+    console.error('[YouTube API DELETE] ❌ Error clearing YouTube API credentials:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to clear credentials'
