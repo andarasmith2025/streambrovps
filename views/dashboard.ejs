@@ -1456,9 +1456,29 @@
             };
           }
           
+          console.log('\n========================================');
+          console.log('[Frontend] Sending POST /api/streams');
+          console.log('========================================');
+          console.log('Form Data:', formData);
+          console.log('Use YouTube API:', formData.useYouTubeAPI);
+          console.log('Stream Now:', formData.streamNow);
+          console.log('Has Schedules:', formData.schedules ? formData.schedules.length : 0);
+          console.log('========================================\n');
+          
           fetch('/api/streams', fetchOptions)
-            .then(response => response.json())
+            .then(response => {
+              console.log('[Frontend] Response status:', response.status);
+              return response.json();
+            })
             .then(data => {
+              console.log('\n========================================');
+              console.log('[Frontend] Response received');
+              console.log('========================================');
+              console.log('Success:', data.success);
+              console.log('Stream ID:', data.stream?.id);
+              console.log('Error:', data.error);
+              console.log('========================================\n');
+              
               // Re-enable button
               submitBtn.disabled = false;
               submitBtn.innerHTML = originalBtnText;

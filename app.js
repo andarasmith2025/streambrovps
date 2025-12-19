@@ -2250,7 +2250,19 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
   body('streamKey').trim().isLength({ min: 1 }).withMessage('Stream key is required')
 ], async (req, res) => {
   try {
-    console.log('Session userId for stream creation:', req.session.userId);
+    console.log('\n========================================');
+    console.log('[POST /api/streams] NEW STREAM REQUEST');
+    console.log('========================================');
+    console.log('Session userId:', req.session.userId);
+    console.log('Session username:', req.session.username);
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Stream Title:', req.body.streamTitle);
+    console.log('RTMP URL:', req.body.rtmpUrl);
+    console.log('Stream Key:', req.body.streamKey ? '***' + req.body.streamKey.slice(-4) : 'missing');
+    console.log('Use YouTube API:', req.body.useYouTubeAPI);
+    console.log('Stream Now:', req.body.streamNow);
+    console.log('Schedules:', req.body.schedules ? 'present' : 'missing');
+    console.log('========================================\n');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, error: errors.array()[0].msg });
@@ -2480,9 +2492,24 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
       }
     }
     
+    console.log('\n========================================');
+    console.log('[POST /api/streams] ✅ SUCCESS');
+    console.log('========================================');
+    console.log('Stream ID:', stream.id);
+    console.log('Stream Title:', stream.title);
+    console.log('Status:', stream.status);
+    console.log('User ID:', stream.user_id);
+    console.log('Stream Now:', streamNow);
+    console.log('========================================\n');
+    
     res.json({ success: true, stream, streamNow });
   } catch (error) {
-    console.error('Error creating stream:', error);
+    console.log('\n========================================');
+    console.log('[POST /api/streams] ❌ ERROR');
+    console.log('========================================');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    console.log('========================================\n');
     res.status(500).json({ success: false, error: 'Failed to create stream' });
   }
 });
