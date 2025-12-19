@@ -2235,7 +2235,7 @@ app.get('/api/streams', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch streams' });
   }
 });
-app.post('/api/streams', isAuthenticated, [
+app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
   body('streamTitle').trim().isLength({ min: 1 }).withMessage('Title is required'),
   body('rtmpUrl').trim().isLength({ min: 1 }).withMessage('RTMP URL is required'),
   body('streamKey').trim().isLength({ min: 1 }).withMessage('Stream key is required')
@@ -2299,12 +2299,23 @@ app.post('/api/streams', isAuthenticated, [
       streamData.youtube_privacy = req.body.youtubePrivacy || 'unlisted';
       streamData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
       streamData.youtube_age_restricted = req.body.youtubeAgeRestricted === 'true' || req.body.youtubeAgeRestricted === true;
+      streamData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
       streamData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
       streamData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
     }
     // Handle Stream Now vs Schedule mode
-    const streamNow = req.body.streamNow === true;
-    const schedules = req.body.schedules;
+    const streamNow = req.body.streamNow === true || req.body.streamNow === 'true';
+    
+    // Parse schedules if it's a JSON string (from FormData)
+    let schedules = req.body.schedules;
+    if (typeof schedules === 'string') {
+      try {
+        schedules = JSON.parse(schedules);
+      } catch (e) {
+        console.error('[CREATE STREAM] Error parsing schedules JSON:', e);
+        schedules = null;
+      }
+    }
     const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;
     
     if (streamNow) {
@@ -2394,6 +2405,44 @@ app.post('/api/streams', isAuthenticated, [
             
             console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
             stream.youtube_broadcast_id = broadcastResult.broadcast.id;
+            
+            // Set audience settings (Made for Kids, Age Restricted)
+            if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted) {
+              try {
+                await youtubeService.setAudience(tokens, {
+                  videoId: broadcastResult.broadcast.id,
+                  selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
+                  ageRestricted: streamData.youtube_age_restricted
+                });
+                console.log(`[CREATE STREAM] ✓ Audience settings applied (Made for Kids: ${streamData.youtube_made_for_kids}, Age Restricted: ${streamData.youtube_age_restricted})`);
+              } catch (audienceError) {
+                console.error('[CREATE STREAM] Error setting audience:', audienceError);
+              }
+            }
+            
+            // Upload thumbnail if provided (multer stores file in req.file)
+            if (req.file) {
+              try {
+                console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
+                
+                await youtubeService.setThumbnail(tokens, {
+                  broadcastId: broadcastResult.broadcast.id,
+                  filePath: req.file.path,
+                  mimeType: req.file.mimetype
+                });
+                
+                console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
+                
+                // Clean up file after upload
+                fs.unlinkSync(req.file.path);
+              } catch (thumbnailError) {
+                console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
+                // Clean up file even on error
+                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                  fs.unlinkSync(req.file.path);
+                }
+              }
+            }
           }
         } else {
           console.warn(`[CREATE STREAM] YouTube tokens not found for user ${req.session.userId}, broadcast not created`);

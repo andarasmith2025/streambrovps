@@ -447,6 +447,15 @@
                               <span>Age-restricted (18+)</span>
                             </label>
                           </div>
+                          
+                          <div>
+                            <label class="text-sm font-medium text-white block mb-2">Konten Sintetis</label>
+                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
+                              <input type="checkbox" name="youtubeSyntheticContent" id="youtubeSyntheticContent" class="w-4 h-4 rounded">
+                              <span>Konten dibuat atau dimodifikasi dengan AI</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">Centang jika video ini menggunakan teknologi AI untuk pembuatan atau modifikasi konten</p>
+                          </div>
                         </div>
                         
                         <!-- Auto Start & Auto End (YouTube API) -->
@@ -1262,6 +1271,7 @@
             formData.youtubePrivacy = document.getElementById('youtubePrivacy')?.value || 'unlisted';
             formData.youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
             formData.youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked || false;
+            formData.youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked || false;
             formData.youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked || false;
             formData.youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked || false;
             
@@ -1305,14 +1315,46 @@
             showNotification('Creating', 'Creating YouTube broadcast, please wait...', 'info');
           }
           
-          fetch('/api/streams', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
-            },
-            body: JSON.stringify(formData)
-          })
+          // Check if thumbnail file is present
+          const thumbnailInput = document.getElementById('youtubeThumbnail');
+          const hasThumbnail = thumbnailInput && thumbnailInput.files && thumbnailInput.files.length > 0;
+          
+          // Use FormData if thumbnail is present, otherwise use JSON
+          let fetchOptions;
+          if (hasThumbnail) {
+            const formDataObj = new FormData();
+            
+            // Add all form data as JSON string or individual fields
+            for (const key in formData) {
+              if (key === 'schedules') {
+                formDataObj.append(key, JSON.stringify(formData[key]));
+              } else {
+                formDataObj.append(key, formData[key]);
+              }
+            }
+            
+            // Add thumbnail file
+            formDataObj.append('youtubeThumbnail', thumbnailInput.files[0]);
+            
+            fetchOptions = {
+              method: 'POST',
+              headers: {
+                ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+              },
+              body: formDataObj
+            };
+          } else {
+            fetchOptions = {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+              },
+              body: JSON.stringify(formData)
+            };
+          }
+          
+          fetch('/api/streams', fetchOptions)
             .then(response => response.json())
             .then(data => {
               // Re-enable button

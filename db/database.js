@@ -132,6 +132,12 @@ function createTables() {
       console.error('Error adding youtube_auto_end column:', err.message);
     }
   });
+  
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_synthetic_content BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_synthetic_content column:', err.message);
+    }
+  });
   db.run(`CREATE TABLE IF NOT EXISTS stream_history (
     id TEXT PRIMARY KEY,
     stream_id TEXT,
