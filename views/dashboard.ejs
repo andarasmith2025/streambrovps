@@ -1325,11 +1325,6 @@
             // Manual RTMP mode
             formData.rtmpUrl = document.getElementById('rtmpUrl')?.value || '';
             formData.streamKey = document.getElementById('streamKey')?.value || '';
-            formData.bitrate = document.querySelector('select[name="bitrate"]')?.value || '2500';
-            formData.fps = document.querySelector('select[name="fps"]')?.value || '30';
-            formData.orientation = currentOrientation || 'horizontal';
-            formData.resolution = document.getElementById('currentResolution')?.textContent?.split(' ')[0] || '1280x720';
-            formData.useAdvancedSettings = document.getElementById('advancedSettingsToggle')?.checked || false;
           }
           // Collect schedules - if no schedules filled, treat as Stream Now
           const schedules = collectSchedules();
@@ -1661,12 +1656,10 @@
             if (stream.video_type === 'playlist') {
               settingsDisplay = 'Playlist • Loading...';
               fetchPlaylistInfo(stream.video_id, stream.id);
-            } else if (stream.use_advanced_settings) {
-              settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'} kbps • ${stream.fps || '30'} FPS`;
             } else {
-              const videoRes = stream.video_resolution || stream.resolution || '1280x720';
-              const videoBitrate = stream.video_bitrate || stream.bitrate || '2500';
-              const videoFps = stream.video_fps || stream.fps || '30';
+              const videoRes = stream.video_resolution || '1280x720';
+              const videoBitrate = stream.video_bitrate || '2500';
+              const videoFps = stream.video_fps || '30';
               settingsDisplay = `${videoRes} • ${videoBitrate} kbps • ${videoFps} FPS`;
             }
             // Calculate start and end time from schedules
@@ -1836,12 +1829,10 @@
             if (stream.video_type === 'playlist') {
               settingsDisplay = 'Playlist • Loading...';
               fetchPlaylistInfo(stream.video_id, stream.id);
-            } else if (stream.use_advanced_settings) {
-              settingsDisplay = `${stream.resolution || '1280x720'} • ${stream.bitrate || '2500'} kbps • ${stream.fps || '30'} FPS`;
             } else {
-              const videoRes = stream.video_resolution || stream.resolution || '1280x720';
-              const videoBitrate = stream.video_bitrate || stream.bitrate || '2500';
-              const videoFps = stream.video_fps || stream.fps || '30';
+              const videoRes = stream.video_resolution || '1280x720';
+              const videoBitrate = stream.video_bitrate || '2500';
+              const videoFps = stream.video_fps || '30';
               settingsDisplay = `${videoRes} • ${videoBitrate} kbps • ${videoFps} FPS`;
             }
             // Use ACTUAL status from database (updated by streamingService)
@@ -2598,9 +2589,6 @@
           startCountdowns();
         });
         let editSelectedVideoData = null;
-        let currentEditOrientation = 'horizontal';
-        let editDesktopVideoPlayer = null;
-        let editMobileVideoPlayer = null;
         let isEditStreamKeyValid = true;
         let originalStreamKey = '';
         function editStream(streamId) {
@@ -2728,9 +2716,8 @@
 
             safeSetChecked('editLoopVideo', stream.loop_video);
 
-            // Note: Bitrate, Resolution, FPS, Schedule Time, and Duration fields
-            // are not in the simplified edit modal. These settings are managed
-            // through the schedule system instead.
+            // Note: Advanced settings (bitrate, resolution, fps) have been removed
+            // Video settings are now auto-detected from the video file itself
             // Load schedules for this stream
             loadStreamSchedules(stream.id);
 
@@ -2761,25 +2748,6 @@
           document.body.style.overflow = 'auto';
 
           resetEditModalForm();
-
-          if (editDesktopVideoPlayer) {
-            try {
-              editDesktopVideoPlayer.pause();
-              editDesktopVideoPlayer.dispose();
-            } catch (e) {
-              console.error('Error disposing desktop video player:', e);
-            }
-            editDesktopVideoPlayer = null;
-          }
-          if (editMobileVideoPlayer) {
-            try {
-              editMobileVideoPlayer.pause();
-              editMobileVideoPlayer.dispose();
-            } catch (e) {
-              console.error('Error disposing mobile video player:', e);
-            }
-            editMobileVideoPlayer = null;
-          }
         }
         function resetEditModalForm() {
           const form = document.getElementById('editStreamForm');
@@ -2962,33 +2930,7 @@
           const dropdown = document.getElementById('editVideoSelectorDropdown');
           if (dropdown) dropdown.classList.add('hidden');
         }
-        // Video preview removed to save RAM (~45 MB)
-        // Users can see video title and thumbnail instead
-        function setEditVideoOrientation(orientation) {
-          currentEditOrientation = orientation;
-          const horizontalBtn = document.querySelector('[onclick="setEditVideoOrientation(\'horizontal\')"]');
-          const verticalBtn = document.querySelector('[onclick="setEditVideoOrientation(\'vertical\')"]');
-          horizontalBtn.classList.remove('edit-active-orientation', 'bg-primary');
-          horizontalBtn.classList.add('bg-dark-700');
-          verticalBtn.classList.remove('edit-active-orientation', 'bg-primary');
-          verticalBtn.classList.add('bg-dark-700');
-          if (orientation === 'horizontal') {
-            horizontalBtn.classList.add('edit-active-orientation', 'bg-primary');
-            horizontalBtn.classList.remove('bg-dark-700');
-          } else {
-            verticalBtn.classList.add('edit-active-orientation', 'bg-primary');
-            verticalBtn.classList.remove('bg-dark-700');
-          }
-          updateEditResolutionDisplay();
-        }
-        function updateEditResolutionDisplay() {
-          const select = document.getElementById('editResolutionSelect');
-          const selected = select.options[select.selectedIndex];
-          const resValue = selected.getAttribute(`data-${currentEditOrientation}`);
-          if (resValue) {
-            document.getElementById('editCurrentResolution').textContent = resValue;
-          }
-        }
+        // Video preview and orientation settings removed - not used in simplified UI
         function toggleEditStreamKeyVisibility() {
           const keyInput = document.getElementById('editStreamKey');
           const eyeIcon = document.getElementById('editStreamKeyToggle');
@@ -3081,23 +3023,7 @@
             });
           });
         }
-        document.addEventListener('DOMContentLoaded', function () {
-          setupAdvancedSettings('advancedSettingsToggle', 'advancedSettingsContent');
-          // Note: editAdvancedSettings removed from simplified edit modal
-        });
-        function setupAdvancedSettings(toggleId, contentId) {
-          const toggle = document.getElementById(toggleId);
-          const content = document.getElementById(contentId);
-          if (toggle && content) {
-            toggle.addEventListener('change', function () {
-              if (this.checked) {
-                content.classList.remove('hidden');
-              } else {
-                content.classList.add('hidden');
-              }
-            });
-          }
-        }
+        // Advanced settings feature removed - video settings auto-detected from file
 
         // Stream Mode Toggle
         let currentStreamMode = 'schedule'; // 'now' or 'schedule'

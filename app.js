@@ -1712,6 +1712,9 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
       file_size: size,
       duration: videoInfo.duration,
       format: format,
+      resolution: analysis.success ? analysis.video.resolution : null,
+      bitrate: analysis.success ? analysis.video.bitrate : null,
+      fps: analysis.success ? analysis.video.fps : null,
       user_id: req.session.userId
     };
     const video = await Video.create(videoData);
@@ -2099,17 +2102,9 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
       });
     });
 
-    let resolution = '';
-    let bitrate = null;
-
-    const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-    if (videoStream) {
-      resolution = `${videoStream.width}x${videoStream.height}`;
-    }
-
-    if (metadata.format && metadata.format.bit_rate) {
-      bitrate = Math.round(parseInt(metadata.format.bit_rate) / 1000);
-    }
+    // Analyze video quality using videoAnalyzer for consistency
+    const { analyzeVideo } = require('./utils/videoAnalyzer');
+    const analysis = await analyzeVideo(result.localFilePath);
 
     const thumbnailName = path.basename(result.filename, path.extname(result.filename)) + '.jpg';
     const thumbnailRelativePath = await generateThumbnail(result.localFilePath, thumbnailName)
@@ -2126,8 +2121,9 @@ async function processGoogleDriveImport(jobId, fileId, userId) {
       file_size: result.fileSize,
       duration: videoInfo.duration,
       format: format,
-      resolution: resolution,
-      bitrate: bitrate,
+      resolution: analysis.success ? analysis.video.resolution : null,
+      bitrate: analysis.success ? analysis.video.bitrate : null,
+      fps: analysis.success ? analysis.video.fps : null,
       user_id: userId
     };
 
