@@ -52,8 +52,7 @@ class StreamSchedule {
   static async findPending() {
     return new Promise((resolve, reject) => {
       const query = `SELECT ss.*, s.title, s.video_id, s.rtmp_url, s.stream_key, s.platform, 
-                s.bitrate, s.resolution, s.fps, s.orientation, s.loop_video, 
-                s.use_advanced_settings, s.user_id
+                s.loop_video, s.user_id
          FROM stream_schedules ss
          JOIN streams s ON ss.stream_id = s.id
          WHERE ss.status = 'pending'

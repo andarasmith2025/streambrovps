@@ -2284,12 +2284,7 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
       stream_key: req.body.streamKey,
       platform,
       platform_icon,
-      bitrate: parseInt(req.body.bitrate) || 2500,
-      resolution: req.body.resolution || '1280x720',
-      fps: parseInt(req.body.fps) || 30,
-      orientation: req.body.orientation || 'horizontal',
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
-      use_advanced_settings: req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true,
       use_youtube_api: useYouTubeAPI,
       user_id: req.session.userId
     };
@@ -2576,15 +2571,8 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
       console.log(`[UPDATE STREAM] Preserving RTMP settings for YouTube API stream ${req.params.id}`);
     }
     
-    if (req.body.bitrate) updateData.bitrate = parseInt(req.body.bitrate);
-    if (req.body.resolution) updateData.resolution = req.body.resolution;
-    if (req.body.fps) updateData.fps = parseInt(req.body.fps);
-    if (req.body.orientation) updateData.orientation = req.body.orientation;
     if (req.body.loopVideo !== undefined) {
       updateData.loop_video = req.body.loopVideo === 'true' || req.body.loopVideo === true;
-    }
-    if (req.body.useAdvancedSettings !== undefined) {
-      updateData.use_advanced_settings = req.body.useAdvancedSettings === 'true' || req.body.useAdvancedSettings === true;
     }
     
     // Preserve YouTube API settings (don't allow changing these via edit)
