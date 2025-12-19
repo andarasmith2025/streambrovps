@@ -2384,7 +2384,11 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           }
           
           // Get YouTube stream ID from request body (sent from frontend)
-          const youtubeStreamId = req.body.youtubeStreamId; // This is the actual YouTube stream ID, not stream key
+          // Handle both null and string "null" from frontend
+          let youtubeStreamId = req.body.youtubeStreamId;
+          if (youtubeStreamId === 'null' || youtubeStreamId === 'undefined' || !youtubeStreamId) {
+            youtubeStreamId = null;
+          }
           
           console.log(`[CREATE STREAM] Creating YouTube broadcast for stream ${stream.id}`);
           console.log(`[CREATE STREAM] - Title: ${req.body.streamTitle}`);
@@ -2398,7 +2402,7 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
             description: streamData.youtube_description || '',
             privacyStatus: streamData.youtube_privacy || 'unlisted',
             scheduledStartTime: scheduledStartTime,
-            streamId: youtubeStreamId || null, // Use YouTube stream ID if provided, otherwise create new
+            streamId: youtubeStreamId, // Use YouTube stream ID if provided, otherwise null to create new
             enableAutoStart: streamData.youtube_auto_start || false,
             enableAutoStop: streamData.youtube_auto_end || false
           });
