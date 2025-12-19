@@ -1015,16 +1015,26 @@ function displayYouTubeStreamKeys(streamKeys) {
   }
   
   container.innerHTML = streamKeys.map(key => `
-    <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
-      class="w-full flex items-start gap-3 p-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-colors text-left">
-      <i class="ti ti-key text-red-500 text-xl mt-0.5"></i>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</p>
-        <p class="text-xs text-gray-400 mt-1">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
-        <p class="text-xs text-gray-500 mt-0.5">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
+    <div class="bg-dark-700 border border-gray-600 rounded-lg p-3">
+      <div class="flex items-start gap-3">
+        <i class="ti ti-key text-red-500 text-xl mt-0.5"></i>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</p>
+          <p class="text-xs text-gray-400 mt-1">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
+          <p class="text-xs text-gray-500 mt-0.5">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
+        </div>
       </div>
-      <i class="ti ti-chevron-right text-gray-400"></i>
-    </button>
+      <div class="flex gap-2 mt-3">
+        <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
+          class="flex-1 px-3 py-2 bg-primary hover:bg-primary/80 text-white text-xs rounded transition-colors">
+          <i class="ti ti-check mr-1"></i>Use for YouTube API
+        </button>
+        <button type="button" onclick="copyToManualRTMP('${key.id}')" 
+          class="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors">
+          <i class="ti ti-copy mr-1"></i>Copy to Manual
+        </button>
+      </div>
+    </div>
   `).join('');
 }
 
@@ -1041,6 +1051,48 @@ function showYouTubeStreamKeysError(message) {
     </div>
   `;
 }
+
+// Copy YouTube stream key to Manual RTMP tab
+function copyToManualRTMP(keyId) {
+  const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+  if (!selectedKey) return;
+  
+  // Close the list modal
+  const listModal = document.getElementById('youtubeStreamKeysModal');
+  if (listModal) {
+    listModal.classList.add('hidden');
+  }
+  
+  // Switch to Manual tab
+  switchStreamTab('manual');
+  
+  // Fill Manual RTMP fields
+  const rtmpUrl = document.getElementById('rtmpUrl');
+  const streamKey = document.getElementById('streamKey');
+  const streamTitle = document.getElementById('streamTitle');
+  
+  if (rtmpUrl && selectedKey.ingestionInfo?.rtmpsIngestionAddress) {
+    rtmpUrl.value = selectedKey.ingestionInfo.rtmpsIngestionAddress;
+  }
+  
+  if (streamKey && selectedKey.ingestionInfo?.streamName) {
+    streamKey.value = selectedKey.ingestionInfo.streamName;
+  }
+  
+  if (streamTitle && selectedKey.title) {
+    streamTitle.value = selectedKey.title;
+  }
+  
+  // Show success message
+  if (typeof showToast === 'function') {
+    showToast('success', 'Stream key copied to Manual RTMP tab');
+  }
+  
+  console.log('[copyToManualRTMP] Copied stream key to Manual tab:', selectedKey.id);
+}
+
+// Make copyToManualRTMP available globally
+window.copyToManualRTMP = copyToManualRTMP;
 
 // Select YouTube stream key
 function selectYouTubeStreamKey(keyId) {
