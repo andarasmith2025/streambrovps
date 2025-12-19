@@ -2329,7 +2329,11 @@
             .then(data => {
               if (data.success) {
                 showNotification('Success!', 'Stream stopped successfully!', 'success');
-                setTimeout(() => window.location.reload(), 1000);
+                // Reload streams data instead of full page reload to avoid cache issues
+                setTimeout(() => {
+                  console.log('[Stop Stream] Reloading streams data...');
+                  loadStreams(true);
+                }, 500);
               } else {
                 showNotification('Error', data.error || 'Failed to stop stream', 'error');
                 restoreButtons();
@@ -2369,7 +2373,11 @@
             .then(data => {
               if (data.success) {
                 showNotification('Success!', 'Schedule cancelled successfully!', 'success');
-                setTimeout(() => window.location.reload(), 1000);
+                // Reload streams data instead of full page reload to avoid cache issues
+                setTimeout(() => {
+                  console.log('[Cancel Schedule] Reloading streams data...');
+                  loadStreams(true);
+                }, 500);
               } else {
                 showNotification('Error', data.error || 'Failed to cancel schedule', 'error');
                 restoreButtons();
@@ -2401,7 +2409,11 @@
                 .then(data => {
                   if (data.success) {
                     showNotification('Success', 'Stream deleted successfully', 'success');
-                    setTimeout(() => window.location.reload(), 1000);
+                    // Reload streams data instead of full page reload to avoid cache issues
+                    setTimeout(() => {
+                      console.log('[Delete Stream] Reloading streams data...');
+                      loadStreams(true);
+                    }, 500);
                   } else {
                     showNotification('Error', data.error || 'Failed to delete stream', 'error');
                   }
