@@ -2666,10 +2666,19 @@ app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
     if (stream.user_id !== req.session.userId) {
       return res.status(403).json({ success: false, error: 'Not authorized to delete this stream' });
     }
+    
+    // Delete associated schedules first (CASCADE DELETE)
+    const StreamSchedule = require('./models/StreamSchedule');
+    await StreamSchedule.deleteByStreamId(req.params.id);
+    console.log(`[DELETE STREAM] Deleted schedules for stream ${req.params.id}`);
+    
+    // Then delete the stream
     await Stream.delete(req.params.id, req.session.userId);
+    console.log(`[DELETE STREAM] Deleted stream ${req.params.id}`);
+    
     res.json({ success: true, message: 'Stream deleted successfully' });
   } catch (error) {
-    console.error('Error deleting stream:', error);
+    console.error('[DELETE STREAM] Error deleting stream:', error);
     res.status(500).json({ success: false, error: 'Failed to delete stream' });
   }
 });

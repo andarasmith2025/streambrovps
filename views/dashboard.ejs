@@ -1591,7 +1591,9 @@
             }
           }
           
-          fetch('/api/streams')
+          // Add cache busting to prevent stale data
+          const cacheBuster = `?_=${Date.now()}`;
+          fetch(`/api/streams${cacheBuster}`)
             .then(response => response.json())
             .then(data => {
               if (data.success) {
@@ -2466,27 +2468,37 @@
             'Delete',
             'Cancel',
             () => {
+              console.log('[Delete Stream] Sending DELETE request for stream:', streamId);
               fetch(`/api/streams/${streamId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json'
                 }
               })
-                .then(response => response.json())
+                .then(response => {
+                  console.log('[Delete Stream] Response status:', response.status);
+                  return response.json();
+                })
                 .then(data => {
+                  console.log('[Delete Stream] Response data:', data);
                   if (data.success) {
                     showNotification('Success', 'Stream deleted successfully', 'success');
-                    // Reload streams data instead of full page reload to avoid cache issues
+                    // Wait longer to ensure database transaction completes
+                    // Also force 2 refreshes to ensure cache is cleared
                     setTimeout(() => {
-                      console.log('[Delete Stream] Reloading streams data...');
+                      console.log('[Delete Stream] First reload...');
                       loadStreams(true);
-                    }, 500);
+                      setTimeout(() => {
+                        console.log('[Delete Stream] Second reload to ensure cache cleared...');
+                        loadStreams(false);
+                      }, 500);
+                    }, 1500);
                   } else {
                     showNotification('Error', data.error || 'Failed to delete stream', 'error');
                   }
                 })
                 .catch(error => {
-                  console.error('Error deleting stream:', error);
+                  console.error('[Delete Stream] Error:', error);
                   showNotification('Error', 'An error occurred while deleting the stream', 'error');
                 });
             }
