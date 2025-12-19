@@ -99,6 +99,9 @@
      });
 
      if ('serviceWorker' in navigator) {
+       // TEMPORARILY DISABLED - Service Worker causing cache issues during development
+       // Uncomment this when ready for production
+       /*
        window.addEventListener('load', function() {
          navigator.serviceWorker.register('/sw.js')
            .then(function(registration) {
@@ -107,6 +110,15 @@
            .catch(function(error) {
              console.log('Service Worker registration failed:', error);
            });
+       });
+       */
+       
+       // Unregister existing service workers
+       navigator.serviceWorker.getRegistrations().then(function(registrations) {
+         for(let registration of registrations) {
+           registration.unregister();
+           console.log('Service Worker unregistered');
+         }
        });
      }
    </script>
