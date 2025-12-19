@@ -396,23 +396,53 @@ async function startStream(streamId, options = {}) {
     
     // Transition YouTube broadcast to live if using YouTube API
     if (stream.use_youtube_api && stream.youtube_broadcast_id) {
-      try {
-        const { getTokensForUser } = require('../routes/youtube');
-        const youtubeService = require('./youtubeService');
-        
-        const tokens = await getTokensForUser(stream.user_id);
-        if (tokens && tokens.access_token) {
-          console.log(`[StreamingService] Transitioning YouTube broadcast ${stream.youtube_broadcast_id} to live`);
-          await youtubeService.transition(tokens, {
-            broadcastId: stream.youtube_broadcast_id,
-            status: 'live'
-          });
-          console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live`);
+      // Wait for stream to become active before transitioning
+      // YouTube needs time to receive and process the stream
+      setTimeout(async () => {
+        try {
+          const { getTokensForUser } = require('../routes/youtube');
+          const youtubeService = require('./youtubeService');
+          
+          const tokens = await getTokensForUser(stream.user_id);
+          if (tokens && tokens.access_token) {
+            console.log(`[StreamingService] Waiting for stream to become active before transitioning...`);
+            
+            // Retry transition up to 10 times with 3 second delay
+            let retries = 10;
+            let transitioned = false;
+            
+            while (retries > 0 && !transitioned) {
+              try {
+                console.log(`[StreamingService] Attempting to transition YouTube broadcast ${stream.youtube_broadcast_id} to live (attempt ${11 - retries}/10)`);
+                await youtubeService.transition(tokens, {
+                  broadcastId: stream.youtube_broadcast_id,
+                  status: 'live'
+                });
+                console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live`);
+                transitioned = true;
+              } catch (err) {
+                if (err.message && err.message.includes('inactive')) {
+                  console.log(`[StreamingService] Stream still inactive, waiting 3 seconds... (${retries} retries left)`);
+                  retries--;
+                  if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                  }
+                } else {
+                  // Other error, don't retry
+                  throw err;
+                }
+              }
+            }
+            
+            if (!transitioned) {
+              console.warn(`[StreamingService] Failed to transition broadcast to live after 10 attempts. Stream may need manual activation in YouTube Studio.`);
+            }
+          }
+        } catch (ytError) {
+          console.error('[StreamingService] Error transitioning YouTube broadcast to live:', ytError.message || ytError);
+          // Don't fail the stream start, just log the error
         }
-      } catch (ytError) {
-        console.error('[StreamingService] Error transitioning YouTube broadcast to live:', ytError);
-        // Don't fail the stream start, just log the error
-      }
+      }, 5000); // Wait 5 seconds before first attempt
     }
     
     // Clear manual_stop flag when stream starts
