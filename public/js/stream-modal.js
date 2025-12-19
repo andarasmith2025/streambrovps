@@ -1012,11 +1012,16 @@ function selectYouTubeStreamKey(keyId) {
   let youtubeStreamIdInput = document.getElementById('youtubeStreamId');
   if (!youtubeStreamIdInput) {
     // Create hidden input if doesn't exist
+    const form = document.getElementById('newStreamForm');
+    if (!form) {
+      console.error('[selectYouTubeStreamKey] Form not found! Cannot store YouTube stream ID');
+      return;
+    }
     youtubeStreamIdInput = document.createElement('input');
     youtubeStreamIdInput.type = 'hidden';
     youtubeStreamIdInput.id = 'youtubeStreamId';
     youtubeStreamIdInput.name = 'youtubeStreamId';
-    document.getElementById('newStreamForm').appendChild(youtubeStreamIdInput);
+    form.appendChild(youtubeStreamIdInput);
   }
   youtubeStreamIdInput.value = selectedKey.id; // Store YouTube stream ID
   
