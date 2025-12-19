@@ -2013,7 +2013,7 @@
                         <span class="text-xs text-blue-400">${dayLabel}</span>
                         ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
                       </div>
-                      ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
+                      ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                         <i class="ti ti-player-stop text-red-400 text-xs"></i>
                       </button>` : ''}
                     </div>`;
@@ -2024,7 +2024,7 @@
                           ${formatDate(schDate)}
                           ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm ml-1"></i>' : ''}
                         </div>
-                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
+                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                           <i class="ti ti-player-stop text-red-400 text-xs"></i>
                         </button>` : ''}
                       </div>`;
@@ -2085,10 +2085,10 @@
           <div class="flex items-center justify-end space-x-2">
             ${getActionButtonHTML(stream.status, stream.id, 'desktop', stream)}
             <div class="ml-2 flex items-center gap-1">
-              <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" onclick="editStream('${stream.id}')">
+              <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" onclick="event.stopPropagation(); editStream('${stream.id}')">
                 <i class="ti ti-edit text-gray-400 hover:text-white"></i>
               </button>
-              <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" onclick="deleteStream('${stream.id}')">
+              <button class="p-1.5 hover:bg-dark-700 rounded transition-colors" onclick="event.stopPropagation(); deleteStream('${stream.id}')">
                 <i class="ti ti-trash text-gray-400 hover:text-red-400"></i>
               </button>
             </div>
