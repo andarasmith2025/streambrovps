@@ -1258,9 +1258,9 @@
             formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
             formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
             
-            // Get YouTube stream ID from hidden field
+            // Get YouTube stream ID from hidden field or sessionStorage fallback
             const youtubeStreamIdInput = document.getElementById('youtubeStreamId');
-            formData.youtubeStreamId = youtubeStreamIdInput?.value || null;
+            formData.youtubeStreamId = youtubeStreamIdInput?.value || sessionStorage.getItem('selectedYouTubeStreamId') || null;
             
             console.log('[Form Submit] YouTube Stream ID input element:', youtubeStreamIdInput);
             console.log('[Form Submit] YouTube Stream ID value:', formData.youtubeStreamId);

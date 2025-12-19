@@ -248,12 +248,17 @@ router.get('/api/broadcasts', async (req, res) => {
   try {
     const tokens = await getTokensFromReq(req);
     if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
-    const status = ['upcoming','active','completed'].includes(String(req.query.status || '').toLowerCase())
+    const status = ['all','upcoming','active','completed'].includes(String(req.query.status || '').toLowerCase())
       ? String(req.query.status).toLowerCase() : 'upcoming';
     const all = await youtubeService.listBroadcasts(tokens, { maxResults: 50 });
     const debug = String(req.query.debug || '').toLowerCase() === '1' || String(req.query.debug || '').toLowerCase() === 'true';
     if (debug) {
       return res.json({ items: all || [], debug: true });
+    }
+    
+    // If status is 'all', return all broadcasts without filtering
+    if (status === 'all') {
+      return res.json({ items: all || [] });
     }
     // Augment timestamps with videos.liveStreamingDetails to avoid lifecycle/timestamp inconsistencies
     let metricsMap = {};
