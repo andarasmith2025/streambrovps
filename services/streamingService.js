@@ -411,23 +411,23 @@ async function startStream(streamId, options = {}) {
             let retries = 10;
             let transitioned = false;
             
-            while (retries > 0 && !transitioned) {
-              try {
-                console.log(`[StreamingService] Attempting to transition YouTube broadcast ${stream.youtube_broadcast_id} to live (attempt ${11 - retries}/10)`);
-                
-                // First, try to transition to testing, then to live
-                // This is the recommended flow for new broadcasts
-                try {
-                  await youtubeService.transition(tokens, {
-                    broadcastId: stream.youtube_broadcast_id,
-                    status: 'testing'
-                  });
-                  console.log(`[StreamingService] ✓ Broadcast transitioned to testing, now transitioning to live...`);
-                  
-                  // Wait a moment before transitioning to live
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  
-                  await youtubeService.transition(tokens, {
+            // First attempt: transition to testing
+            let inTestingMode = false;
+            try {
+              console.log(`[StreamingService] Transitioning broadcast to testing mode first...`);
+              await youtubeService.transition(tokens, {
+                broadcastId: stream.youtube_broadcast_id,
+                status: 'testing'
+              });
+              console.log(`[StreamingService] ✓ Broadcast in testing mode`);
+              inTestingMode = true;
+            } catch (testingErr) {
+              const errMsg = testingErr.message || '';
+              if (errMsg.includes('Redundant transition')) {
+                console.log(`[StreamingService] Broadcast already in testing mode`);
+                inTestingMode = true;
+              } else {
+                console.log(`[StreamingService] Coulkens, {
                     broadcastId: stream.youtube_broadcast_id,
                     status: 'live'
                   });
