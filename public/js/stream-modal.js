@@ -87,11 +87,8 @@ function openNewStreamModal() {
       console.log('[openNewStreamModal] Set youtubeStreamId to:', selectedStreamId);
     }
     
-    // Clear sessionStorage after loading
-    sessionStorage.removeItem('selectedYouTubeStreamId');
-    sessionStorage.removeItem('selectedYouTubeStreamKey');
-    sessionStorage.removeItem('selectedYouTubeStreamTitle');
-    sessionStorage.removeItem('selectedYouTubeStreamDescription');
+    // DON'T clear sessionStorage yet - keep it as fallback until form is submitted
+    // sessionStorage will be cleared in dashboard.ejs after successful form submission
     
     // Show success message
     if (typeof showToast === 'function') {

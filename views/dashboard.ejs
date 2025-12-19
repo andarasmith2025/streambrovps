@@ -1362,6 +1362,12 @@
               submitBtn.innerHTML = originalBtnText;
               
               if (data.success) {
+                // Clear YouTube stream selection from sessionStorage after successful submission
+                sessionStorage.removeItem('selectedYouTubeStreamId');
+                sessionStorage.removeItem('selectedYouTubeStreamKey');
+                sessionStorage.removeItem('selectedYouTubeStreamTitle');
+                sessionStorage.removeItem('selectedYouTubeStreamDescription');
+                
                 // Trigger event for YouTube Manage tab to refresh
                 if (data.stream && data.stream.use_youtube_api) {
                   window.dispatchEvent(new CustomEvent('youtubeStreamCreated', { 
