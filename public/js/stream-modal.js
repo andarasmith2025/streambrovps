@@ -965,10 +965,27 @@ async function loadYouTubeStreamKeys(forceRefresh = false) {
         console.log('[loadYouTubeStreamKeys] Using cached stream keys (age:', Math.round(cacheAge / 1000), 'seconds)');
         youtubeStreamKeys = youtubeStreamKeysCache;
         displayYouTubeStreamKeys(youtubeStreamKeysCache);
+        
+        // Show cache info
+        if (typeof showToast === 'function') {
+          const minutes = Math.floor(cacheAge / 60000);
+          showToast('info', `Using cached data (${minutes}m old). Click refresh to update.`);
+        }
         return;
       } else {
         console.log('[loadYouTubeStreamKeys] Cache expired (age:', Math.round(cacheAge / 1000), 'seconds), fetching fresh data...');
       }
+    }
+    
+    // Show loading state
+    const container = document.getElementById('youtubeStreamKeysList');
+    if (container) {
+      container.innerHTML = `
+        <div class="text-center py-4 text-gray-400">
+          <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+          <p class="text-xs">Loading stream keys from YouTube...</p>
+        </div>
+      `;
     }
     
     console.log('[loadYouTubeStreamKeys] Fetching stream keys from YouTube API...');
@@ -985,13 +1002,26 @@ async function loadYouTubeStreamKeys(forceRefresh = false) {
       console.log('[loadYouTubeStreamKeys] Stream keys cached for', STREAM_KEYS_CACHE_DURATION / 1000, 'seconds');
       
       displayYouTubeStreamKeys(data.streamKeys);
+      
+      // Show success message
+      if (typeof showToast === 'function') {
+        showToast('success', `Loaded ${data.streamKeys.length} stream key(s) from YouTube`);
+      }
     } else {
       console.error('Failed to load YouTube stream keys:', data.error);
       showYouTubeStreamKeysError(data.error || 'Failed to load stream keys');
+      
+      if (typeof showToast === 'function') {
+        showToast('error', data.error || 'Failed to load stream keys');
+      }
     }
   } catch (error) {
     console.error('Error loading YouTube stream keys:', error);
     showYouTubeStreamKeysError('Error connecting to YouTube API');
+    
+    if (typeof showToast === 'function') {
+      showToast('error', 'Error connecting to YouTube API');
+    }
   }
 }
 
@@ -999,6 +1029,27 @@ async function loadYouTubeStreamKeys(forceRefresh = false) {
 function displayYouTubeStreamKeys(streamKeys) {
   const container = document.getElementById('youtubeStreamKeysList');
   if (!container) return;
+  
+  // Update count
+  const countElement = document.getElementById('streamKeysCount');
+  if (countElement) {
+    countElement.textContent = `(${streamKeys.length})`;
+  }
+  
+  // Update cache info
+  const cacheInfoElement = document.getElementById('streamKeysCacheInfo');
+  if (cacheInfoElement && youtubeStreamKeysCacheTime) {
+    const cacheAge = Math.floor((Date.now() - youtubeStreamKeysCacheTime) / 1000);
+    const minutes = Math.floor(cacheAge / 60);
+    const seconds = cacheAge % 60;
+    
+    if (minutes > 0) {
+      cacheInfoElement.textContent = `Cached ${minutes}m ago`;
+    } else {
+      cacheInfoElement.textContent = `Cached ${seconds}s ago`;
+    }
+    cacheInfoElement.classList.remove('hidden');
+  }
   
   if (streamKeys.length === 0) {
     container.innerHTML = `
@@ -1013,20 +1064,29 @@ function displayYouTubeStreamKeys(streamKeys) {
   
   container.innerHTML = streamKeys.map(key => `
     <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
-      class="w-full flex items-center gap-3 p-3 bg-dark-700 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
-      <i class="ti ti-key text-red-500 text-xl"></i>
+      class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-key text-red-500 text-lg flex-shrink-0"></i>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
-        <p class="text-xs text-gray-400 mt-0.5 truncate">RTMP: ${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
-        <p class="text-xs text-gray-500 mt-0.5 truncate">Key: ${key.ingestionInfo?.streamName?.substring(0, 20)}...</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="event.stopPropagation(); copyToManualRTMP('${key.id}')" 
-          class="p-2 hover:bg-gray-600 rounded transition-colors" 
-          title="Copy to Manual RTMP">
-          <i class="ti ti-copy text-gray-400 hover:text-white"></i>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button type="button" onclick="event.stopPropagation(); copyStreamKeyToClipboard('${key.id}', 'rtmp')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy RTMP URL">
+          <i class="ti ti-link text-gray-400 hover:text-blue-400 text-sm"></i>
         </button>
-        <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors"></i>
+        <button type="button" onclick="event.stopPropagation(); copyStreamKeyToClipboard('${key.id}', 'key')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy Stream Key">
+          <i class="ti ti-key text-gray-400 hover:text-yellow-400 text-sm"></i>
+        </button>
+        <button type="button" onclick="event.stopPropagation(); copyToManualRTMP('${key.id}')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy to Manual RTMP">
+          <i class="ti ti-copy text-gray-400 hover:text-green-400 text-sm"></i>
+        </button>
+        <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
       </div>
     </button>
   `).join('');
@@ -1044,6 +1104,44 @@ function showYouTubeStreamKeysError(message) {
       <p class="text-xs text-gray-500 mt-1">Make sure you're connected to YouTube</p>
     </div>
   `;
+}
+
+// Copy stream key data to clipboard
+function copyStreamKeyToClipboard(keyId, type) {
+  const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+  if (!selectedKey) return;
+  
+  let textToCopy = '';
+  let successMessage = '';
+  
+  if (type === 'rtmp') {
+    textToCopy = selectedKey.ingestionInfo?.rtmpsIngestionAddress || '';
+    successMessage = 'RTMP URL copied to clipboard!';
+  } else if (type === 'key') {
+    textToCopy = selectedKey.ingestionInfo?.streamName || '';
+    successMessage = 'Stream Key copied to clipboard!';
+  }
+  
+  if (!textToCopy) {
+    if (typeof showToast === 'function') {
+      showToast('error', 'No data to copy');
+    }
+    return;
+  }
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    if (typeof showToast === 'function') {
+      showToast('success', successMessage);
+    } else {
+      console.log(successMessage, textToCopy);
+    }
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    if (typeof showToast === 'function') {
+      showToast('error', 'Failed to copy to clipboard');
+    }
+  });
 }
 
 // Copy YouTube stream key to Manual RTMP tab
@@ -1271,6 +1369,8 @@ window.selectYouTubeStreamKey = selectYouTubeStreamKey;
 window.toggleYouTubeStreamKeyVisibility = toggleYouTubeStreamKeyVisibility;
 window.toggleYouTubeStreamKeysDropdown = toggleYouTubeStreamKeysDropdown;
 window.refreshYouTubeStreamKeys = refreshYouTubeStreamKeys;
+window.copyStreamKeyToClipboard = copyStreamKeyToClipboard;
+window.copyToManualRTMP = copyToManualRTMP;
 window.toggleYouTubeAdditionalSettings = toggleYouTubeAdditionalSettings;
 window.toggleScheduleSection = toggleScheduleSection;
 

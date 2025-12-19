@@ -359,28 +359,55 @@
                       </div>
                       
                       <!-- Dropdown for Stream Keys -->
-                      <div id="youtubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div id="youtubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg">
                         <div class="p-2">
-                          <div class="flex items-center justify-between mb-2 px-2">
-                            <span class="text-xs font-medium text-gray-400">Select from your channel:</span>
+                          <!-- Header -->
+                          <div class="flex items-center justify-between mb-2 px-2 pb-2 border-b border-gray-600">
                             <div class="flex items-center gap-2">
+                              <span class="text-xs font-medium text-gray-300">Stream Keys</span>
+                              <span id="streamKeysCount" class="text-xs text-gray-500"></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span id="streamKeysCacheInfo" class="text-xs text-gray-500"></span>
                               <button type="button" onclick="refreshYouTubeStreamKeys()"
-                                class="text-gray-400 hover:text-primary transition-colors" title="Refresh stream keys">
+                                class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600" 
+                                title="Refresh stream keys">
                                 <i class="ti ti-refresh text-sm"></i>
                               </button>
                               <button type="button" onclick="toggleYouTubeStreamKeysDropdown()"
-                                class="text-gray-400 hover:text-white">
+                                class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600"
+                                title="Close">
                                 <i class="ti ti-x text-sm"></i>
                               </button>
                             </div>
                           </div>
-                          <div id="youtubeStreamKeysList" class="space-y-1"></div>
-                            <div class="text-center py-4 text-gray-400">
-                              <i class="ti ti-loader animate-spin text-xl mb-2"></i>
-                              <p class="text-xs">Loading...</p>
+                          
+                          <!-- List Container with max height and scroll -->
+                          <div class="max-h-64 overflow-y-auto">
+                            <div id="youtubeStreamKeysList" class="space-y-1">
+                              <div class="text-center py-4 text-gray-400">
+                                <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+                                <p class="text-xs">Loading stream keys...</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Footer with legend -->
+                          <div class="mt-2 pt-2 border-t border-gray-600 px-2">
+                            <div class="flex items-center gap-3 text-xs text-gray-500">
+                              <span class="flex items-center gap-1">
+                                <i class="ti ti-link text-blue-400"></i> RTMP
+                              </span>
+                              <span class="flex items-center gap-1">
+                                <i class="ti ti-key text-yellow-400"></i> Key
+                              </span>
+                              <span class="flex items-center gap-1">
+                                <i class="ti ti-copy text-green-400"></i> Copy All
+                              </span>
                             </div>
                           </div>
                         </div>
+                      </div>
                     
                     <!-- Collapsible Additional Settings -->
                     <div class="border-t border-gray-700 pt-3">
@@ -1222,6 +1249,17 @@
               document.getElementById('youtubeStreamKey')?.focus();
               return;
             }
+            
+            // ⚠️ CRITICAL: Validate that YouTube Stream ID is present
+            const youtubeStreamIdInput = document.getElementById('youtubeStreamId');
+            const youtubeStreamId = youtubeStreamIdInput?.value || sessionStorage.getItem('selectedYouTubeStreamId');
+            
+            if (!youtubeStreamId || youtubeStreamId === 'null' || youtubeStreamId === 'undefined') {
+              showNotification('Warning', 'Please select a stream from YouTube streamlist first. Click "Select Stream Key" button to choose an existing stream.', 'warning');
+              return;
+            }
+            
+            console.log('[Form Submit] YouTube Stream ID validated:', youtubeStreamId);
           } else {
             // Manual RTMP mode validation
             const rtmpUrl = document.getElementById('rtmpUrl')?.value.trim();

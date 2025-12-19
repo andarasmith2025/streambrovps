@@ -2396,13 +2396,28 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           console.log(`[CREATE STREAM] - Privacy: ${streamData.youtube_privacy}`);
           console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED - will create new'}`);
           
-          // Create broadcast via YouTube API
+          // ⚠️ CRITICAL: YouTube Stream ID MUST be provided when using YouTube API mode
+          // If not provided, we cannot create the broadcast because we don't know which stream key to use
+          if (!youtubeStreamId) {
+            console.error(`[CREATE STREAM] ❌ YouTube Stream ID is required for YouTube API mode`);
+            console.error(`[CREATE STREAM] User must select a stream from YouTube streamlist first`);
+            
+            // Delete the stream we just created since we can't proceed
+            await Stream.delete(stream.id);
+            
+            return res.status(400).json({ 
+              success: false, 
+              error: 'YouTube Stream ID is required. Please select a stream from YouTube streamlist first.' 
+            });
+          }
+          
+          // Create broadcast via YouTube API with the selected stream ID
           const broadcastResult = await youtubeService.scheduleLive(tokens, {
             title: req.body.streamTitle,
             description: streamData.youtube_description || '',
             privacyStatus: streamData.youtube_privacy || 'unlisted',
             scheduledStartTime: scheduledStartTime,
-            streamId: youtubeStreamId, // Use YouTube stream ID if provided, otherwise null to create new
+            streamId: youtubeStreamId, // MUST use the stream ID selected by user
             enableAutoStart: streamData.youtube_auto_start || false,
             enableAutoStop: streamData.youtube_auto_end || false
           });
