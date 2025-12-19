@@ -300,20 +300,25 @@ app.use((req, res, next) => {
 });
 
 // Load youtube_tokens from DB into session if absent
-app.use((req, res, next) => {
+// Also auto-refresh if expired
+app.use(async (req, res, next) => {
   if (!req.session || req.session.youtubeTokens) return next();
   const userId = req.session.userId || req.session.user_id;
   if (!userId) return next();
-  db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], (err, row) => {
-    if (!err && row) {
-      req.session.youtubeTokens = {
-        access_token: row.access_token,
-        refresh_token: row.refresh_token,
-        expiry_date: row.expiry_date
-      };
+  
+  try {
+    // Use getTokensForUser which has auto-refresh logic
+    const { getTokensForUser } = require('./routes/youtube');
+    const tokens = await getTokensForUser(userId);
+    
+    if (tokens) {
+      req.session.youtubeTokens = tokens;
     }
     next();
-  });
+  } catch (error) {
+    console.error('[Middleware] Failed to load/refresh YouTube tokens:', error.message);
+    next();
+  }
 });
 
 // OAuth routes
