@@ -815,6 +815,14 @@ app.get('/', (req, res) => {
 });
 app.get('/dashboard', isAuthenticated, async (req, res) => {
   try {
+    // Prevent browser caching to ensure latest JavaScript is always loaded
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    });
+    
     const user = await User.findById(req.session.userId);
     res.render('dashboard', {
       title: 'Dashboard',
