@@ -706,7 +706,20 @@
             <div class="flex-1 overflow-y-auto">
               <form id="editStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate></form>
                 <input type="hidden" id="editStreamId" name="streamId" value="">
-                <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
+                <parameter name="input type="hidden" id="editSelectedVideoId" name="videoId" value="">
+                <input type="hidden" id="editStreamPlatform" name="platform" value="">
+                <input type="hidden" id="editUseYoutubeApi" name="useYoutubeApi" value="">
+
+                <!-- Platform Mode Indicator -->
+                <div id="editPlatformModeIndicator" class="hidden mb-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <div class="flex items-center gap-2">
+                    <i class="ti ti-brand-youtube text-red-500"></i>
+                    <div class="flex-1">
+                      <p class="text-sm font-medium text-white">YouTube API Stream</p>
+                      <p class="text-xs text-gray-400 mt-0.5">RTMP settings are managed by YouTube API</p>
+                    </div>
+                  </div>
+                </div>
 
                 <!-- Form Fields (Single Column) -->
                 <div class="space-y-3">
@@ -2817,13 +2830,26 @@
             safeSetValue('editStreamTitle', stream.title);
             safeSetValue('editRtmpUrl', stream.rtmp_url || '');
             safeSetValue('editStreamKey', stream.stream_key || '');
+            safeSetValue('editStreamPlatform', stream.platform || 'youtube');
+            safeSetValue('editUseYoutubeApi', stream.use_youtube_api ? '1' : '0');
 
             // Check if using YouTube API
             const isYouTubeAPI = stream.use_youtube_api === 1 || stream.use_youtube_api === true;
             
+            // Show/hide platform mode indicator
+            const platformIndicator = document.getElementById('editPlatformModeIndicator');
+            if (platformIndicator) {
+              if (isYouTubeAPI) {
+                platformIndicator.classList.remove('hidden');
+              } else {
+                platformIndicator.classList.add('hidden');
+              }
+            }
+            
             // Disable RTMP fields if using YouTube API (managed by broadcast)
             const rtmpUrlField = document.getElementById('editRtmpUrl');
             const streamKeyField = document.getElementById('editStreamKey');
+            const platformSelector = document.getElementById('editPlatformSelector');
             
             if (isYouTubeAPI) {
               if (rtmpUrlField) {
@@ -2835,6 +2861,11 @@
                 streamKeyField.disabled = true;
                 streamKeyField.classList.add('opacity-50', 'cursor-not-allowed');
                 streamKeyField.title = 'Stream Key is managed by YouTube broadcast';
+              }
+              if (platformSelector) {
+                platformSelector.disabled = true;
+                platformSelector.classList.add('opacity-50', 'cursor-not-allowed');
+                platformSelector.title = 'Platform is managed by YouTube API';
               }
               
               // Add info badge
@@ -2856,6 +2887,11 @@
                 streamKeyField.disabled = false;
                 streamKeyField.classList.remove('opacity-50', 'cursor-not-allowed');
                 streamKeyField.title = '';
+              }
+              if (platformSelector) {
+                platformSelector.disabled = false;
+                platformSelector.classList.remove('opacity-50', 'cursor-not-allowed');
+                platformSelector.title = '';
               }
               
               // Remove info badge if exists
