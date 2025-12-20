@@ -140,12 +140,12 @@
               </button>
               <% if (youtubeConnected && youtubeChannel) { %>
                 <div
-                  class="w-full sm:w-auto flex items-center gap-3 bg-dark-700 text-white px-4 py-2 rounded-lg border border-gray-600 whitespace-nowrap">
-                  <img src="<%= youtubeChannel.avatar %>" alt="YT Avatar" class="w-6 h-6 rounded-full">
-                  <span class="text-sm">Connected as <span class="font-semibold">
+                  class="w-full sm:w-auto flex items-center gap-2 bg-dark-700 text-white px-3 py-2 rounded-lg border border-gray-600">
+                  <img src="<%= youtubeChannel.avatar %>" alt="YT Avatar" class="w-6 h-6 rounded-full flex-shrink-0">
+                  <span class="text-sm flex-1 min-w-0">Connected as <span class="font-semibold truncate inline-block max-w-[120px] sm:max-w-none align-bottom">
                       <%= youtubeChannel.title %>
                     </span></span>
-                  <a href="/oauth2/disconnect" class="ml-2 text-red-400 hover:text-red-300 text-sm">Disconnect</a>
+                  <a href="/oauth2/disconnect" class="text-red-400 hover:text-red-300 text-sm flex-shrink-0">Disconnect</a>
                 </div>
                 <% } else { %>
                   <a href="/oauth2/login"
