@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>
     <%= title %> - Streambro Light
   </title>
@@ -98,21 +101,22 @@
        });
      });
 
-     // PERMANENTLY DISABLED - Service Worker causes cache issues
-     // Force unregister and clear all caches on every page load
+     // SERVICE WORKER COMPLETELY DISABLED
+     // File sw.js has been deleted to prevent caching issues
      if ('serviceWorker' in navigator) {
+       // Force unregister any existing service workers
        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-         for(let registration of registrations) {
+         registrations.forEach(function(registration) {
            registration.unregister();
-         }
+         });
        });
        
        // Clear all caches
        if ('caches' in window) {
          caches.keys().then(function(names) {
-           for (let name of names) {
+           names.forEach(function(name) {
              caches.delete(name);
-           }
+           });
          });
        }
      }
