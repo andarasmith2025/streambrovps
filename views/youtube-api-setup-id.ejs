@@ -78,12 +78,15 @@
             <h4 class="font-semibold text-lg mb-2">Langkah 1: Buat Google Cloud Project</h4>
             <ol class="list-decimal list-inside space-y-2 text-gray-300">
               <li>Buka <a href="https://console.cloud.google.com" target="_blank" class="text-blue-400 hover:underline">Google Cloud Console</a></li>
-              <li>Klik "Select a project" → "New Project"</li>
+              <li><strong>Klik dropdown project:</strong> Di bagian atas (sebelah logo Google Cloud), klik tulisan "Select a project" atau nama project yang sedang aktif</li>
+              <li><strong>Buat project baru:</strong> Di popup yang muncul, klik tombol <strong>"NEW PROJECT"</strong> di pojok kanan atas</li>
               <li>Masukkan nama project (contoh: "StreamBro YouTube API")</li>
-              <li>Klik "Create"</li>
+              <li>Klik tombol <strong>"Create"</strong></li>
+              <li>Tunggu beberapa detik sampai project dibuat (akan ada notifikasi)</li>
+              <li><strong>Pilih project:</strong> Klik dropdown project lagi dan pilih project yang baru Anda buat</li>
             </ol>
             <div class="mt-3 p-3 bg-blue-900/20 rounded border border-blue-700">
-              <p class="text-sm text-blue-300">💡 Tips: Ini 100% GRATIS. Tidak perlu kartu kredit.</p>
+              <p class="text-sm text-blue-300">💡 Tips: Ini 100% GRATIS. Tidak perlu kartu kredit. Pastikan project yang baru dibuat sudah terpilih (terlihat di bagian atas) sebelum lanjut ke langkah berikutnya.</p>
             </div>
           </div>
 
@@ -102,18 +105,29 @@
           <div class="border-l-4 border-yellow-500 pl-4">
             <h4 class="font-semibold text-lg mb-2">Langkah 3: Konfigurasi OAuth Consent Screen</h4>
             <ol class="list-decimal list-inside space-y-2 text-gray-300">
-              <li>Buka "APIs & Services" → "OAuth consent screen"</li>
-              <li>Pilih "External" user type → Klik "Create"</li>
-              <li>Isi:
-                <ul class="list-disc list-inside ml-6 mt-2">
-                  <li>App name: Nama aplikasi Anda</li>
-                  <li>User support email: Email Anda</li>
-                  <li>Developer contact: Email Anda</li>
+              <li><strong>Buka menu:</strong> Di sidebar kiri, klik "APIs & Services" → pilih "OAuth consent screen"</li>
+              <li><strong>Pilih User Type:</strong> Anda akan melihat halaman dengan 2 pilihan:
+                <ul class="list-disc list-inside ml-6 mt-2 space-y-1">
+                  <li><strong>Internal</strong> - Hanya untuk organisasi Google Workspace (skip ini)</li>
+                  <li><strong>External</strong> - Untuk semua pengguna (pilih ini ✓)</li>
                 </ul>
               </li>
+              <li>Klik tombol radio <strong>"External"</strong></li>
+              <li>Klik tombol <strong>"Create"</strong> di bawah</li>
+              <li><strong>Isi form App Information:</strong>
+                <ul class="list-disc list-inside ml-6 mt-2">
+                  <li>App name: Nama aplikasi Anda (contoh: "StreamBro")</li>
+                  <li>User support email: Pilih email Anda dari dropdown</li>
+                  <li>Developer contact: Masukkan email Anda</li>
+                </ul>
+              </li>
+              <li>Klik <strong>"Save and Continue"</strong> sampai halaman "Test users"</li>
+              <li><strong>Tambahkan test users:</strong> Klik "Add Users" dan masukkan email akun YouTube Anda</li>
               <li>Klik "Save and Continue" sampai selesai</li>
-              <li>Tambahkan test users (email akun YouTube Anda)</li>
             </ol>
+            <div class="mt-3 p-3 bg-yellow-900/20 rounded border border-yellow-700">
+              <p class="text-sm text-yellow-300">⚠️ Penting: Pilih "External" bukan "Internal". Jika tidak melihat pilihan ini, pastikan Anda sudah di halaman "OAuth consent screen".</p>
+            </div>
           </div>
 
           <!-- Step 4 -->
