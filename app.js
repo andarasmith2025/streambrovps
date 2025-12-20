@@ -1036,6 +1036,43 @@ app.get('/users', isAdmin, async (req, res) => {
   try {
     const users = await User.findAll();
 
+    // Calculate statistics
+    const stats = {
+      totalUsers: users.length,
+      activeUsers: users.filter(u => u.status === 'active').length,
+      inactiveUsers: users.filter(u => u.status === 'inactive').length,
+      adminUsers: users.filter(u => u.user_role === 'admin').length,
+      memberUsers: users.filter(u => u.user_role === 'member').length,
+      usersStreaming: 0,
+      totalLiveStreams: 0
+    };
+
+    // Get users currently streaming
+    const streamingStats = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT DISTINCT user_id FROM streams WHERE status = 'live'`,
+        [],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+    stats.usersStreaming = streamingStats.length;
+
+    // Get total live streams
+    const liveStreamsCount = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT COUNT(*) as count FROM streams WHERE status = 'live'`,
+        [],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row.count);
+        }
+      );
+    });
+    stats.totalLiveStreams = liveStreamsCount;
+
     const usersWithStats = await Promise.all(users.map(async (user) => {
       const videoStats = await new Promise((resolve, reject) => {
         db.get(
@@ -1092,6 +1129,7 @@ app.get('/users', isAdmin, async (req, res) => {
       title: 'User Management',
       active: 'users',
       users: usersWithStats,
+      stats: stats,
       user: req.user
     });
   } catch (error) {
