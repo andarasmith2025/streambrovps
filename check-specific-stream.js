@@ -1,6 +1,6 @@
 const { db } = require('./db/database');
 
-const streamId = '435a373e-3e1c-45d7-84e3-9aa1fd740656';
+const streamId = '33e06213-9c27-438e-a323-0fb32939ec6a';
 
 console.log('\n=== Checking Stream & Schedule ===\n');
 console.log(`Stream ID: ${streamId}\n`);

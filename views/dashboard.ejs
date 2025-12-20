@@ -1472,6 +1472,15 @@
           fetch('/api/streams', fetchOptions)
             .then(response => {
               console.log('[Frontend] Response status:', response.status);
+              console.log('[Frontend] Response headers:', response.headers);
+              console.log('[Frontend] Response ok:', response.ok);
+              
+              if (!response.ok) {
+                console.error('[Frontend] ❌ Response not OK!');
+                console.error('[Frontend] Status:', response.status, response.statusText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+              
               return response.json();
             })
             .then(data => {
@@ -1522,11 +1531,18 @@
               }
             })
             .catch(error => {
-              console.error('Error:', error);
+              console.error('\n========================================');
+              console.error('[Frontend] ❌ FETCH ERROR');
+              console.error('========================================');
+              console.error('Error type:', error.name);
+              console.error('Error message:', error.message);
+              console.error('Error stack:', error.stack);
+              console.error('========================================\n');
+              
               // Re-enable button on error
               submitBtn.disabled = false;
               submitBtn.innerHTML = originalBtnText;
-              showNotification('Error', 'An error occurred while creating the stream', 'error');
+              showNotification('Error', `Failed to create stream: ${error.message}`, 'error');
             });
         });
         // Auto-refresh configuration
