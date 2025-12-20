@@ -12,14 +12,14 @@ db.get(`
   SELECT 
     user_id,
     created_at,
-    expires_at,
+    expiry_date,
     CASE 
-      WHEN datetime(expires_at/1000, 'unixepoch') > datetime('now') THEN 'VALID'
+      WHEN datetime(expiry_date/1000, 'unixepoch') > datetime('now') THEN 'VALID'
       ELSE 'EXPIRED'
     END as status,
-    CAST((julianday(datetime(expires_at/1000, 'unixepoch')) - julianday('now')) * 24 * 60 AS INTEGER) as minutes_remaining,
+    CAST((julianday(datetime(expiry_date/1000, 'unixepoch')) - julianday('now')) * 24 * 60 AS INTEGER) as minutes_remaining,
     datetime(created_at, 'localtime') as created_local,
-    datetime(expires_at/1000, 'unixepoch', 'localtime') as expires_local
+    datetime(expiry_date/1000, 'unixepoch', 'localtime') as expires_local
   FROM youtube_tokens 
   ORDER BY created_at DESC 
   LIMIT 1
