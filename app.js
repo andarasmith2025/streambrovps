@@ -219,13 +219,24 @@ app.use(session({
   rolling: true,
   cookie: {
     httpOnly: true,
-    secure: true, // Always use secure for production HTTPS
+    secure: true, // HTTPS required
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: 'none' // Required for cross-site OAuth redirects with secure cookies
+    sameSite: 'lax' // Changed from 'none' to 'lax' for better compatibility
   }
 }));
+app.use((req, res, next) => {
+  // Log all requests to OAuth endpoints
+  if (req.path.startsWith('/oauth2')) {
+    console.log('[OAuth Request]', req.method, req.path, {
+      query: req.query,
+      sessionID: req.sessionID,
+      userId: req.session?.userId,
+      hasYouTubeTokens: !!req.session?.youtubeTokens
+    });
+  }
+  next();
+});
 app.use(async (req, res, next) => {
-  console.log('Session check - Path:', req.path, 'SessionID:', req.sessionID, 'UserID:', req.session?.userId);
   if (req.session && req.session.userId) {
     try {
       const user = await User.findById(req.session.userId);
@@ -321,6 +332,24 @@ app.use(async (req, res, next) => {
 // OAuth routes
 const oauthRoutes = require('./routes/oauth');
 app.use('/oauth2', oauthRoutes);
+
+// Test endpoint untuk debug OAuth
+app.get('/test-oauth-debug', (req, res) => {
+  res.json({
+    message: 'OAuth debug endpoint',
+    session: {
+      id: req.sessionID,
+      userId: req.session?.userId,
+      hasYouTubeTokens: !!req.session?.youtubeTokens,
+      youtubeChannel: req.session?.youtubeChannel
+    },
+    headers: req.headers,
+    cookies: req.cookies,
+    timestamp: new Date().toISOString()
+  });
+});
+
+console.log('[Debug] OAuth test endpoint registered at /test-oauth-debug');
 
 // YouTube feature routes
 const youtubeRoutes = require('./routes/youtube');

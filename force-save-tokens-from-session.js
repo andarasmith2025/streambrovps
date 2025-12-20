@@ -1,101 +1,143 @@
-const { db } = require('./db/database');
-const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
-
-console.log('Force saving YouTube tokens from session to database...\n');
-
-// Get all sessions from session store
-const store = new SQLiteStore({ db: 'sessions.db', dir: './' });
-
-// Query sessions table directly
 const sqlite3 = require('sqlite3').verbose();
-const sessionsDb = new sqlite3.Database('./sessions.db');
+const path = require('path');
 
-sessionsDb.all('SELECT sess, sid FROM sessions', [], (err, rows) => {
+const sessionsDbPath = path.join(__dirname, 'db', 'sessions.db');
+const streambroDbPath = path.join(__dirname, 'db', 'streambro.db');
+
+const sessionsDb = new sqlite3.Database(sessionsDbPath);
+const streambroDb = new sqlite3.Database(streambroDbPath);
+
+console.log('\n=== Force Save YouTube Tokens from Session to Database ===\n');
+
+// Get all sessions
+sessionsDb.all("SELECT * FROM sessions WHERE expired > datetime('now')", (err, rows) => {
   if (err) {
-    console.error('Error reading sessions:', err);
-    process.exit(1);
+    console.error('Error:', err);
+    sessionsDb.close();
+    streambroDb.close();
+    return;
   }
   
-  console.log(`Found ${rows.length} session(s)\n`);
+  console.log(`Found ${rows.length} active session(s)\n`);
   
   let savedCount = 0;
   let processedCount = 0;
   
-  rows.forEach((row, index) => {
+  rows.forEach((row, idx) => {
     try {
-      const sessionData = JSON.parse(row.sess);
-      const userId = sessionData.userId || sessionData.user_id;
-      const youtubeTokens = sessionData.youtubeTokens;
+      const sess = JSON.parse(row.sess);
+      const userId = sess.userId || sess.user_id;
+      const youtubeTokens = sess.youtubeTokens;
       
-      if (userId && youtubeTokens && youtubeTokens.access_token) {
-        console.log(`Session ${index + 1}:`);
-        console.log(`- User ID: ${userId}`);
-        console.log(`- Has access_token: ${!!youtubeTokens.access_token}`);
-        console.log(`- Has refresh_token: ${!!youtubeTokens.refresh_token}`);
-        console.log(`- Expiry: ${youtubeTokens.expiry_date ? new Date(youtubeTokens.expiry_date).toISOString() : 'NULL'}`);
+      console.log(`${idx + 1}. Session: ${row.sid.substring(0, 20)}...`);
+      console.log(`   User ID: ${userId || 'N/A'}`);
+      console.log(`   Has YouTube Tokens: ${!!youtubeTokens}`);
+      
+      if (youtubeTokens && userId) {
+        console.log(`   - Access Token: ${youtubeTokens.access_token ? 'YES (' + youtubeTokens.access_token.length + ' chars)' : 'NO'}`);
+        console.log(`   - Refresh Token: ${youtubeTokens.refresh_token ? 'YES (' + youtubeTokens.refresh_token.length + ' chars)' : 'NO'}`);
+        
+        if (youtubeTokens.expiry_date) {
+          const now = Date.now();
+          const expiry = Number(youtubeTokens.expiry_date);
+          const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+          
+          if (minutesUntilExpiry < 0) {
+            console.log(`   - Token EXPIRED ${Math.abs(minutesUntilExpiry)} minutes ago`);
+          } else {
+            console.log(`   - Token valid (expires in ${minutesUntilExpiry} minutes)`);
+          }
+        }
         
         // Save to database
-        const expiry = youtubeTokens.expiry_date || null;
+        console.log(`   → Saving to database...`);
         
-        db.run(`INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date)
-                VALUES(?, ?, ?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET
-                  access_token=excluded.access_token,
-                  refresh_token=COALESCE(excluded.refresh_token, youtube_tokens.refresh_token),
-                  expiry_date=excluded.expiry_date,
-                  updated_at=CURRENT_TIMESTAMP`,
-          [userId, youtubeTokens.access_token, youtubeTokens.refresh_token || null, expiry],
-          (saveErr) => {
+        streambroDb.run(
+          `INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date, created_at, updated_at)
+           VALUES(?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT(user_id) DO UPDATE SET
+             access_token=excluded.access_token,
+             refresh_token=COALESCE(excluded.refresh_token, youtube_tokens.refresh_token),
+             expiry_date=excluded.expiry_date,
+             updated_at=CURRENT_TIMESTAMP`,
+          [
+            userId,
+            youtubeTokens.access_token || null,
+            youtubeTokens.refresh_token || null,
+            youtubeTokens.expiry_date || null
+          ],
+          function(saveErr) {
             processedCount++;
             
             if (saveErr) {
-              console.error(`  ❌ Failed to save:`, saveErr.message);
+              console.error(`   ❌ Failed to save:`, saveErr.message);
             } else {
-              console.log(`  ✅ Tokens saved to database!`);
               savedCount++;
-            }
-            
-            console.log('');
-            
-            // Check if all processed
-            if (processedCount === rows.filter(r => {
-              try {
-                const sd = JSON.parse(r.sess);
-                return (sd.userId || sd.user_id) && sd.youtubeTokens && sd.youtubeTokens.access_token;
-              } catch { return false; }
-            }).length) {
-              console.log(`\n=== SUMMARY ===`);
-              console.log(`Total sessions: ${rows.length}`);
-              console.log(`Sessions with YouTube tokens: ${processedCount}`);
-              console.log(`Successfully saved: ${savedCount}`);
+              console.log(`   ✅ Saved successfully! (rows affected: ${this.changes})`);
               
-              sessionsDb.close();
-              db.close();
-              process.exit(0);
+              // Verify
+              streambroDb.get(
+                'SELECT user_id, LENGTH(access_token) as token_len, expiry_date FROM youtube_tokens WHERE user_id = ?',
+                [userId],
+                (verifyErr, verifyRow) => {
+                  if (verifyErr) {
+                    console.error(`   ❌ Verification failed:`, verifyErr.message);
+                  } else if (verifyRow) {
+                    console.log(`   ✅ Verified: Token in database (length: ${verifyRow.token_len})`);
+                  } else {
+                    console.error(`   ❌ Verification failed: Token not found in database`);
+                  }
+                  
+                  // Close databases when all done
+                  if (processedCount === rows.filter(r => {
+                    try {
+                      const s = JSON.parse(r.sess);
+                      return s.youtubeTokens && (s.userId || s.user_id);
+                    } catch (e) {
+                      return false;
+                    }
+                  }).length) {
+                    console.log(`\n=== Summary ===`);
+                    console.log(`Total sessions: ${rows.length}`);
+                    console.log(`Tokens saved: ${savedCount}`);
+                    
+                    sessionsDb.close();
+                    streambroDb.close();
+                  }
+                }
+              );
             }
           }
         );
+      } else {
+        console.log(`   ⚠️  Skipped (no tokens or no user ID)\n`);
       }
-    } catch (parseErr) {
-      // Skip invalid sessions
+      
+    } catch (e) {
+      console.log(`   Error parsing session: ${e.message}\n`);
     }
   });
   
-  // If no valid sessions found
-  if (processedCount === 0) {
-    console.log('❌ No sessions with YouTube tokens found!');
-    console.log('\nThis means:');
-    console.log('1. User is not logged in, OR');
-    console.log('2. YouTube is not connected in current session, OR');
-    console.log('3. Session has expired');
+  if (rows.length === 0 || rows.filter(r => {
+    try {
+      const s = JSON.parse(r.sess);
+      return s.youtubeTokens && (s.userId || s.user_id);
+    } catch (e) {
+      return false;
+    }
+  }).length === 0) {
+    console.log('\n❌ No sessions with YouTube tokens found');
+    console.log('\nPossible reasons:');
+    console.log('1. You are not logged in');
+    console.log('2. You have not connected YouTube yet');
+    console.log('3. Session expired');
     console.log('\nPlease:');
-    console.log('1. Login to StreamBro');
-    console.log('2. Connect YouTube (Settings → Test Connection)');
-    console.log('3. Run this script again');
+    console.log('1. Login to dashboard');
+    console.log('2. Click "Connect YouTube"');
+    console.log('3. Authorize with Google');
+    console.log('4. Run this script again');
     
     sessionsDb.close();
-    db.close();
-    process.exit(1);
+    streambroDb.close();
   }
 });

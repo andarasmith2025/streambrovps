@@ -101,25 +101,55 @@
        });
      });
 
-     // SERVICE WORKER COMPLETELY DISABLED
-     // File sw.js has been deleted to prevent caching issues
-     if ('serviceWorker' in navigator) {
-       // Force unregister any existing service workers
-       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-         registrations.forEach(function(registration) {
-           registration.unregister();
-         });
-       });
+     // SERVICE WORKER FORCE DISABLE - AGGRESSIVE MODE
+     // This runs IMMEDIATELY on page load to unregister Service Worker
+     (function() {
+       console.log('[SW Killer] Starting aggressive Service Worker removal...');
        
-       // Clear all caches
-       if ('caches' in window) {
-         caches.keys().then(function(names) {
-           names.forEach(function(name) {
-             caches.delete(name);
-           });
+       if ('serviceWorker' in navigator) {
+         // Method 1: Unregister all Service Workers
+         navigator.serviceWorker.getRegistrations().then(function(registrations) {
+           if (registrations.length > 0) {
+             console.log('[SW Killer] Found ' + registrations.length + ' Service Worker(s), unregistering...');
+             registrations.forEach(function(registration) {
+               registration.unregister().then(function(success) {
+                 console.log('[SW Killer] ✅ Service Worker unregistered:', success);
+               }).catch(function(err) {
+                 console.error('[SW Killer] ❌ Failed to unregister:', err);
+               });
+             });
+           } else {
+             console.log('[SW Killer] ✅ No Service Workers found (good!)');
+           }
+         }).catch(function(err) {
+           console.error('[SW Killer] Error checking Service Workers:', err);
          });
+         
+         // Method 2: Clear all caches
+         if ('caches' in window) {
+           caches.keys().then(function(names) {
+             if (names.length > 0) {
+               console.log('[SW Killer] Found ' + names.length + ' cache(s), deleting...');
+               names.forEach(function(name) {
+                 caches.delete(name).then(function(success) {
+                   console.log('[SW Killer] ✅ Cache deleted:', name);
+                 });
+               });
+             } else {
+               console.log('[SW Killer] ✅ No caches found (good!)');
+             }
+           });
+         }
+         
+         // Method 3: Prevent Service Worker registration
+         navigator.serviceWorker.register = function() {
+           console.log('[SW Killer] 🚫 Service Worker registration blocked!');
+           return Promise.reject(new Error('Service Worker registration is disabled'));
+         };
        }
-     }
+       
+       console.log('[SW Killer] ✅ Service Worker killer initialized');
+     })();
    </script>
 </head>
 <body class="bg-dark-900 text-white font-inter">

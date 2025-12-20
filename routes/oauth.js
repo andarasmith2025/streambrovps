@@ -93,27 +93,62 @@ router.get('/callback', async (req, res) => {
     // Persist tokens to session for now; also save to DB if userId available
     req.session.youtubeTokens = tokens;
     console.log('[OAuth] Tokens saved to session. Has access_token:', !!tokens.access_token, 'Has refresh_token:', !!tokens.refresh_token);
+    
     if (userId) {
       const expiry = tokens.expiry_date || (tokens.expiry_date === 0 ? 0 : null);
-      console.log('[OAuth] Saving tokens to database for user:', userId);
-      db.run(`INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date)
-              VALUES(?, ?, ?, ?)
-              ON CONFLICT(user_id) DO UPDATE SET
-                access_token=excluded.access_token,
-                refresh_token=COALESCE(excluded.refresh_token, youtube_tokens.refresh_token),
-                expiry_date=excluded.expiry_date,
-                updated_at=CURRENT_TIMESTAMP`,
-        [userId, tokens.access_token || null, tokens.refresh_token || null, expiry],
-        (err) => {
-          if (err) {
-            console.error('[OAuth] Failed to persist youtube_tokens:', err.message);
-          } else {
-            console.log('[OAuth] ✓ Tokens successfully saved to database for user:', userId);
+      console.log('[OAuth] Preparing to save tokens to database...');
+      console.log('[OAuth] - User ID:', userId);
+      console.log('[OAuth] - Access Token length:', tokens.access_token ? tokens.access_token.length : 0);
+      console.log('[OAuth] - Refresh Token length:', tokens.refresh_token ? tokens.refresh_token.length : 0);
+      console.log('[OAuth] - Expiry Date:', expiry ? new Date(expiry).toISOString() : 'null');
+      
+      // Use Promise to ensure token is saved before continuing
+      await new Promise((resolve, reject) => {
+        db.run(`INSERT INTO youtube_tokens(user_id, access_token, refresh_token, expiry_date, created_at, updated_at)
+                VALUES(?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                  access_token=excluded.access_token,
+                  refresh_token=COALESCE(excluded.refresh_token, youtube_tokens.refresh_token),
+                  expiry_date=excluded.expiry_date,
+                  updated_at=CURRENT_TIMESTAMP`,
+          [userId, tokens.access_token || null, tokens.refresh_token || null, expiry],
+          function(err) {
+            if (err) {
+              console.error('[OAuth] ❌ Failed to persist youtube_tokens:', err.message);
+              console.error('[OAuth] SQL Error:', err);
+              reject(err);
+            } else {
+              console.log('[OAuth] ✅ Tokens successfully saved to database for user:', userId);
+              console.log('[OAuth] - Rows affected:', this.changes);
+              
+              // Verify token was saved
+              db.get('SELECT user_id, LENGTH(access_token) as token_len, expiry_date FROM youtube_tokens WHERE user_id = ?', 
+                [userId], 
+                (verifyErr, row) => {
+                  if (verifyErr) {
+                    console.error('[OAuth] Failed to verify token save:', verifyErr.message);
+                  } else if (row) {
+                    console.log('[OAuth] ✅ Verification: Token found in database');
+                    console.log('[OAuth] - Token length:', row.token_len);
+                    console.log('[OAuth] - Expiry:', row.expiry_date ? new Date(row.expiry_date).toISOString() : 'null');
+                  } else {
+                    console.error('[OAuth] ❌ Verification: Token NOT found in database!');
+                  }
+                }
+              );
+              
+              resolve();
+            }
           }
-        }
-      );
+        );
+      });
     } else {
-      console.warn('[OAuth] No userId in session, tokens not saved to database');
+      console.warn('[OAuth] ⚠️  No userId available, tokens not saved to database');
+      console.warn('[OAuth] Session data:', { 
+        userId: req.session.userId, 
+        user_id: req.session.user_id,
+        username: req.session.username 
+      });
     }
 
     // Fetch channel basic info for UI badge
