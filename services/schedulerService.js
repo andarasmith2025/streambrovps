@@ -158,6 +158,40 @@ async function checkScheduledStreams() {
         
         console.log(`[Scheduler] Starting stream: ${stream.id} - ${stream.title} with duration ${schedule.duration} minutes (schedule: ${schedule.id})`);
         
+        // ⭐ CRITICAL: Refresh YouTube tokens before starting stream (for recurring schedules)
+        if (stream.use_youtube_api && stream.user_id) {
+          try {
+            console.log(`[Scheduler] Refreshing YouTube tokens for user ${stream.user_id} before starting stream`);
+            const { getTokensForUser } = require('../routes/youtube');
+            const tokens = await getTokensForUser(stream.user_id);
+            
+            if (tokens && tokens.access_token) {
+              const now = Date.now();
+              const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+              const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+              console.log(`[Scheduler] ✓ YouTube token valid (expires in ${minutesUntilExpiry} minutes)`);
+            } else {
+              console.error(`[Scheduler] ❌ Failed to get valid YouTube tokens for user ${stream.user_id}`);
+              console.error(`[Scheduler] Stream ${stream.id} will NOT start - YouTube tokens missing or expired`);
+              
+              // Mark schedule as failed
+              if (!schedule.is_recurring) {
+                await StreamSchedule.updateStatus(schedule.id, 'failed');
+              }
+              continue; // Skip this stream
+            }
+          } catch (tokenError) {
+            console.error(`[Scheduler] ❌ Error refreshing YouTube tokens:`, tokenError.message);
+            console.error(`[Scheduler] Stream ${stream.id} will NOT start - token refresh failed`);
+            
+            // Mark schedule as failed
+            if (!schedule.is_recurring) {
+              await StreamSchedule.updateStatus(schedule.id, 'failed');
+            }
+            continue; // Skip this stream
+          }
+        }
+        
         // Update stream duration and active_schedule_id to match this specific schedule
         // This ensures auto-stop uses the correct duration and we know which schedule is active
         await Stream.update(schedule.stream_id, { 

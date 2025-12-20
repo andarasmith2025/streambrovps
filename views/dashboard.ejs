@@ -1395,14 +1395,18 @@
           }
           // Collect schedules - if no schedules filled, treat as Stream Now
           const schedules = collectSchedules();
+          console.log('[Form Submit] collectSchedules() returned:', schedules);
+          console.log('[Form Submit] Number of schedules:', schedules ? schedules.length : 0);
+          
           if (schedules && schedules.length > 0) {
             // Has schedules - will be scheduled
             formData.schedules = schedules;
-            console.log('[Form Submit] Stream will be scheduled with', schedules.length, 'schedule(s)');
+            console.log('[Form Submit] ✓ Stream will be SCHEDULED with', schedules.length, 'schedule(s)');
+            console.log('[Form Submit] Schedule details:', JSON.stringify(schedules, null, 2));
           } else {
             // No schedules - Stream Now mode (start immediately)
             formData.streamNow = true;
-            console.log('[Form Submit] No schedules found - Stream Now mode activated');
+            console.log('[Form Submit] ⚠️  No schedules found - Stream Now mode activated');
           }
           const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
           
