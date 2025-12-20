@@ -1082,21 +1082,37 @@ async function recoverStreamsAfterRestart(liveStreams) {
       });
       
       if (streamData && streamData.manual_stop === 1) {
-        console.log(`[Recovery] ΓÅ¡∩╕Å  Skipping stream ${streamInfo.id} (${streamInfo.title}) - was manually stopped by user`);
-        skippedCount++;
+        // Check how long ago the stream was stopped
+        const startTime = streamData.start_time ? new Date(streamData.start_time).getTime() : 0;
+        const minutesSinceStart = Math.floor((now - startTime) / (60 * 1000));
         
-        // Update status to offline if still marked as live
-        await new Promise((resolve) => {
-          db.run(
-            `UPDATE streams SET status = 'offline', status_updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'live'`,
-            [streamInfo.id],
-            () => resolve()
-          );
-        });
-        
-        // DON'T clear manual_stop flag - keep it until user manually starts stream again
-        // This prevents auto-recovery on subsequent restarts
-        continue;
+        // Only skip if stream was stopped more than 10 minutes ago
+        // This allows recovery of streams that were just started by scheduler
+        if (minutesSinceStart > 10 || !streamData.start_time) {
+          console.log(`[Recovery] Skipping stream ${streamInfo.id} (${streamInfo.title}) - was manually stopped by user (${minutesSinceStart} minutes ago)`);
+          skippedCount++;
+          
+          // Update status to offline if still marked as live
+          await new Promise((resolve) => {
+            db.run(
+              `UPDATE streams SET status = 'offline', status_updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'live'`,
+              [streamInfo.id],
+              () => resolve()
+            );
+          });
+          
+          continue;
+        } else {
+          console.log(`[Recovery] Stream ${streamInfo.id} was recently started (${minutesSinceStart} minutes ago), attempting recovery...`);
+          // Clear manual_stop flag and proceed with recovery
+          await new Promise((resolve) => {
+            db.run(
+              `UPDATE streams SET manual_stop = 0 WHERE id = ?`,
+              [streamInfo.id],
+              () => resolve()
+            );
+          });
+        }
       }
       
       const startTime = new Date(streamInfo.start_time);

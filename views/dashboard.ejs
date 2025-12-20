@@ -1858,7 +1858,7 @@
         </div>
         <div class="p-4">
           <div class="flex items-center justify-between mb-2">
-            <div class="font-medium">${stream.title}</div>
+            <div class="font-medium break-words line-clamp-2 flex-1 mr-2">${stream.title}</div>
             <div class="flex items-center text-sm">
               <i class="ti ti-brand-${getPlatformIcon(stream.platform)} text-${getPlatformColor(stream.platform)} mr-1"></i>
               <span>${stream.platform || 'Custom'}</span>
@@ -2037,7 +2037,7 @@
               <img src="${thumbnail}" class="w-full h-full object-cover" alt="${stream.title}">
             </div>
             <div>
-              <div class="text-sm font-medium">${stream.title}</div>
+              <div class="text-sm font-medium break-words line-clamp-2">${stream.title}</div>
               <div class="text-xs text-gray-400">${settingsDisplay}</div>
             </div>
           </div>
