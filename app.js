@@ -260,11 +260,8 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/sw.js', (req, res) => {
-  res.setHeader('Content-Type', 'application/javascript');
-  res.setHeader('Service-Worker-Allowed', '/');
-  res.sendFile(path.join(__dirname, 'public', 'sw.js'));
-});
+// SERVICE WORKER REMOVED - Caused caching issues with stream creation
+// The unregister code is in views/layout.ejs
 
 app.use('/uploads', function (req, res, next) {
   res.header('Cache-Control', 'no-cache');
