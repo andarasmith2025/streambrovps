@@ -224,8 +224,17 @@ async function getTokensFromReq(req) {
         
         return req.session.youtubeTokens;
       } catch (refreshErr) {
-        console.error(`[getTokensFromReq] Failed to refresh token:`, refreshErr.message);
-        // Continue with old token, let caller handle the error
+        console.error(`[getTokensFromReq] Failed to refresh session token:`, refreshErr.message);
+        
+        // ⭐ If refresh fails (e.g., deleted_client), clear session and fallback to database
+        console.log(`[getTokensFromReq] Clearing invalid session token, falling back to database...`);
+        delete req.session.youtubeTokens;
+        
+        // Fallback to database
+        if (userId) {
+          return await getTokensForUser(userId);
+        }
+        return null;
       }
     }
     
@@ -340,7 +349,22 @@ router.get('/api/broadcasts', async (req, res) => {
     return res.json({ items });
   } catch (err) {
     const detail = err?.response?.data || null;
+    const errorCode = detail?.error || detail?.error_description || '';
     const message = (detail && detail.error && detail.error.message) ? detail.error.message : (err && err.message ? err.message : 'Unknown error');
+    
+    // ⭐ If error is "deleted_client", clear session and suggest reconnect
+    if (errorCode === 'deleted_client' || message.includes('deleted_client')) {
+      console.error('[YouTube API] ❌ OAuth client deleted or invalid - clearing session');
+      if (req.session && req.session.youtubeTokens) {
+        delete req.session.youtubeTokens;
+      }
+      return res.status(401).json({ 
+        error: 'OAuth client invalid',
+        message: 'Your YouTube connection is no longer valid. Please disconnect and reconnect your channel.',
+        needsReconnect: true
+      });
+    }
+    
     console.error('[YouTube] list broadcasts error:', detail || message);
     return res.status(500).json({ error: 'Failed to list broadcasts', message, detail });
   }
