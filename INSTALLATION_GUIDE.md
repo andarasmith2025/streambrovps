@@ -1,580 +1,370 @@
-# 🚀 StreamBro - Complete Installation Guide
+# StreamBro - Panduan Instalasi VPS
 
-Panduan lengkap instalasi StreamBro di VPS Ubuntu dari awal sampai running.
+Panduan lengkap instalasi StreamBro di VPS untuk pemula.
 
----
+## 📋 Persyaratan
 
-## 📋 Table of Contents
-
-1. [Requirements](#requirements)
-2. [VPS Setup](#vps-setup)
-3. [SSH Key Setup](#ssh-key-setup)
-4. [Server Preparation](#server-preparation)
-5. [Install Dependencies](#install-dependencies)
-6. [Clone & Configure StreamBro](#clone--configure-streambro)
-7. [Database Setup](#database-setup)
-8. [Create Admin Account](#create-admin-account)
-9. [Run with PM2](#run-with-pm2)
-10. [Firewall & Security](#firewall--security)
-11. [Common Commands](#common-commands)
-12. [Troubleshooting](#troubleshooting)
-
----
-
-## 1. Requirements
-
-### Minimum VPS Specs:
-- **OS**: Ubuntu 22.04 LTS
+### VPS Minimum:
+- **RAM**: 2GB (recommended 4GB)
+- **Storage**: 20GB
+- **OS**: Ubuntu 20.04 / 22.04 LTS
 - **CPU**: 2 cores
-- **RAM**: 4 GB
-- **Storage**: 60 GB SSD
-- **Network**: 100 Mbps upload (untuk streaming)
 
-### Recommended VPS Providers:
-- Contabo (murah, performa bagus)
-- DigitalOcean
-- Vultr
-- Linode
+### Yang Perlu Disiapkan:
+- ✅ VPS dengan akses SSH (root atau sudo)
+- ✅ Domain (opsional, bisa pakai IP)
+- ✅ Koneksi internet stabil
 
 ---
 
-## 2. VPS Setup
+## 🚀 Langkah 1: Koneksi ke VPS
 
-### A. Order VPS
-1. Pilih provider (contoh: Contabo)
-2. Pilih plan: **Cloud VPS M** (2 CPU, 4GB RAM, 100 Mbps)
-3. Pilih OS: **Ubuntu 22.04 LTS**
-4. Pilih region terdekat (Singapore untuk Asia)
-5. Order dan tunggu email konfirmasi
-
-### B. Dapatkan Akses SSH
-Setelah VPS aktif, Anda akan menerima email berisi:
-```
-IP Address: 94.237.3.164
-Username: root
-Password: YourRandomPassword123
-```
-
-### C. Login Pertama Kali
+### Windows (PowerShell/CMD):
 ```bash
-ssh root@94.237.3.164
+ssh root@IP_VPS_ANDA
 ```
-Masukkan password dari email.
 
-**PENTING**: Ganti password default!
+### Mac/Linux (Terminal):
 ```bash
-passwd
+ssh root@IP_VPS_ANDA
 ```
+
+Masukkan password saat diminta.
 
 ---
 
-## 3. SSH Key Setup
+## 📦 Langkah 2: Install Dependencies
 
-Agar tidak perlu password setiap login, gunakan SSH key.
+Jalankan perintah berikut satu per satu:
 
-### A. Generate SSH Key (di komputer local Windows)
-
-**Buka PowerShell:**
-```powershell
-# Generate SSH key
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-
-# Tekan Enter 3x (default location, no passphrase)
-# Key akan tersimpan di: C:\Users\YourName\.ssh\id_rsa
-```
-
-### B. Copy Public Key ke Server
-
-**Cara 1: Manual Copy**
-```powershell
-# Lihat public key
-type C:\Users\YourName\.ssh\id_rsa.pub
-```
-
-Copy output, lalu di server:
-```bash
-# Di server VPS
-mkdir -p ~/.ssh
-nano ~/.ssh/authorized_keys
-# Paste public key, Ctrl+X, Y, Enter
-
-# Set permission
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-```
-
-**Cara 2: Otomatis (jika ssh-copy-id tersedia)**
-```powershell
-ssh-copy-id root@94.237.3.164
-```
-
-### C. Test SSH Key
-```bash
-# Logout dari server
-exit
-
-# Login lagi (seharusnya tidak perlu password)
-ssh root@94.237.3.164
-```
-
----
-
-## 4. Server Preparation
-
-### A. Update System
+### Update sistem:
 ```bash
 apt update && apt upgrade -y
 ```
 
-### B. Set Timezone (opsional)
+### Install Node.js 20.x:
 ```bash
-timedatectl set-timezone Asia/Jakarta
-```
-
-### C. Install Basic Tools
-```bash
-apt install -y curl wget git nano htop net-tools
-```
-
----
-
-## 5. Install Dependencies
-
-### A. Install Node.js 20.x
-```bash
-# Add NodeSource repository
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-
-# Install Node.js
 apt install -y nodejs
-
-# Verify
-node -v  # Should show v20.x.x
-npm -v   # Should show 10.x.x
 ```
 
-### B. Install FFmpeg
+### Install Git:
+```bash
+apt install -y git
+```
+
+### Install FFmpeg:
 ```bash
 apt install -y ffmpeg
-
-# Verify
-ffmpeg -version
 ```
 
-### C. Install PM2 (Process Manager)
+### Install PM2 (Process Manager):
 ```bash
 npm install -g pm2
-
-# Verify
-pm2 -v
 ```
 
-### D. Install NVIDIA Drivers (jika ada GPU)
+### Verifikasi instalasi:
 ```bash
-# Cek GPU
-lspci | grep -i nvidia
-
-# Install driver (jika ada GPU)
-apt install -y nvidia-driver-535
-
-# Reboot
-reboot
-
-# Setelah reboot, cek
-nvidia-smi
+node --version    # Harus v20.x.x
+npm --version     # Harus 10.x.x
+git --version     # Harus 2.x.x
+ffmpeg -version   # Harus 4.x.x atau lebih
+pm2 --version     # Harus 5.x.x
 ```
 
 ---
 
-## 6. Clone & Configure StreamBro
+## 📥 Langkah 3: Clone Repository
 
-### A. Clone Repository
 ```bash
-# Masuk ke home directory
-cd ~
-
-# Clone project
-git clone https://github.com/yourusername/streambro.git streambrovps
-
-# Masuk ke folder
+cd /root
+git clone https://github.com/andarasmith2025/streambrovps.git
 cd streambrovps
 ```
 
-### B. Install Dependencies
+---
+
+## ⚙️ Langkah 4: Konfigurasi Environment
+
+### Copy file .env.example:
+```bash
+cp .env.example .env
+```
+
+### Edit file .env:
+```bash
+nano .env
+```
+
+### Isi konfigurasi:
+```env
+PORT=7575
+SESSION_SECRET=GANTI_DENGAN_STRING_RANDOM_PANJANG
+
+# Google OAuth (untuk YouTube API)
+GOOGLE_CLIENT_ID=your_client_id_here
+GOOGLE_CLIENT_SECRET=your_client_secret_here
+GOOGLE_REDIRECT_URI=https://domain-anda.com/oauth2/callback
+
+# FFmpeg paths (biasanya sudah benar)
+FFMPEG_PATH=/usr/bin/ffmpeg
+FFPROBE_PATH=/usr/bin/ffprobe
+
+# Hardware encoding (opsional)
+PREFER_HARDWARE_ENCODING=false
+HARDWARE_ENCODER_FALLBACK=true
+```
+
+**Tips Generate SESSION_SECRET:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Simpan dengan: `Ctrl + O`, `Enter`, `Ctrl + X`
+
+---
+
+## 📦 Langkah 5: Install Dependencies
+
 ```bash
 npm install
 ```
 
-### C. Configure Environment
-```bash
-# Copy example env
-cp .env.example .env
-
-# Edit .env
-nano .env
-```
-
-**Isi .env:**
-```env
-# Server Configuration
-PORT=7575
-NODE_ENV=production
-
-# Session Secret (generate dengan: node generate-secret.js)
-SESSION_SECRET=your_generated_secret_here
-
-# Database
-DB_PATH=./db/streambro.db
-
-# FFmpeg Path
-FFMPEG_PATH=/usr/bin/ffmpeg
-
-# Stream Limits
-MAX_CONCURRENT_STREAMS_PER_USER=5
-MAX_CONCURRENT_STREAMS_GLOBAL=20
-
-# Resource Monitoring
-RESOURCE_WARNING_CPU_PERCENT=80
-RESOURCE_WARNING_MEMORY_MB=500
-RESOURCE_MONITOR_INTERVAL_MS=30000
-
-# Hardware Encoding
-PREFER_HARDWARE_ENCODING=true
-HARDWARE_ENCODER_FALLBACK=true
-
-# Force Kill Timeout
-FORCE_KILL_TIMEOUT_MS=5000
-
-# Google OAuth (opsional - untuk YouTube)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=
-```
-
-### D. Generate Session Secret
-```bash
-node generate-secret.js
-```
-Copy output dan paste ke `.env` di `SESSION_SECRET=`
+Tunggu sampai selesai (5-10 menit tergantung koneksi).
 
 ---
 
-## 7. Database Setup
+## 🗄️ Langkah 6: Setup Database
 
-Database SQLite akan otomatis dibuat saat pertama kali run.
+Database SQLite akan dibuat otomatis saat pertama kali aplikasi dijalankan.
 
-### A. Verify Database Path
+### Buat folder database:
 ```bash
-# Pastikan folder db ada
-ls -la db/
-
-# Database akan dibuat otomatis di: db/streambro.db
+mkdir -p db
 ```
 
 ---
 
-## 8. Create Admin Account
+## 👤 Langkah 7: Buat Admin User
 
-### A. Run Create Admin Script
 ```bash
 node create-admin.js
 ```
 
-**Input:**
-```
-Enter admin username: Admin
-Enter admin password: YourStrongPassword123
-```
-
-**Output:**
-```
-✅ Admin account created successfully!
-Username: Admin
-Role: admin
-Status: active
-```
-
-### B. Verify Admin Account
-```bash
-node check-users.js
-```
+Ikuti instruksi untuk membuat user admin pertama.
 
 ---
 
-## 9. Run with PM2
+## 🚀 Langkah 8: Jalankan Aplikasi
 
-### A. Start Application
+### Start dengan PM2:
 ```bash
-# Start dengan PM2
-pm2 start app.js --name streambro
+pm2 start ecosystem.config.js
+```
 
-# Save PM2 configuration
+### Simpan konfigurasi PM2:
+```bash
 pm2 save
-
-# Setup auto-start on reboot
 pm2 startup
-# Copy dan jalankan command yang muncul
 ```
 
-### B. Verify Running
+Jalankan command yang muncul (biasanya dimulai dengan `sudo env PATH=...`)
+
+### Cek status:
 ```bash
-# Check status
 pm2 status
-
-# Check logs
-pm2 logs streambro --lines 50
-
-# Monitor real-time
-pm2 monit
-```
-
-### C. Access Dashboard
-Buka browser:
-```
-http://94.237.3.164:7575
-```
-
-Login dengan:
-- Username: `Admin`
-- Password: `YourStrongPassword123`
-
----
-
-## 10. Firewall & Security
-
-### A. Configure UFW Firewall
-```bash
-# Enable firewall
-ufw enable
-
-# Allow SSH
-ufw allow 22/tcp
-
-# Allow StreamBro port
-ufw allow 7575/tcp
-
-# Check status
-ufw status
-```
-
-### B. Fail2Ban (opsional - proteksi brute force)
-```bash
-apt install -y fail2ban
-systemctl enable fail2ban
-systemctl start fail2ban
-```
-
-### C. Change SSH Port (opsional - extra security)
-```bash
-nano /etc/ssh/sshd_config
-# Ubah: Port 22 -> Port 2222
-
-systemctl restart sshd
-
-# Jangan lupa allow port baru di firewall
-ufw allow 2222/tcp
+pm2 logs streambro
 ```
 
 ---
 
-## 11. Common Commands
+## 🌐 Langkah 9: Akses Aplikasi
 
-### PM2 Management
+### Jika menggunakan IP:
+```
+http://IP_VPS_ANDA:7575
+```
+
+### Jika menggunakan domain:
+Setup reverse proxy dengan Nginx (lihat bagian berikutnya).
+
+---
+
+## 🔒 Langkah 10: Setup Nginx & SSL (Opsional)
+
+### Install Nginx:
 ```bash
-# Start
-pm2 start streambro
+apt install -y nginx
+```
 
-# Stop
-pm2 stop streambro
+### Buat konfigurasi Nginx:
+```bash
+nano /etc/nginx/sites-available/streambro
+```
 
-# Restart
+### Isi dengan:
+```nginx
+server {
+    listen 80;
+    server_name domain-anda.com;
+
+    location / {
+        proxy_pass http://localhost:7575;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Aktifkan konfigurasi:
+```bash
+ln -s /etc/nginx/sites-available/streambro /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
+```
+
+### Install SSL dengan Certbot:
+```bash
+apt install -y certbot python3-certbot-nginx
+certbot --nginx -d domain-anda.com
+```
+
+Ikuti instruksi untuk setup SSL.
+
+---
+
+## 🔄 Perintah Berguna
+
+### Restart aplikasi:
+```bash
 pm2 restart streambro
+```
 
-# Reload (zero-downtime)
-pm2 reload streambro
+### Stop aplikasi:
+```bash
+pm2 stop streambro
+```
 
-# Delete
-pm2 delete streambro
-
-# Logs
+### Lihat logs:
+```bash
 pm2 logs streambro
 pm2 logs streambro --lines 100
-pm2 logs streambro --err  # Error logs only
-
-# Monitor
-pm2 monit
 ```
 
-### Git Update
+### Update aplikasi:
 ```bash
-cd ~/streambrovps
-
-# Pull latest changes
-git pull origin main
-
-# Install new dependencies (if any)
+cd /root/streambrovps
+git pull
 npm install
-
-# Restart
 pm2 restart streambro
 ```
 
-### Database Management
+### Cek status sistem:
 ```bash
-# Check users
-node check-users.js
-
-# Reset password
-node reset-password.js Username NewPassword123
-
-# Activate user
-node activate-user.js Username
-
-# Check streams
-node check-streams.js
-
-# Check schedules
-node check-schedules.js
-```
-
-### System Monitoring
-```bash
-# RAM usage
-free -h
-
-# CPU usage
-htop
-
-# Disk usage
-df -h
-
-# Network usage
-iftop
-
-# Process list
-ps aux | grep -E 'node|ffmpeg'
+pm2 status
+pm2 monit
 ```
 
 ---
 
-## 12. Troubleshooting
+## 🐛 Troubleshooting
 
-### Problem: Cannot Login
+### Port 7575 sudah digunakan:
 ```bash
-# Check if server is running
-pm2 status
-
-# Check logs for errors
-pm2 logs streambro --err
-
-# Verify admin account exists
-node check-users.js
-
-# Reset password if needed
-node reset-password.js Admin NewPassword123
-```
-
-### Problem: Port Already in Use
-```bash
-# Check what's using port 7575
+# Cek proses yang menggunakan port
 lsof -i :7575
 
-# Kill process
-kill -9 <PID>
-
-# Or change port in .env
-nano .env
-# Change PORT=7575 to PORT=8080
+# Kill proses
+kill -9 PID_YANG_MUNCUL
 ```
 
-### Problem: FFmpeg Not Found
+### FFmpeg tidak ditemukan:
 ```bash
-# Check FFmpeg installation
-which ffmpeg
-ffmpeg -version
-
-# Reinstall if needed
+# Install ulang FFmpeg
 apt install -y ffmpeg
 
-# Update .env with correct path
-nano .env
-# FFMPEG_PATH=/usr/bin/ffmpeg
+# Cek lokasi FFmpeg
+which ffmpeg
+which ffprobe
+
+# Update .env dengan path yang benar
 ```
 
-### Problem: Database Locked
+### PM2 tidak start otomatis setelah reboot:
 ```bash
-# Stop application
-pm2 stop streambro
-
-# Check database file
-ls -la db/streambro.db
-
-# Restart
-pm2 start streambro
+pm2 startup
+pm2 save
 ```
 
-### Problem: High RAM Usage
+### Database error:
 ```bash
-# Check memory
-free -h
-pm2 monit
+# Backup database lama
+cp db/streambro.db db/streambro.db.backup
 
-# Check FFmpeg processes
-ps aux | grep ffmpeg
+# Hapus database (akan dibuat ulang)
+rm db/streambro.db
 
-# Stop all streams
-# (via dashboard or restart server)
+# Restart aplikasi
 pm2 restart streambro
+
+# Buat admin baru
+node create-admin.js
 ```
 
-### Problem: Stream Not Starting
+### Out of memory:
 ```bash
-# Check logs
-pm2 logs streambro --lines 100
+# Cek memory
+free -h
 
-# Common issues:
-# 1. Invalid RTMP URL/Key
-# 2. Video file not found
-# 3. FFmpeg error
-# 4. Network issue
-
-# Test FFmpeg manually
-ffmpeg -re -i /path/to/video.mp4 -c copy -f flv rtmp://your-rtmp-url/key
+# Tambah swap (jika RAM < 2GB)
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
 ---
 
-## 📚 Additional Documentation
+## 📚 Dokumentasi Lainnya
 
-- **User Management**: See `USER_MANAGEMENT.md`
-- **RAM Calculation**: See `RAM_CALCULATION_GUIDE.md`
-- **Auto Recovery**: See `AUTO_RECOVERY.md`
-- **Video Quality**: See `VIDEO_QUALITY_DETECTION.md`
-- **Memory Optimization**: See `MEMORY_OPTIMIZATION.md`
-
----
-
-## 🆘 Need Help?
-
-1. Check logs: `pm2 logs streambro`
-2. Check system: `htop` and `free -h`
-3. Check processes: `ps aux | grep -E 'node|ffmpeg'`
-4. Restart: `pm2 restart streambro`
+- **YouTube API Setup**: Lihat `YOUTUBE_API_SETUP_GUIDE.md`
+- **SSL Setup**: Lihat `SSL_SETUP_GUIDE.md`
+- **Deployment**: Lihat `DEPLOYMENT.md`
+- **User Management**: Lihat `USER_MANAGEMENT.md`
 
 ---
 
-## 🎉 Success!
+## 🆘 Butuh Bantuan?
 
-Jika semua langkah berhasil, Anda sekarang memiliki:
-- ✅ StreamBro running di VPS
-- ✅ Admin account aktif
-- ✅ PM2 auto-start on reboot
-- ✅ Firewall configured
-- ✅ Ready untuk streaming!
+Jika mengalami masalah:
+1. Cek logs: `pm2 logs streambro`
+2. Cek status: `pm2 status`
+3. Restart: `pm2 restart streambro`
+4. Buka issue di GitHub repository
 
-**Next Steps:**
-1. Upload video pertama
-2. Buat stream pertama
-3. Test streaming ke YouTube/Facebook
-4. Monitor RAM/CPU usage
-5. Enjoy! 🚀
+---
+
+## ✅ Checklist Instalasi
+
+- [ ] VPS sudah siap dengan Ubuntu 20.04/22.04
+- [ ] Node.js 20.x terinstall
+- [ ] Git terinstall
+- [ ] FFmpeg terinstall
+- [ ] PM2 terinstall
+- [ ] Repository di-clone
+- [ ] File .env dikonfigurasi
+- [ ] Dependencies terinstall (`npm install`)
+- [ ] Admin user dibuat
+- [ ] Aplikasi berjalan dengan PM2
+- [ ] PM2 startup dikonfigurasi
+- [ ] Nginx & SSL setup (opsional)
+- [ ] Aplikasi bisa diakses via browser
+
+Selamat! StreamBro sudah siap digunakan! 🎉
