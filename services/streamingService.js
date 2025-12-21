@@ -422,7 +422,7 @@ async function startStream(streamId, options = {}) {
                     broadcastId: stream.youtube_broadcast_id,
                     status: 'testing'
                   });
-                  console.log(`[StreamingService] Γ£ô Broadcast transitioned to testing, now transitioning to live...`);
+                  console.log(`[StreamingService] ✓ Broadcast transitioned to testing, now transitioning to live...`);
                   
                   // Wait a moment before transitioning to live
                   await new Promise(resolve => setTimeout(resolve, 2000));
@@ -431,7 +431,7 @@ async function startStream(streamId, options = {}) {
                     broadcastId: stream.youtube_broadcast_id,
                     status: 'live'
                   });
-                  console.log(`[StreamingService] Γ£ô YouTube broadcast transitioned to live`);
+                  console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live`);
                   transitioned = true;
                 } catch (testingErr) {
                   // If testing transition fails, try direct to live
@@ -441,7 +441,7 @@ async function startStream(streamId, options = {}) {
                       broadcastId: stream.youtube_broadcast_id,
                       status: 'live'
                     });
-                    console.log(`[StreamingService] Γ£ô YouTube broadcast transitioned to live (direct)`);
+                    console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live (direct)`);
                     transitioned = true;
                   } else {
                     throw testingErr;
@@ -449,7 +449,58 @@ async function startStream(streamId, options = {}) {
                 }
               } catch (err) {
                 const errorMsg = err.message || '';
-                if (errorMsg.includes('inactive')) {
+                
+                // Handle deleted_client error - recreate broadcast
+                if (errorMsg.includes('deleted_client')) {
+                  console.warn(`[StreamingService] ⚠️ Broadcast ${stream.youtube_broadcast_id} was created with old OAuth client, recreating...`);
+                  try {
+                    // Create new broadcast with current token
+                    const newBroadcast = await youtubeService.scheduleLive(tokens, {
+                      title: stream.title || 'Live Stream',
+                      description: stream.description || '',
+                      privacyStatus: stream.youtube_privacy || 'unlisted',
+                      scheduledStartTime: new Date().toISOString(),
+                      streamId: stream.youtube_stream_id, // Reuse existing stream
+                      enableAutoStart: true,
+                      enableAutoStop: false
+                    });
+                    
+                    const newBroadcastId = newBroadcast.broadcast.id;
+                    console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
+                    
+                    // Update stream with new broadcast ID
+                    await new Promise((resolve, reject) => {
+                      db.run(
+                        `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
+                        [newBroadcastId, streamId],
+                        (err) => {
+                          if (err) reject(err);
+                          else resolve();
+                        }
+                      );
+                    });
+                    
+                    console.log(`[StreamingService] ✓ Stream updated with new broadcast ID`);
+                    
+                    // Update stream object
+                    stream.youtube_broadcast_id = newBroadcastId;
+                    
+                    // Try transition again with new broadcast
+                    await youtubeService.transition(tokens, {
+                      broadcastId: newBroadcastId,
+                      status: 'live'
+                    });
+                    console.log(`[StreamingService] ✓ New broadcast transitioned to live`);
+                    transitioned = true;
+                  } catch (recreateErr) {
+                    console.error(`[StreamingService] ❌ Failed to recreate broadcast:`, recreateErr.message);
+                    // Continue with retries
+                    retries--;
+                    if (retries > 0) {
+                      await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                  }
+                } else if (errorMsg.includes('inactive')) {
                   console.log(`[StreamingService] Stream still inactive, waiting 3 seconds... (${retries} retries left)`);
                   retries--;
                   if (retries > 0) {
