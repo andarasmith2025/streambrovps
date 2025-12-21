@@ -102,11 +102,9 @@ db.all(`
       db.all(`
         SELECT 
           id,
-          status,
           start_time,
           end_time,
-          duration_seconds,
-          error_message,
+          duration,
           created_at
         FROM stream_history
         WHERE stream_id = ?
@@ -123,13 +121,9 @@ db.all(`
         } else {
           history.forEach((h, i) => {
             console.log(`\n  History #${i + 1}:`);
-            console.log(`    Status: ${h.status}`);
             console.log(`    Start: ${h.start_time ? new Date(h.start_time).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'N/A'}`);
             console.log(`    End: ${h.end_time ? new Date(h.end_time).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'N/A'}`);
-            console.log(`    Duration: ${h.duration_seconds ? Math.floor(h.duration_seconds / 60) + ' minutes' : 'N/A'}`);
-            if (h.error_message) {
-              console.log(`    Error: ${h.error_message}`);
-            }
+            console.log(`    Duration: ${h.duration ? h.duration + ' minutes' : 'N/A'}`);
             console.log(`    Created: ${new Date(h.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`);
           });
         }
