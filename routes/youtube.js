@@ -274,7 +274,8 @@ router.get('/api/broadcasts', async (req, res) => {
       console.log('[YouTube API] No tokens found - user not connected');
       return res.status(401).json({ 
         error: 'YouTube not connected',
-        message: 'Please connect your YouTube account first by clicking "Connect YouTube" button on the dashboard'
+        message: 'Please connect your YouTube account first',
+        needsReconnect: true
       });
     }
     
@@ -282,7 +283,8 @@ router.get('/api/broadcasts', async (req, res) => {
       console.log('[YouTube API] No access token - user needs to reconnect');
       return res.status(401).json({ 
         error: 'YouTube access token missing',
-        message: 'Please reconnect your YouTube account'
+        message: 'Please reconnect your YouTube account',
+        needsReconnect: true
       });
     }
     

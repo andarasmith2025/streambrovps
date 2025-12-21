@@ -228,7 +228,35 @@
         } catch {}
       }
     } catch (e){
-      container.innerHTML = `<div class="text-red-400">Failed to load broadcasts${e?.message?': '+e.message:''}</div>`;
+      const errorMsg = e?.message || 'Unknown error';
+      
+      // Check if error indicates need to reconnect
+      if (errorMsg.includes('reconnect') || errorMsg.includes('not connected') || errorMsg.includes('invalid')) {
+        container.innerHTML = `
+          <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <i class="ti ti-alert-triangle text-yellow-400 text-2xl"></i>
+              <div class="flex-1">
+                <div class="font-medium text-yellow-300 mb-2">YouTube Connection Required</div>
+                <div class="text-sm text-gray-300 mb-3">${errorMsg}</div>
+                <div class="flex gap-2">
+                  <a href="/oauth2/disconnect" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">
+                    <i class="ti ti-plug-off mr-1"></i>Disconnect
+                  </a>
+                  <a href="/oauth2/login" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded text-sm transition-colors">
+                    <i class="ti ti-brand-youtube mr-1"></i>Reconnect YouTube
+                  </a>
+                  <a href="/dashboard" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors">
+                    <i class="ti ti-arrow-left mr-1"></i>Back to Dashboard
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `<div class="text-red-400">Failed to load broadcasts: ${errorMsg}</div>`;
+      }
     }
   }
   function openEditFromData(btn){
