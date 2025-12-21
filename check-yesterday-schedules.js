@@ -30,7 +30,7 @@ db.all(`
     s.end_time,
     COUNT(sc.id) as schedule_count
   FROM streams s
-  LEFT JOIN schedules sc ON s.id = sc.stream_id
+  LEFT JOIN stream_schedules sc ON s.id = sc.stream_id
   WHERE s.created_at >= ?
   GROUP BY s.id
   ORDER BY s.created_at DESC
@@ -70,8 +70,9 @@ db.all(`
         duration,
         is_recurring,
         recurring_days,
-        executed_count
-      FROM schedules
+        status,
+        executed_at
+      FROM stream_schedules
       WHERE stream_id = ?
       ORDER BY schedule_time ASC
     `, [stream.id], (err, schedules) => {
@@ -86,6 +87,7 @@ db.all(`
         console.log(`\n  Schedule #${i + 1}:`);
         console.log(`    Time: ${schTime.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`);
         console.log(`    Duration: ${sch.duration} minutes`);
+        console.log(`    Status: ${sch.status}`);
         console.log(`    Recurring: ${sch.is_recurring ? 'Yes' : 'No'}`);
         if (sch.is_recurring) {
           const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -93,7 +95,7 @@ db.all(`
           const dayNames = dayIndices.map(d => days[d]).join(', ');
           console.log(`    Days: ${dayNames}`);
         }
-        console.log(`    Executed Count: ${sch.executed_count || 0}`);
+        console.log(`    Executed At: ${sch.executed_at ? new Date(sch.executed_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'Not executed'}`);
       });
 
       // Get history for this stream
