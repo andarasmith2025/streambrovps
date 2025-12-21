@@ -394,6 +394,53 @@ async function startStream(streamId, options = {}) {
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     
+    // ⭐ ALWAYS create NEW YouTube broadcast when starting stream (prevents deleted_client error)
+    if (stream.use_youtube_api) {
+      try {
+        const { getTokensForUser } = require('../routes/youtube');
+        const youtubeService = require('./youtubeService');
+        
+        const tokens = await getTokensForUser(stream.user_id);
+        if (tokens && tokens.access_token) {
+          console.log(`[StreamingService] Creating NEW YouTube broadcast for stream ${streamId}...`);
+          
+          // Create new broadcast with current token
+          const newBroadcast = await youtubeService.scheduleLive(tokens, {
+            title: stream.title || 'Live Stream',
+            description: stream.description || '',
+            privacyStatus: stream.youtube_privacy || 'unlisted',
+            scheduledStartTime: new Date().toISOString(),
+            streamId: stream.youtube_stream_id, // Reuse existing stream key
+            enableAutoStart: true,
+            enableAutoStop: false
+          });
+          
+          const newBroadcastId = newBroadcast.broadcast.id;
+          console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
+          
+          // Update stream with new broadcast ID
+          await new Promise((resolve, reject) => {
+            db.run(
+              `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
+              [newBroadcastId, streamId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          
+          console.log(`[StreamingService] ✓ Stream updated with new broadcast ID`);
+          
+          // Update stream object
+          stream.youtube_broadcast_id = newBroadcastId;
+        }
+      } catch (createErr) {
+        console.error(`[StreamingService] ⚠️ Failed to create new broadcast:`, createErr.message);
+        // Continue anyway - stream will still work, just won't appear in YouTube Studio
+      }
+    }
+    
     // Transition YouTube broadcast to live if using YouTube API
     if (stream.use_youtube_api && stream.youtube_broadcast_id) {
       // Wait for stream to become active before transitioning
@@ -450,57 +497,7 @@ async function startStream(streamId, options = {}) {
               } catch (err) {
                 const errorMsg = err.message || '';
                 
-                // Handle deleted_client error - recreate broadcast
-                if (errorMsg.includes('deleted_client')) {
-                  console.warn(`[StreamingService] ⚠️ Broadcast ${stream.youtube_broadcast_id} was created with old OAuth client, recreating...`);
-                  try {
-                    // Create new broadcast with current token
-                    const newBroadcast = await youtubeService.scheduleLive(tokens, {
-                      title: stream.title || 'Live Stream',
-                      description: stream.description || '',
-                      privacyStatus: stream.youtube_privacy || 'unlisted',
-                      scheduledStartTime: new Date().toISOString(),
-                      streamId: stream.youtube_stream_id, // Reuse existing stream
-                      enableAutoStart: true,
-                      enableAutoStop: false
-                    });
-                    
-                    const newBroadcastId = newBroadcast.broadcast.id;
-                    console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
-                    
-                    // Update stream with new broadcast ID
-                    await new Promise((resolve, reject) => {
-                      db.run(
-                        `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
-                        [newBroadcastId, streamId],
-                        (err) => {
-                          if (err) reject(err);
-                          else resolve();
-                        }
-                      );
-                    });
-                    
-                    console.log(`[StreamingService] ✓ Stream updated with new broadcast ID`);
-                    
-                    // Update stream object
-                    stream.youtube_broadcast_id = newBroadcastId;
-                    
-                    // Try transition again with new broadcast
-                    await youtubeService.transition(tokens, {
-                      broadcastId: newBroadcastId,
-                      status: 'live'
-                    });
-                    console.log(`[StreamingService] ✓ New broadcast transitioned to live`);
-                    transitioned = true;
-                  } catch (recreateErr) {
-                    console.error(`[StreamingService] ❌ Failed to recreate broadcast:`, recreateErr.message);
-                    // Continue with retries
-                    retries--;
-                    if (retries > 0) {
-                      await new Promise(resolve => setTimeout(resolve, 3000));
-                    }
-                  }
-                } else if (errorMsg.includes('inactive')) {
+                if (errorMsg.includes('inactive')) {
                   console.log(`[StreamingService] Stream still inactive, waiting 3 seconds... (${retries} retries left)`);
                   retries--;
                   if (retries > 0) {
@@ -514,6 +511,7 @@ async function startStream(streamId, options = {}) {
                   }
                 } else {
                   // Other error, don't retry
+                  console.error(`[StreamingService] Transition error: ${errorMsg}`);
                   throw err;
                 }
               }
