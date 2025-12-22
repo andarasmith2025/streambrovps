@@ -219,7 +219,7 @@ app.use(session({
   rolling: true,
   cookie: {
     httpOnly: true,
-    secure: true, // HTTPS required
+    secure: process.env.NODE_ENV === 'production' && process.env.USE_HTTPS === 'true', // Only require HTTPS in production with HTTPS enabled
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: 'lax' // Changed from 'none' to 'lax' for better compatibility
   }
