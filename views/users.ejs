@@ -91,6 +91,14 @@
         <option value="inactive">Inactive</option>
       </select>
     </div>
+    <div class="w-36">
+      <select id="streamingFilter" 
+        class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+        <option value="">All Users</option>
+        <option value="streaming">Streaming</option>
+        <option value="not-streaming">Not Streaming</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -115,7 +123,8 @@
             <tr class="hover:bg-dark-700/50 transition-colors user-row" 
                 data-username="<%= user.username.toLowerCase() %>" 
                 data-role="<%= user.user_role %>" 
-                data-status="<%= user.status %>">
+                data-status="<%= user.status %>"
+                data-streaming="<%= (user.activeStreamCount || 0) > 0 ? 'yes' : 'no' %>">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div class="flex-shrink-0 h-10 w-10">
@@ -826,29 +835,35 @@ document.getElementById('confirmButton').addEventListener('click', confirmAction
 document.getElementById('searchInput').addEventListener('input', filterUsers);
 document.getElementById('roleFilter').addEventListener('change', filterUsers);
 document.getElementById('statusFilter').addEventListener('change', filterUsers);
+document.getElementById('streamingFilter').addEventListener('change', filterUsers);
 
 function filterUsers() {
   const searchTerm = document.getElementById('searchInput').value.toLowerCase();
   const roleFilter = document.getElementById('roleFilter').value;
   const statusFilter = document.getElementById('statusFilter').value;
+  const streamingFilter = document.getElementById('streamingFilter').value;
   
   const rows = document.querySelectorAll('.user-row');
   const defaultEmptyState = document.getElementById('defaultEmptyState');
   const searchEmptyState = document.getElementById('searchEmptyState');
   
   let visibleCount = 0;
-  const hasFilters = searchTerm || roleFilter || statusFilter;
+  const hasFilters = searchTerm || roleFilter || statusFilter || streamingFilter;
   
   rows.forEach(row => {
     const username = row.dataset.username;
     const role = row.dataset.role;
     const status = row.dataset.status;
+    const streaming = row.dataset.streaming;
     
     const matchesSearch = username.includes(searchTerm);
     const matchesRole = !roleFilter || role === roleFilter;
     const matchesStatus = !statusFilter || status === statusFilter;
+    const matchesStreaming = !streamingFilter || 
+      (streamingFilter === 'streaming' && streaming === 'yes') ||
+      (streamingFilter === 'not-streaming' && streaming === 'no');
     
-    if (matchesSearch && matchesRole && matchesStatus) {
+    if (matchesSearch && matchesRole && matchesStatus && matchesStreaming) {
       row.style.display = '';
       visibleCount++;
     } else {
