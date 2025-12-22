@@ -111,11 +111,15 @@ const getAuthenticatedClient = async (userId) => {
     return null;
   }
 
+  console.log(`[TokenManager] Getting authenticated client for userId: ${userId}`);
+
   try {
     // 1. Get user's YouTube credentials
     const user = await getUserCredentials(userId);
+    console.log(`[TokenManager] User credentials query result:`, user ? 'Found' : 'Not found');
+    
     if (!user?.youtube_client_id) {
-      console.error('[TokenManager] User has no YouTube credentials configured');
+      console.error(`[TokenManager] User has no YouTube credentials configured. User data:`, JSON.stringify(user));
       return null;
     }
 
