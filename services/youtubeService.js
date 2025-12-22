@@ -79,7 +79,7 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
 
   return {
     broadcast: broadcastRes.data,
-    stream: streamRes ? streamRes.data : null,
+    stream: streamRes ? streamRes.data : null, // null if reused existing stream
   };
 }
 

@@ -436,27 +436,46 @@ async function startStream(streamId, options = {}) {
           const newBroadcast = await youtubeService.scheduleLive(tokens, broadcastOptions);
           
           const newBroadcastId = newBroadcast.broadcast.id;
-          const newStreamId = newBroadcast.stream.id;
+          const newStreamId = newBroadcast.stream?.id || stream.youtube_stream_id; // Use existing if available
           console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
-          console.log(`[StreamingService] ✓ Stream ID: ${newStreamId}`);
+          console.log(`[StreamingService] ✓ Stream ID: ${newStreamId} ${newBroadcast.stream?.id ? '(new)' : '(reused)'}`);
           
-          // Update stream with new broadcast ID AND stream ID
-          await new Promise((resolve, reject) => {
-            db.run(
-              `UPDATE streams SET youtube_broadcast_id = ?, youtube_stream_id = ? WHERE id = ?`,
-              [newBroadcastId, newStreamId, streamId],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-          
-          console.log(`[StreamingService] ✓ Stream updated with broadcast ID and stream ID`);
+          // Update stream with new broadcast ID
+          // Only update youtube_stream_id if it was newly created (not reused)
+          if (newBroadcast.stream?.id) {
+            // New stream was created, update both broadcast_id and stream_id
+            await new Promise((resolve, reject) => {
+              db.run(
+                `UPDATE streams SET youtube_broadcast_id = ?, youtube_stream_id = ? WHERE id = ?`,
+                [newBroadcastId, newStreamId, streamId],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+            console.log(`[StreamingService] ✓ Stream updated with NEW broadcast ID and NEW stream ID`);
+          } else {
+            // Existing stream was reused, only update broadcast_id
+            await new Promise((resolve, reject) => {
+              db.run(
+                `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
+                [newBroadcastId, streamId],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+            console.log(`[StreamingService] ✓ Stream updated with NEW broadcast ID, REUSED stream ID: ${stream.youtube_stream_id}`);
+          }
           
           // Update stream object
           stream.youtube_broadcast_id = newBroadcastId;
-          stream.youtube_stream_id = newStreamId;
+          if (newBroadcast.stream?.id) {
+            stream.youtube_stream_id = newStreamId;
+          }
+          // If reused, keep existing stream.youtube_stream_id
         }
       } catch (createErr) {
         console.error(`[StreamingService] ⚠️ Failed to create new broadcast:`, createErr.message);
