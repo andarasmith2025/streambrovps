@@ -6,6 +6,7 @@
       <div class="hidden sm:flex items-center gap-2">
         <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
         <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
+        <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>Bulk Thumbnail</button>
         <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
       </div>
       <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
@@ -594,8 +595,10 @@
       const boxes = Array.from(document.querySelectorAll('.yt-select-item'));
       const any = boxes.some(b=>b.checked);
       const bulkEditBtn = document.getElementById('yt-bulk-edit');
+      const bulkThumbBtn = document.getElementById('yt-bulk-thumbnail');
       if (bulkBtn) bulkBtn.disabled = !any;
       if (bulkEditBtn) bulkEditBtn.disabled = !any;
+      if (bulkThumbBtn) bulkThumbBtn.disabled = !any;
       if (selAll) selAll.checked = boxes.length>0 && boxes.every(b=>b.checked);
     }
     if (selAll) selAll.addEventListener('change', ()=>{
@@ -633,6 +636,14 @@
       const ids = Array.from(document.querySelectorAll('.yt-select-item:checked')).map(b=>b.value);
       if (!ids.length) return;
       openBulkEditModal(ids);
+    });
+    
+    // Bulk Thumbnail button
+    const bulkThumbBtn = document.getElementById('yt-bulk-thumbnail');
+    if (bulkThumbBtn) bulkThumbBtn.addEventListener('click', ()=>{
+      const ids = Array.from(document.querySelectorAll('.yt-select-item:checked')).map(b=>b.value);
+      if (!ids.length) return;
+      openBulkThumbnailUpload(ids);
     });
   
     const editForm = document.getElementById('ytEditForm');
@@ -788,5 +799,77 @@
       
       loadList();
     });
+  }
+  
+  // Bulk Thumbnail Upload
+  function openBulkThumbnailUpload(ids){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      if (!input.files || !input.files[0]) return;
+      
+      const file = input.files[0];
+      const count = ids.length;
+      
+      if (!confirm(`Upload this thumbnail to ${count} selected broadcasts?`)) return;
+      
+      // Show progress toast
+      const progressToast = document.createElement('div');
+      progressToast.className = 'fixed bottom-4 right-4 bg-dark-800 border border-blue-600 rounded-lg p-4 shadow-lg z-[100]';
+      progressToast.innerHTML = `
+        <div class="flex items-center gap-3">
+          <i class="ti ti-loader animate-spin text-blue-400 text-xl"></i>
+          <div>
+            <div class="font-medium text-white">Uploading thumbnails...</div>
+            <div class="text-sm text-gray-400" id="bulk-thumb-progress">0 / ${count}</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(progressToast);
+      
+      let success = 0, failed = 0;
+      const progressEl = document.getElementById('bulk-thumb-progress');
+      
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        if (progressEl) progressEl.textContent = `${i + 1} / ${count} processing...`;
+        
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          
+          const res = await fetch(`/youtube/broadcasts/${id}/thumbnail`, { 
+            method: 'POST', 
+            body: fd 
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          
+          success++;
+          
+          // Update cache bust for this broadcast
+          ytThumbBust[id] = Date.now();
+        } catch (err) {
+          console.error(`Failed to upload thumbnail for ${id}:`, err.message);
+          failed++;
+        }
+      }
+      
+      // Remove progress toast
+      document.body.removeChild(progressToast);
+      
+      // Show result
+      toast(`Bulk thumbnail upload complete — Success: ${success}, Failed: ${failed}`, failed > 0 ? 'error' : 'success');
+      
+      // Uncheck all and refresh
+      const selAll = document.getElementById('yt-select-all');
+      if (selAll) selAll.checked = false;
+      document.querySelectorAll('.yt-select-item').forEach(b => b.checked = false);
+      
+      loadList();
+    };
+    input.click();
   }
 </script>
