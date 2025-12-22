@@ -139,20 +139,33 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
     if (title || description || privacyStatus || 
         typeof enableAutoStart === 'boolean' || typeof enableAutoStop === 'boolean') {
       
-      // Get current broadcast to preserve scheduledStartTime
-      const currentBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId: req.params.id });
-      
-      await youtubeService.updateBroadcast(tokens, {
-        broadcastId: req.params.id,
-        title,
-        description,
-        privacyStatus,
-        scheduledStartTime: currentBroadcast?.snippet?.scheduledStartTime, // Preserve existing time
-        enableAutoStart,
-        enableAutoStop,
-      });
-      
-      console.log(`[YouTube] ✓ Broadcast metadata updated for ${req.params.id}`);
+      try {
+        // Get current broadcast to preserve scheduledStartTime
+        const currentBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId: req.params.id });
+        
+        await youtubeService.updateBroadcast(tokens, {
+          broadcastId: req.params.id,
+          title,
+          description,
+          privacyStatus,
+          scheduledStartTime: currentBroadcast?.snippet?.scheduledStartTime, // Preserve existing time
+          enableAutoStart,
+          enableAutoStop,
+        });
+        
+        console.log(`[YouTube] ✓ Broadcast metadata updated for ${req.params.id}`);
+      } catch (updateErr) {
+        // Log detailed error for debugging
+        const errorDetail = updateErr?.response?.data?.error;
+        console.error(`[YouTube] Update error details:`, {
+          broadcastId: req.params.id,
+          errorCode: errorDetail?.code,
+          errorMessage: errorDetail?.message,
+          errorReason: errorDetail?.errors?.[0]?.reason,
+          fullError: JSON.stringify(updateErr?.response?.data, null, 2)
+        });
+        throw updateErr;
+      }
     }
     
     // Update audience settings (made for kids, age restricted)

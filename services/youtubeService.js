@@ -145,6 +145,9 @@ module.exports = {
       throw new Error('Broadcast not found');
     }
     
+    // Log current broadcast contentDetails for debugging
+    console.log(`[YouTubeService] Current broadcast ${broadcastId} contentDetails:`, JSON.stringify(currentBroadcast.contentDetails, null, 2));
+    
     // Build request body - NEVER include cdn or other read-only fields
     const requestBody = {
       id: broadcastId,
@@ -159,10 +162,13 @@ module.exports = {
       },
       contentDetails: {
         // Only include if explicitly provided, otherwise preserve current values
-        enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : currentBroadcast.contentDetails?.enableAutoStart,
-        enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : currentBroadcast.contentDetails?.enableAutoStop,
+        enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : (currentBroadcast.contentDetails?.enableAutoStart ?? false),
+        enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : (currentBroadcast.contentDetails?.enableAutoStop ?? false),
         // REQUIRED: enableMonitorStream must always be included when updating contentDetails
-        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream ?? true,
+        // Use current value if exists, otherwise default to true
+        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream !== undefined 
+          ? currentBroadcast.contentDetails.enableMonitorStream 
+          : true,
       },
     };
     
