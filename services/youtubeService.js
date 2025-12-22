@@ -197,7 +197,7 @@ module.exports = {
   async getBroadcast(tokensOrUserId, { broadcastId }) {
     const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     const response = await yt.liveBroadcasts.list({
-      part: 'snippet,status,contentDetails,cdn',
+      part: 'snippet,status,contentDetails',
       id: broadcastId
     });
     return response.data.items?.[0] || null;
