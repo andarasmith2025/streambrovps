@@ -141,26 +141,33 @@ module.exports = {
     // Get current broadcast to preserve CDN settings (required by API)
     const currentBroadcast = await this.getBroadcast(tokensOrUserId, { broadcastId });
     
-    return yt.liveBroadcasts.update({
-      part: 'snippet,status,contentDetails,cdn',
-      requestBody: {
-        id: broadcastId,
-        snippet: {
-          title,
-          description,
-          scheduledStartTime,
-        },
-        status: {
-          privacyStatus,
-        },
-        contentDetails: {
-          // Only include if defined to avoid overriding unintentionally
-          ...(typeof enableAutoStart === 'boolean' ? { enableAutoStart } : {}),
-          ...(typeof enableAutoStop === 'boolean' ? { enableAutoStop } : {}),
-          enableMonitorStream: currentBroadcast?.contentDetails?.enableMonitorStream ?? true,
-        },
-        cdn: currentBroadcast?.cdn || {}, // Preserve existing CDN settings
+    // Build request body
+    const requestBody = {
+      id: broadcastId,
+      snippet: {
+        title,
+        description,
+        scheduledStartTime,
       },
+      status: {
+        privacyStatus,
+      },
+      contentDetails: {
+        // Only include if defined to avoid overriding unintentionally
+        ...(typeof enableAutoStart === 'boolean' ? { enableAutoStart } : {}),
+        ...(typeof enableAutoStop === 'boolean' ? { enableAutoStop } : {}),
+        enableMonitorStream: currentBroadcast?.contentDetails?.enableMonitorStream ?? true,
+      },
+    };
+    
+    // Only include CDN if it exists and has properties
+    if (currentBroadcast?.cdn && Object.keys(currentBroadcast.cdn).length > 0) {
+      requestBody.cdn = currentBroadcast.cdn;
+    }
+    
+    return yt.liveBroadcasts.update({
+      part: 'snippet,status,contentDetails' + (requestBody.cdn ? ',cdn' : ''),
+      requestBody,
     });
   },
   async transition(tokensOrUserId, { broadcastId, status }) {

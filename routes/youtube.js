@@ -159,7 +159,7 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
     
     return res.json({ success: true, message: 'Broadcast updated' });
   } catch (err) {
-    console.error('[YouTube] bulk update broadcast error:', err?.response?.data || err.message);
+    console.error('[YouTube] bulk update broadcast error:', JSON.stringify(err?.response?.data || err.message, null, 2));
     return res.status(500).json({ error: 'Failed to update broadcast', details: err?.response?.data?.error?.message || err.message });
   }
 });
