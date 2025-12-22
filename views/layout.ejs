@@ -324,13 +324,44 @@
         <i class="ti ti-video"></i>
         <span>Gallery</span>
       </a>
-      
+      <% if (typeof youtubeConnected !== 'undefined' && youtubeConnected) { %>
+      <a href="/youtube/manage" class="bottom-nav-item <%= active === 'youtube-manage' ? 'bottom-nav-active' : '' %>">
+        <i class="ti ti-brand-youtube"></i>
+        <span>YouTube</span>
+      </a>
+      <% } %>
       <a href="/history" class="bottom-nav-item <%= active === 'history' ? 'bottom-nav-active' : '' %>">
         <i class="ti ti-history"></i>
         <span>History</span>
       </a>
-      
+      <button id="mobile-more-btn" class="bottom-nav-item">
+        <i class="ti ti-dots"></i>
+        <span>More</span>
+      </button>
     </nav>
+    
+    <!-- Mobile More Menu -->
+    <div id="mobile-more-menu" class="hidden absolute bottom-16 right-0 left-0 bg-dark-800 border-t border-gray-700 shadow-lg">
+      <div class="p-4 space-y-2">
+        <% if (req.session && req.session.user_role === 'admin') { %>
+        <a href="/users" class="flex items-center gap-3 p-3 rounded-lg hover:bg-dark-700 transition-colors">
+          <i class="ti ti-users-group text-xl"></i>
+          <span class="text-sm">Users</span>
+        </a>
+        <% } %>
+        <% if (typeof youtubeConnected !== 'undefined' && youtubeConnected) { %>
+        <a href="/oauth2/disconnect" class="flex items-center gap-3 p-3 rounded-lg hover:bg-dark-700 transition-colors text-red-400">
+          <i class="ti ti-plug-off text-xl"></i>
+          <span class="text-sm">Disconnect YouTube</span>
+        </a>
+        <% } %>
+        <a href="/settings" class="flex items-center gap-3 p-3 rounded-lg hover:bg-dark-700 transition-colors">
+          <i class="ti ti-settings text-xl"></i>
+          <span class="text-sm">Settings</span>
+        </a>
+      </div>
+    </div>
+  </div>
     <div id="mobile-profile-popup"
       class="fixed top-16 right-4 bg-dark-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden hidden transform transition-all duration-200 ease-out opacity-0 translate-y-2 w-48 z-50">
       <div class="py-2 px-3">
@@ -628,6 +659,25 @@
           setTimeout(() => {
             profilePopup.classList.add('hidden');
           }, 200);
+        }
+      });
+    }
+    
+    // Mobile More Menu
+    const moreBtn = document.getElementById('mobile-more-btn');
+    const moreMenu = document.getElementById('mobile-more-menu');
+    if (moreBtn && moreMenu) {
+      moreBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        moreMenu.classList.toggle('hidden');
+      });
+      
+      document.addEventListener('click', function(e) {
+        if (!moreMenu.classList.contains('hidden') &&
+            !moreBtn.contains(e.target) &&
+            !moreMenu.contains(e.target)) {
+          moreMenu.classList.add('hidden');
         }
       });
     }

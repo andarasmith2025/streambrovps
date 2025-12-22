@@ -1,35 +1,81 @@
 <% layout('layout') -%>
 <div class="space-y-4">
   <!-- Sticky Header -->
-  <div class="sticky top-0 z-50 bg-dark-900/95 backdrop-blur-sm border-b border-gray-700 -mx-4 px-4 py-3 mb-4">
-    <div class="flex items-center justify-between">
+  <div class="sticky top-0 lg:top-0 z-50 bg-dark-900/95 backdrop-blur-sm border-b border-gray-700 -mx-2 sm:-mx-4 md:-mx-6 px-2 sm:px-4 md:px-6 py-3 mb-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
       <h2 class="text-xl font-semibold">YouTube Broadcasts</h2>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <!-- Mobile: Show only essential buttons -->
         <div class="hidden sm:flex items-center gap-2">
-          <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
-          <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
-          <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>Bulk Thumbnail</button>
-          <button id="yt-bulk-streamkey" class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>Set Stream Key</button>
-          <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
+          <label class="inline-flex items-center gap-2 text-sm text-gray-300">
+            <input id="yt-select-all" type="checkbox"> 
+            <span class="hidden md:inline">Select all</span>
+          </label>
+          <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>
+            <span class="hidden md:inline">Bulk Edit</span>
+            <span class="md:hidden">Edit</span>
+          </button>
+          <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>
+            <span class="hidden md:inline">Bulk Thumbnail</span>
+            <span class="md:hidden">Thumb</span>
+          </button>
+          <button id="yt-bulk-streamkey" class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>
+            <span class="hidden md:inline">Set Stream Key</span>
+            <span class="md:hidden">Key</span>
+          </button>
+          <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>
+            <span class="hidden md:inline">Delete selected</span>
+            <span class="md:hidden">Delete</span>
+          </button>
         </div>
-        <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
-          <i class="ti ti-refresh text-gray-300"></i>
-        </button>
-        <label for="yt-status" class="text-sm text-gray-400">Status</label>
-        <select id="yt-status" class="bg-dark-700 border border-gray-600 text-sm rounded px-2 py-1">
-          <option value="all">All</option>
-          <option value="upcoming" selected>Upcoming</option>
-          <option value="active">Active (Live)</option>
-          <option value="completed">Completed</option>
-        </select>
+        
+        <!-- Mobile Bulk Actions Menu -->
+        <div class="sm:hidden flex items-center gap-2 w-full">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-300">
+            <input id="yt-select-all-mobile" type="checkbox"> 
+            <span class="text-xs">Select</span>
+          </label>
+          <button id="mobile-bulk-menu-btn" class="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded disabled:opacity-50 flex items-center gap-1" disabled>
+            <i class="ti ti-dots"></i>
+            <span class="text-xs">Actions</span>
+          </button>
+        </div>
+        
+        <div class="flex items-center gap-2 ml-auto">
+          <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
+            <i class="ti ti-refresh text-gray-300"></i>
+          </button>
+          <select id="yt-status" class="bg-dark-700 border border-gray-600 text-sm rounded px-2 py-1.5">
+            <option value="all">All</option>
+            <option value="upcoming" selected>Upcoming</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
       </div>
+    </div>
+    
+    <!-- Mobile Bulk Actions Dropdown -->
+    <div id="mobile-bulk-menu" class="hidden sm:hidden mt-2 p-2 bg-dark-800 border border-gray-700 rounded-lg space-y-1">
+      <button id="yt-bulk-edit-mobile" class="w-full px-3 py-2 text-sm text-left bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>
+        <i class="ti ti-edit mr-2"></i>Bulk Edit
+      </button>
+      <button id="yt-bulk-thumbnail-mobile" class="w-full px-3 py-2 text-sm text-left bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>
+        <i class="ti ti-photo mr-2"></i>Bulk Thumbnail
+      </button>
+      <button id="yt-bulk-streamkey-mobile" class="w-full px-3 py-2 text-sm text-left bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>
+        <i class="ti ti-key mr-2"></i>Set Stream Key
+      </button>
+      <button id="yt-bulk-delete-mobile" class="w-full px-3 py-2 text-sm text-left bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>
+        <i class="ti ti-trash mr-2"></i>Delete Selected
+      </button>
     </div>
   </div>
 
   <div id="yt-broadcasts" class="space-y-3"></div>
 
   <!-- Scroll to Top Button -->
-  <button id="scrollToTopBtn" class="hidden fixed bottom-6 right-6 z-40 p-3 bg-primary hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-300 hover:scale-110" title="Scroll to top">
+  <button id="scrollToTopBtn" class="hidden fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 p-3 bg-primary hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-300 hover:scale-110" title="Scroll to top">
     <i class="ti ti-arrow-up text-xl"></i>
   </button>
 
@@ -1029,6 +1075,75 @@
         behavior: 'smooth'
       });
     });
+  })();
+  
+  // Mobile Bulk Menu Logic
+  (function() {
+    const menuBtn = document.getElementById('mobile-bulk-menu-btn');
+    const menu = document.getElementById('mobile-bulk-menu');
+    
+    if (menuBtn && menu) {
+      menuBtn.addEventListener('click', () => {
+        menu.classList.toggle('hidden');
+      });
+      
+      // Close menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!menuBtn.contains(e.target) && !menu.contains(e.target)) {
+          menu.classList.add('hidden');
+        }
+      });
+    }
+    
+    // Sync mobile and desktop select all checkboxes
+    const selectAll = document.getElementById('yt-select-all');
+    const selectAllMobile = document.getElementById('yt-select-all-mobile');
+    
+    if (selectAll && selectAllMobile) {
+      selectAll.addEventListener('change', () => {
+        selectAllMobile.checked = selectAll.checked;
+      });
+      
+      selectAllMobile.addEventListener('change', () => {
+        selectAll.checked = selectAllMobile.checked;
+        // Trigger the same event as desktop
+        selectAll.dispatchEvent(new Event('change'));
+      });
+    }
+    
+    // Sync mobile bulk action buttons with desktop
+    const bulkEdit = document.getElementById('yt-bulk-edit');
+    const bulkEditMobile = document.getElementById('yt-bulk-edit-mobile');
+    const bulkThumbnail = document.getElementById('yt-bulk-thumbnail');
+    const bulkThumbnailMobile = document.getElementById('yt-bulk-thumbnail-mobile');
+    const bulkStreamkey = document.getElementById('yt-bulk-streamkey');
+    const bulkStreamkeyMobile = document.getElementById('yt-bulk-streamkey-mobile');
+    const bulkDelete = document.getElementById('yt-bulk-delete');
+    const bulkDeleteMobile = document.getElementById('yt-bulk-delete-mobile');
+    
+    if (bulkEditMobile && bulkEdit) {
+      bulkEditMobile.addEventListener('click', () => bulkEdit.click());
+    }
+    if (bulkThumbnailMobile && bulkThumbnail) {
+      bulkThumbnailMobile.addEventListener('click', () => bulkThumbnail.click());
+    }
+    if (bulkStreamkeyMobile && bulkStreamkey) {
+      bulkStreamkeyMobile.addEventListener('click', () => bulkStreamkey.click());
+    }
+    if (bulkDeleteMobile && bulkDelete) {
+      bulkDeleteMobile.addEventListener('click', () => bulkDelete.click());
+    }
+    
+    // Sync disabled state
+    const observer = new MutationObserver(() => {
+      if (bulkEdit && bulkEditMobile) bulkEditMobile.disabled = bulkEdit.disabled;
+      if (bulkThumbnail && bulkThumbnailMobile) bulkThumbnailMobile.disabled = bulkThumbnail.disabled;
+      if (bulkStreamkey && bulkStreamkeyMobile) bulkStreamkeyMobile.disabled = bulkStreamkey.disabled;
+      if (bulkDelete && bulkDeleteMobile) bulkDeleteMobile.disabled = bulkDelete.disabled;
+      if (menuBtn) menuBtn.disabled = bulkEdit?.disabled ?? true;
+    });
+    
+    if (bulkEdit) observer.observe(bulkEdit, { attributes: true, attributeFilter: ['disabled'] });
   })();
 </script>
 
