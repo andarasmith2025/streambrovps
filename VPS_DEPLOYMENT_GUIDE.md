@@ -93,6 +93,49 @@ pm2 -v
 
 ---
 
+### 2.1. Setup Timezone ke WIB (Untuk User Indonesia)
+
+**PENTING:** Jika user Anda di Indonesia, set timezone ke WIB agar jadwal stream sesuai waktu lokal.
+
+```bash
+# Cek timezone saat ini
+timedatectl
+
+# Set timezone ke WIB (Asia/Jakarta)
+timedatectl set-timezone Asia/Jakarta
+
+# Verify timezone sudah berubah
+timedatectl
+# Output: Time zone: Asia/Jakarta (WIB, +0700)
+
+# Cek waktu sekarang
+date
+# Output: Mon Dec 23 10:30:00 WIB 2024
+```
+
+**Timezone Options untuk Indonesia:**
+```bash
+# WIB (Waktu Indonesia Barat) - Jakarta, Sumatra
+timedatectl set-timezone Asia/Jakarta
+
+# WITA (Waktu Indonesia Tengah) - Bali, Kalimantan
+timedatectl set-timezone Asia/Makassar
+
+# WIT (Waktu Indonesia Timur) - Papua, Maluku
+timedatectl set-timezone Asia/Jayapura
+```
+
+**Restart PM2 setelah ganti timezone:**
+```bash
+# Jika aplikasi sudah running
+pm2 restart streambro
+
+# Atau restart semua
+pm2 restart all
+```
+
+---
+
 ### 3. Clone Repository
 
 ```bash
@@ -388,6 +431,38 @@ swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
+### Timezone/Jadwal tidak sesuai:
+
+```bash
+# Cek timezone VPS
+timedatectl
+
+# Jika timezone salah, set ke WIB
+timedatectl set-timezone Asia/Jakarta
+
+# Verify
+date
+# Harus muncul: WIB (bukan UTC)
+
+# Restart aplikasi
+pm2 restart streambro
+
+# Cek jadwal di database
+sqlite3 db/streambro.db "SELECT id, title, schedule_time FROM streams WHERE status='scheduled' LIMIT 5"
+```
+
+**Penjelasan Timezone:**
+- **UTC** = Waktu Universal (0 offset)
+- **WIB** = UTC+7 (Jakarta, Sumatra)
+- **WITA** = UTC+8 (Bali, Kalimantan)
+- **WIT** = UTC+9 (Papua, Maluku)
+
+**Contoh:**
+- Jadwal: 10:00 WIB
+- Di database tersimpan: 03:00 UTC (10:00 - 7 jam)
+- VPS timezone WIB → Scheduler trigger jam 10:00 WIB ✅
+- VPS timezone UTC → Scheduler trigger jam 03:00 UTC (salah!) ❌
+
 ---
 
 ## 🔐 Security Best Practices
@@ -574,6 +649,11 @@ cd streambrovps
 npm install
 cp .env.example .env
 nano .env  # Edit SESSION_SECRET
+
+# Set timezone ke WIB (untuk user Indonesia)
+timedatectl set-timezone Asia/Jakarta
+date  # Verify timezone
+
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
@@ -587,6 +667,11 @@ ssh root@94.237.3.164 "cd /root/streambrovps && git pull && pm2 restart streambr
 **Check Status:**
 ```bash
 ssh root@94.237.3.164 "pm2 logs streambro --lines 50"
+```
+
+**Check Timezone:**
+```bash
+ssh root@94.237.3.164 "timedatectl && date"
 ```
 
 Selesai! 🎉
