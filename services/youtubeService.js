@@ -161,6 +161,8 @@ module.exports = {
         // Only include if explicitly provided, otherwise preserve current values
         enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : currentBroadcast.contentDetails?.enableAutoStart,
         enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : currentBroadcast.contentDetails?.enableAutoStop,
+        // REQUIRED: enableMonitorStream must always be included when updating contentDetails
+        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream ?? true,
       },
     };
     
@@ -168,6 +170,7 @@ module.exports = {
       title: requestBody.snippet.title,
       enableAutoStart: requestBody.contentDetails.enableAutoStart,
       enableAutoStop: requestBody.contentDetails.enableAutoStop,
+      enableMonitorStream: requestBody.contentDetails.enableMonitorStream,
     });
     
     // CRITICAL: Only send snippet, status, and contentDetails - NEVER cdn
