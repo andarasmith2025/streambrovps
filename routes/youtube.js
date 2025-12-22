@@ -120,7 +120,6 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       title, 
       description, 
       privacyStatus, 
-      scheduledStartTime, 
       enableAutoStart, 
       enableAutoStop,
       selfDeclaredMadeForKids,
@@ -128,15 +127,19 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       syntheticContent
     } = req.body || {};
     
-    // Update broadcast metadata
-    if (title || description || privacyStatus || scheduledStartTime || 
+    // Update broadcast metadata (WITHOUT scheduledStartTime - it's unique per broadcast)
+    if (title || description || privacyStatus || 
         typeof enableAutoStart === 'boolean' || typeof enableAutoStop === 'boolean') {
+      
+      // Get current broadcast to preserve scheduledStartTime
+      const currentBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId: req.params.id });
+      
       await youtubeService.updateBroadcast(tokens, {
         broadcastId: req.params.id,
         title,
         description,
         privacyStatus,
-        scheduledStartTime,
+        scheduledStartTime: currentBroadcast?.snippet?.scheduledStartTime, // Preserve existing time
         enableAutoStart,
         enableAutoStop,
       });
@@ -461,7 +464,8 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     console.log(`[YouTube] - Title: ${src.snippet?.title}`);
     console.log(`[YouTube] - Description: ${src.snippet?.description?.substring(0, 50)}...`);
     console.log(`[YouTube] - Privacy: ${src.status?.privacyStatus}`);
-    console.log(`[YouTube] - Stream ID: ${boundStreamId || 'NONE'}`);
+    console.log(`[YouTube] - Bound Stream ID: ${boundStreamId || 'NONE (will create new)'}`);
+    console.log(`[YouTube] - contentDetails:`, JSON.stringify(src.contentDetails, null, 2));
     console.log(`[YouTube] - Auto Start: ${src.contentDetails?.enableAutoStart}`);
     console.log(`[YouTube] - Auto Stop: ${src.contentDetails?.enableAutoStop}`);
 
