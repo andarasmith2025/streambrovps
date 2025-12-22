@@ -412,14 +412,19 @@ async function startStream(streamId, options = {}) {
             privacyStatus: stream.youtube_privacy || 'unlisted',
             scheduledStartTime: new Date().toISOString(),
             streamId: stream.youtube_stream_id, // Reuse existing stream key
-            // Use stream settings if available, otherwise defaults
-            enableAutoStart: stream.youtube_auto_start ? true : false,
-            enableAutoStop: stream.youtube_auto_end ? true : false,
+            // ⭐ IMPORTANT: Auto Start/Stop settings
+            // enableAutoStart: true = YouTube auto-transitions to live when stream data arrives (RECOMMENDED)
+            // enableAutoStop: true = YouTube auto-ends broadcast and starts VOD processing faster (RECOMMENDED)
+            // Default to TRUE for better UX, unless user explicitly disabled it
+            enableAutoStart: stream.youtube_auto_start === undefined || stream.youtube_auto_start === null ? true : (stream.youtube_auto_start ? true : false),
+            enableAutoStop: stream.youtube_auto_end === undefined || stream.youtube_auto_end === null ? true : (stream.youtube_auto_end ? true : false),
             // Additional YouTube settings
             madeForKids: stream.youtube_made_for_kids ? true : false,
             ageRestricted: stream.youtube_age_restricted ? true : false,
             syntheticContent: stream.youtube_synthetic_content ? true : false
           };
+          
+          console.log(`[StreamingService] Broadcast settings: autoStart=${broadcastOptions.enableAutoStart}, autoStop=${broadcastOptions.enableAutoStop}`);
           
           // Add thumbnail if available
           if (stream.video_thumbnail) {
