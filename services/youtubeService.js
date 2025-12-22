@@ -145,35 +145,49 @@ module.exports = {
       throw new Error('Broadcast not found');
     }
     
-    // Log current broadcast contentDetails for debugging
-    console.log(`[YouTubeService] Current broadcast ${broadcastId} contentDetails:`, JSON.stringify(currentBroadcast.contentDetails, null, 2));
-    
-    // Build request body - NEVER include cdn or other read-only fields
+    // Build request body - start with current values
     const requestBody = {
       id: broadcastId,
       snippet: {
-        // Use provided values or fall back to current values
-        title: title || currentBroadcast.snippet?.title,
-        description: description !== undefined ? description : currentBroadcast.snippet?.description,
-        scheduledStartTime: scheduledStartTime || currentBroadcast.snippet?.scheduledStartTime,
+        title: currentBroadcast.snippet?.title || 'Untitled',
+        description: currentBroadcast.snippet?.description || '',
+        scheduledStartTime: currentBroadcast.snippet?.scheduledStartTime,
       },
       status: {
-        privacyStatus: privacyStatus || currentBroadcast.status?.privacyStatus,
+        privacyStatus: currentBroadcast.status?.privacyStatus || 'unlisted',
       },
       contentDetails: {
-        // Only include if explicitly provided, otherwise preserve current values
-        enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : (currentBroadcast.contentDetails?.enableAutoStart ?? false),
-        enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : (currentBroadcast.contentDetails?.enableAutoStop ?? false),
-        // REQUIRED: enableMonitorStream must always be included when updating contentDetails
-        // Use current value if exists, otherwise default to true
-        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream !== undefined 
-          ? currentBroadcast.contentDetails.enableMonitorStream 
-          : true,
+        enableAutoStart: currentBroadcast.contentDetails?.enableAutoStart ?? false,
+        enableAutoStop: currentBroadcast.contentDetails?.enableAutoStop ?? false,
+        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream ?? true,
       },
     };
     
+    // Only update fields that are explicitly provided (not undefined)
+    if (title !== undefined && title !== '(unchanged)') {
+      requestBody.snippet.title = title;
+    }
+    if (description !== undefined) {
+      requestBody.snippet.description = description;
+    }
+    if (privacyStatus !== undefined && privacyStatus !== '(unchanged)') {
+      requestBody.status.privacyStatus = privacyStatus;
+    }
+    if (scheduledStartTime !== undefined) {
+      requestBody.snippet.scheduledStartTime = scheduledStartTime;
+    }
+    
+    // CRITICAL: Only update boolean fields if explicitly provided as boolean
+    if (typeof enableAutoStart === 'boolean') {
+      requestBody.contentDetails.enableAutoStart = enableAutoStart;
+    }
+    if (typeof enableAutoStop === 'boolean') {
+      requestBody.contentDetails.enableAutoStop = enableAutoStop;
+    }
+    
     console.log(`[YouTubeService] Updating broadcast ${broadcastId}:`, {
       title: requestBody.snippet.title,
+      privacyStatus: requestBody.status.privacyStatus,
       enableAutoStart: requestBody.contentDetails.enableAutoStart,
       enableAutoStop: requestBody.contentDetails.enableAutoStop,
       enableMonitorStream: requestBody.contentDetails.enableMonitorStream,

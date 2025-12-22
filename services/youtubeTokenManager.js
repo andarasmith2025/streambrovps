@@ -119,14 +119,16 @@ const getAuthenticatedClient = async (userId) => {
     console.log(`[TokenManager] User credentials query result:`, user ? 'Found' : 'Not found');
     
     if (!user?.youtube_client_id) {
-      console.error(`[TokenManager] User has no YouTube credentials configured. User data:`, JSON.stringify(user));
+      console.error(`[TokenManager] ❌ User ${userId} has no YouTube credentials configured`);
+      console.error(`[TokenManager] User needs to set up YouTube OAuth in user settings`);
       return null;
     }
 
     // 2. Get tokens from database
     const tokenRow = await getTokensFromDB(userId);
     if (!tokenRow) {
-      console.error('[TokenManager] No tokens found for user');
+      console.error(`[TokenManager] ❌ No tokens found for user ${userId}`);
+      console.error(`[TokenManager] User needs to connect YouTube account first`);
       return null;
     }
 

@@ -113,8 +113,26 @@ router.patch('/broadcasts/:id', async (req, res) => {
 // Bulk update broadcast (supports additional settings)
 router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
   try {
+    // Validate session and userId first
+    const userId = req.session?.userId || req.session?.user_id;
+    if (!userId) {
+      console.error('[YouTube] Bulk update failed - No userId in session');
+      return res.status(401).json({ 
+        error: 'Not authenticated',
+        message: 'Please login first'
+      });
+    }
+    
+    console.log(`[YouTube] Bulk update request for broadcast ${req.params.id} by user ${userId}`);
+    
     const tokens = await getTokensFromReq(req);
-    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    if (!tokens) {
+      console.error(`[YouTube] Bulk update failed - No tokens for user ${userId}`);
+      return res.status(401).json({ 
+        error: 'YouTube not connected',
+        message: 'Please connect your YouTube account'
+      });
+    }
     
     const { 
       title, 
@@ -126,13 +144,14 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       ageRestricted
     } = req.body || {};
     
-    console.log(`[YouTube] Bulk update for ${req.params.id}:`, {
+    console.log(`[YouTube] Bulk update data for ${req.params.id}:`, {
+      userId,
       title: title || '(unchanged)',
       privacyStatus: privacyStatus || '(unchanged)',
-      enableAutoStart,
-      enableAutoStop,
-      selfDeclaredMadeForKids,
-      ageRestricted
+      enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : '(unchanged)',
+      enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : '(unchanged)',
+      selfDeclaredMadeForKids: typeof selfDeclaredMadeForKids === 'boolean' ? selfDeclaredMadeForKids : '(unchanged)',
+      ageRestricted: typeof ageRestricted === 'boolean' ? ageRestricted : '(unchanged)'
     });
     
     // Update broadcast metadata
@@ -140,15 +159,11 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
         typeof enableAutoStart === 'boolean' || typeof enableAutoStop === 'boolean') {
       
       try {
-        // Get current broadcast to preserve scheduledStartTime
-        const currentBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId: req.params.id });
-        
         await youtubeService.updateBroadcast(tokens, {
           broadcastId: req.params.id,
           title,
           description,
           privacyStatus,
-          scheduledStartTime: currentBroadcast?.snippet?.scheduledStartTime, // Preserve existing time
           enableAutoStart,
           enableAutoStop,
         });
@@ -159,10 +174,16 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
         const errorDetail = updateErr?.response?.data?.error;
         console.error(`[YouTube] Update error details:`, {
           broadcastId: req.params.id,
+          userId,
           errorCode: errorDetail?.code,
           errorMessage: errorDetail?.message,
           errorReason: errorDetail?.errors?.[0]?.reason,
-          fullError: JSON.stringify(updateErr?.response?.data, null, 2)
+          requestData: {
+            title,
+            privacyStatus,
+            enableAutoStart,
+            enableAutoStop
+          }
         });
         throw updateErr;
       }
@@ -170,13 +191,18 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
     
     // Update audience settings (made for kids, age restricted)
     if (typeof selfDeclaredMadeForKids === 'boolean' || typeof ageRestricted === 'boolean') {
-      await youtubeService.setAudience(tokens, {
-        videoId: req.params.id,
-        selfDeclaredMadeForKids,
-        ageRestricted,
-      });
-      
-      console.log(`[YouTube] ✓ Audience settings updated for ${req.params.id}`);
+      try {
+        await youtubeService.setAudience(tokens, {
+          videoId: req.params.id,
+          selfDeclaredMadeForKids,
+          ageRestricted,
+        });
+        
+        console.log(`[YouTube] ✓ Audience settings updated for ${req.params.id}`);
+      } catch (audienceErr) {
+        console.error(`[YouTube] Audience update error:`, audienceErr?.response?.data || audienceErr.message);
+        // Don't throw - audience update is optional
+      }
     }
     
     return res.json({ success: true, message: 'Broadcast updated' });
@@ -191,7 +217,8 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       code: errorCode,
       status: errorStatus,
       message: errorMessage,
-      fullError: JSON.stringify(err?.response?.data || err.message, null, 2)
+      userId: req.session?.userId || req.session?.user_id,
+      requestBody: req.body
     });
     
     return res.status(500).json({ 
