@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db/database');
 const youtubeService = require('../services/youtubeService');
+const tokenManager = require('../services/youtubeTokenManager'); // ⭐ Token Manager dengan Event Listener
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -190,62 +191,48 @@ router.post('/broadcasts/:id/thumbnail', upload.single('file'), async (req, res)
 async function getTokensFromReq(req) {
   const userId = req.session && (req.session.userId || req.session.user_id);
   
-  // If tokens in session, check if expired and refresh if needed
-  if (req.session && req.session.youtubeTokens) {
-    const tokens = req.session.youtubeTokens;
-    const now = Date.now();
-    const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
-    const isExpired = expiry && now > expiry - (5 * 60 * 1000); // 5 minutes buffer
-    
-    if (isExpired && tokens.refresh_token && userId) {
-      console.log(`[getTokensFromReq] Session token expired/expiring, auto-refreshing...`);
-      try {
-        const { getFreshClient } = require('../services/googleAuth');
-        const { oauth2, tokens: freshTokens } = await getFreshClient(tokens);
-        
-        // Update session
-        req.session.youtubeTokens.access_token = freshTokens.access_token;
-        req.session.youtubeTokens.expiry_date = freshTokens.expiry_date;
-        
-        // Update database
-        db.run(
-          `UPDATE youtube_tokens 
-           SET access_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
-           WHERE user_id = ?`,
-          [freshTokens.access_token, freshTokens.expiry_date || null, userId],
-          (updateErr) => {
-            if (updateErr) {
-              console.error(`[getTokensFromReq] Failed to update refreshed tokens:`, updateErr);
-            } else {
-              console.log(`[getTokensFromReq] ✓ Token refreshed and saved`);
-            }
-          }
-        );
-        
-        return req.session.youtubeTokens;
-      } catch (refreshErr) {
-        console.error(`[getTokensFromReq] Failed to refresh session token:`, refreshErr.message);
-        
-        // ⭐ If refresh fails (e.g., deleted_client), clear session and fallback to database
-        console.log(`[getTokensFromReq] Clearing invalid session token, falling back to database...`);
-        delete req.session.youtubeTokens;
-        
-        // Fallback to database
-        if (userId) {
-          return await getTokensForUser(userId);
-        }
-        return null;
-      }
-    }
-    
-    return tokens;
+  if (!userId) {
+    console.log('[getTokensFromReq] No userId in session');
+    return null;
   }
   
-  // Otherwise fetch from database (with auto-refresh)
-  if (!userId) return null;
-  
-  // Use getTokensForUser which has auto-refresh built-in
-  return await getTokensForUser(userId);
+  // ⭐ ALWAYS use database as source of truth for VPS/background processes
+  // Session tokens are unreliable for long-running streams
+  try {
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    
+    if (!oauth2Client) {
+      console.log('[getTokensFromReq] Failed to get authenticated client');
+      // Clear session if exists
+      if (req.session && req.session.youtubeTokens) {
+        delete req.session.youtubeTokens;
+      }
+      return null;
+    }
+    
+    // Get credentials from client
+    const credentials = oauth2Client.credentials;
+    
+    // Update session for web UI consistency
+    if (req.session) {
+      req.session.youtubeTokens = {
+        access_token: credentials.access_token,
+        refresh_token: credentials.refresh_token,
+        expiry_date: credentials.expiry_date
+      };
+    }
+    
+    return credentials;
+  } catch (err) {
+    console.error('[getTokensFromReq] Error:', err.message);
+    
+    // Clear invalid session
+    if (req.session && req.session.youtubeTokens) {
+      delete req.session.youtubeTokens;
+    }
+    
+    return null;
+  }
 }
 
 router.post('/schedule-live', async (req, res) => {
@@ -436,77 +423,26 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
   }
 });
 
-// Helper function to get tokens for a specific user (for use in other modules)
-// Automatically refreshes expired tokens using refresh_token
+// ⭐ Helper function menggunakan Token Manager dengan Event Listener
+// Token akan otomatis di-refresh dan disimpan ke database
 async function getTokensForUser(userId) {
   if (!userId) return null;
   
-  return new Promise((resolve) => {
-    // Get tokens
-    db.get('SELECT access_token, refresh_token, expiry_date FROM youtube_tokens WHERE user_id = ?', [userId], async (err, row) => {
-      if (err || !row) return resolve(null);
-      
-      // Get user credentials
-      db.get('SELECT youtube_client_id, youtube_client_secret, youtube_redirect_uri FROM users WHERE id = ?', [userId], async (err2, userRow) => {
-        let tokens = { 
-          access_token: row.access_token, 
-          refresh_token: row.refresh_token, 
-          expiry_date: row.expiry_date 
-        };
-        
-        // Attach user credentials if available
-        if (!err2 && userRow && userRow.youtube_client_id && userRow.youtube_client_secret) {
-          tokens._userCredentials = {
-            client_id: userRow.youtube_client_id,
-            client_secret: userRow.youtube_client_secret,
-            redirect_uri: userRow.youtube_redirect_uri
-          };
-        }
-        
-        // ⭐ AUTO-REFRESH: Check if token is expired or about to expire (within 5 minutes)
-        const now = Date.now();
-        const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
-        const isExpired = expiry && now > expiry - (5 * 60 * 1000); // 5 minutes buffer
-        
-        if (isExpired && tokens.refresh_token) {
-          console.log(`[getTokensForUser] Token expired/expiring for user ${userId}, auto-refreshing...`);
-          try {
-            const { getFreshClient } = require('../services/googleAuth');
-            const { oauth2, tokens: freshTokens } = await getFreshClient(tokens);
-            
-            // Update tokens in database
-            const newExpiry = freshTokens.expiry_date || null;
-            db.run(
-              `UPDATE youtube_tokens 
-               SET access_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
-               WHERE user_id = ?`,
-              [freshTokens.access_token, newExpiry, userId],
-              (updateErr) => {
-                if (updateErr) {
-                  console.error(`[getTokensForUser] Failed to update refreshed tokens:`, updateErr);
-                } else {
-                  console.log(`[getTokensForUser] ✓ Token refreshed and saved for user ${userId}`);
-                }
-              }
-            );
-            
-            // Return fresh tokens
-            tokens.access_token = freshTokens.access_token;
-            tokens.expiry_date = freshTokens.expiry_date;
-            console.log(`[getTokensForUser] ✓ Returning fresh token (expires: ${new Date(freshTokens.expiry_date).toISOString()})`);
-          } catch (refreshErr) {
-            console.error(`[getTokensForUser] Failed to refresh token:`, refreshErr.message);
-            // Return old tokens anyway, let caller handle the error
-          }
-        } else if (expiry) {
-          const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
-          console.log(`[getTokensForUser] Token valid for user ${userId} (expires in ${minutesUntilExpiry} minutes)`);
-        }
-        
-        resolve(tokens);
-      });
-    });
-  });
+  try {
+    // Use the new token manager with event listener
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    
+    if (!oauth2Client) {
+      console.log(`[getTokensForUser] No authenticated client for user ${userId}`);
+      return null;
+    }
+    
+    // Return credentials in expected format
+    return oauth2Client.credentials;
+  } catch (error) {
+    console.error(`[getTokensForUser] Error:`, error.message);
+    return null;
+  }
 }
 
 // Export router and helper function

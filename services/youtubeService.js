@@ -1,8 +1,20 @@
-const { getYouTubeClient } = require('../config/google');
+const tokenManager = require('./youtubeTokenManager'); // ⭐ Auto-refresh dengan event listener
 const fs = require('fs');
 
-async function scheduleLive(tokens, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false }) {
-  const yt = getYouTubeClient(tokens);
+// ⭐ Helper untuk mendapatkan YouTube client dari tokens atau userId
+async function getYouTubeClientFromTokensOrUserId(tokensOrUserId) {
+  // Jika parameter adalah string (userId), gunakan token manager
+  if (typeof tokensOrUserId === 'string') {
+    return await tokenManager.getYouTubeClient(tokensOrUserId);
+  }
+  
+  // Jika parameter adalah object (tokens), gunakan cara lama untuk backward compatibility
+  const { getYouTubeClient } = require('../config/google');
+  return getYouTubeClient(tokensOrUserId);
+}
+
+async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false }) {
+  const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
   
   console.log(`[YouTubeService.scheduleLive] Called with:`);
   console.log(`[YouTubeService.scheduleLive] - Title: ${title}`);
@@ -73,8 +85,8 @@ async function scheduleLive(tokens, { title, description, privacyStatus, schedul
 
 module.exports = {
   scheduleLive,
-  async listBroadcasts(tokens, { maxResults = 50 } = {}) {
-    const yt = getYouTubeClient(tokens);
+  async listBroadcasts(tokensOrUserId, { maxResults = 50 } = {}) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     const params = {
       part: 'id,snippet,status,contentDetails',
       mine: true,
@@ -95,9 +107,9 @@ module.exports = {
       throw err;
     }
   },
-  async getVideoMetrics(tokens, ids = []) {
+  async getVideoMetrics(tokensOrUserId, ids = []) {
     if (!ids || (Array.isArray(ids) && ids.length === 0)) return {};
-    const yt = getYouTubeClient(tokens);
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     const list = Array.isArray(ids) ? ids : String(ids).split(',').map(s => s.trim()).filter(Boolean);
     if (!list.length) return {};
     const res = await yt.videos.list({ part: 'id,liveStreamingDetails,statistics', id: list.join(',') });
@@ -114,8 +126,8 @@ module.exports = {
     });
     return out;
   },
-  async listStreams(tokens, { maxResults = 50 } = {}) {
-    const yt = getYouTubeClient(tokens);
+  async listStreams(tokensOrUserId, { maxResults = 50 } = {}) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     const res = await yt.liveStreams.list({
       part: 'id,snippet,cdn,contentDetails,status',
       mine: true,
@@ -123,8 +135,8 @@ module.exports = {
     });
     return res.data?.items || [];
   },
-  async updateBroadcast(tokens, { broadcastId, title, description, privacyStatus, scheduledStartTime, enableAutoStart, enableAutoStop }) {
-    const yt = getYouTubeClient(tokens);
+  async updateBroadcast(tokensOrUserId, { broadcastId, title, description, privacyStatus, scheduledStartTime, enableAutoStart, enableAutoStop }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     return yt.liveBroadcasts.update({
       part: 'snippet,status,contentDetails',
       requestBody: {
@@ -145,16 +157,16 @@ module.exports = {
       },
     });
   },
-  async transition(tokens, { broadcastId, status }) {
-    const yt = getYouTubeClient(tokens);
+  async transition(tokensOrUserId, { broadcastId, status }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     return yt.liveBroadcasts.transition({
       id: broadcastId,
       part: 'status',
       broadcastStatus: status, // 'testing' | 'live' | 'complete'
     });
   },
-  async setThumbnail(tokens, { broadcastId, filePath, mimeType }) {
-    const yt = getYouTubeClient(tokens);
+  async setThumbnail(tokensOrUserId, { broadcastId, filePath, mimeType }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     return yt.thumbnails.set({
       videoId: broadcastId,
       media: {
@@ -163,20 +175,20 @@ module.exports = {
       },
     });
   },
-  async getBroadcast(tokens, { broadcastId }) {
-    const yt = getYouTubeClient(tokens);
+  async getBroadcast(tokensOrUserId, { broadcastId }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     const response = await yt.liveBroadcasts.list({
       part: 'snippet,status,contentDetails,cdn',
       id: broadcastId
     });
     return response.data.items?.[0] || null;
   },
-  async deleteBroadcast(tokens, { broadcastId }) {
-    const yt = getYouTubeClient(tokens);
+  async deleteBroadcast(tokensOrUserId, { broadcastId }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     return yt.liveBroadcasts.delete({ id: broadcastId });
   },
-  async setAudience(tokens, { videoId, selfDeclaredMadeForKids, ageRestricted }) {
-    const yt = getYouTubeClient(tokens);
+  async setAudience(tokensOrUserId, { videoId, selfDeclaredMadeForKids, ageRestricted }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     
     // Build parts array based on what we're updating
     const parts = [];
@@ -203,5 +215,156 @@ module.exports = {
       part: parts.join(','),
       requestBody: body,
     });
+  },
+  
+  /**
+   * Get stream status by stream ID
+   * Returns stream object with status information
+   */
+  async getStreamStatus(tokensOrUserId, { streamId }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
+    const response = await yt.liveStreams.list({
+      part: 'id,snippet,cdn,status',
+      id: streamId
+    });
+    return response.data.items?.[0] || null;
+  },
+  
+  /**
+   * Check if stream is active and ready for broadcast transition
+   * Returns true if stream status is 'active'
+   */
+  async isStreamActive(tokensOrUserId, { streamId }) {
+    try {
+      const stream = await module.exports.getStreamStatus(tokensOrUserId, { streamId });
+      if (!stream) {
+        console.log(`[YouTubeService] Stream ${streamId} not found`);
+        return false;
+      }
+      
+      const status = stream.status?.streamStatus;
+      console.log(`[YouTubeService] Stream ${streamId} status: ${status}`);
+      return status === 'active';
+    } catch (err) {
+      console.error(`[YouTubeService] Error checking stream status:`, err.message);
+      return false;
+    }
+  },
+  
+  /**
+   * Wait for stream to become active with retry logic
+   * Returns true if stream becomes active, false if timeout
+   */
+  async waitForStreamActive(tokensOrUserId, { streamId, maxRetries = 20, delayMs = 3000 }) {
+    console.log(`[YouTubeService] Waiting for stream ${streamId} to become active...`);
+    
+    for (let i = 0; i < maxRetries; i++) {
+      const isActive = await module.exports.isStreamActive(tokensOrUserId, { streamId });
+      
+      if (isActive) {
+        console.log(`[YouTubeService] ✅ Stream ${streamId} is active after ${i + 1} attempts`);
+        return true;
+      }
+      
+      if (i < maxRetries - 1) {
+        console.log(`[YouTubeService] Stream not active yet, waiting ${delayMs}ms... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    console.warn(`[YouTubeService] ⚠️ Stream ${streamId} did not become active after ${maxRetries} attempts`);
+    return false;
+  },
+  
+  /**
+   * Transition broadcast with smart retry logic
+   * Waits for stream to be active before attempting transition
+   */
+  async transitionBroadcastSmart(tokensOrUserId, { broadcastId, streamId, targetStatus = 'live' }) {
+    console.log(`[YouTubeService] Smart transition: ${broadcastId} → ${targetStatus}`);
+    
+    // Step 1: Wait for stream to become active (if streamId provided)
+    if (streamId) {
+      const streamActive = await module.exports.waitForStreamActive(tokensOrUserId, { 
+        streamId, 
+        maxRetries: 20, 
+        delayMs: 3000 
+      });
+      
+      if (!streamActive) {
+        throw new Error('Stream did not become active - cannot transition broadcast');
+      }
+    } else {
+      // If no streamId, just wait a bit for FFmpeg to connect
+      console.log(`[YouTubeService] No streamId provided, waiting 10 seconds for FFmpeg connection...`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+    }
+    
+    // Step 2: Try transition with retry logic
+    let retries = 5;
+    let lastError = null;
+    
+    while (retries > 0) {
+      try {
+        // For 'live' status, try testing → live flow first
+        if (targetStatus === 'live') {
+          try {
+            console.log(`[YouTubeService] Attempting testing → live transition...`);
+            await module.exports.transition(tokensOrUserId, {
+              broadcastId,
+              status: 'testing'
+            });
+            console.log(`[YouTubeService] ✓ Transitioned to testing`);
+            
+            // Wait 2 seconds before going live
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            await module.exports.transition(tokensOrUserId, {
+              broadcastId,
+              status: 'live'
+            });
+            console.log(`[YouTubeService] ✅ Transitioned to live`);
+            return true;
+          } catch (testingErr) {
+            // If testing fails, try direct to live
+            if (testingErr.message && testingErr.message.includes('Invalid transition')) {
+              console.log(`[YouTubeService] Testing transition failed, trying direct to live...`);
+              await module.exports.transition(tokensOrUserId, {
+                broadcastId,
+                status: 'live'
+              });
+              console.log(`[YouTubeService] ✅ Transitioned to live (direct)`);
+              return true;
+            }
+            throw testingErr;
+          }
+        } else {
+          // For other statuses, direct transition
+          await module.exports.transition(tokensOrUserId, {
+            broadcastId,
+            status: targetStatus
+          });
+          console.log(`[YouTubeService] ✅ Transitioned to ${targetStatus}`);
+          return true;
+        }
+      } catch (err) {
+        lastError = err;
+        const errorMsg = err.message || '';
+        
+        if (errorMsg.includes('inactive') || errorMsg.includes('Invalid transition')) {
+          retries--;
+          if (retries > 0) {
+            console.log(`[YouTubeService] Transition failed: ${errorMsg}, retrying in 3s... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        } else {
+          // Other error, don't retry
+          throw err;
+        }
+      }
+    }
+    
+    throw new Error(`Failed to transition after retries: ${lastError?.message || 'Unknown error'}`);
   }
 };
+

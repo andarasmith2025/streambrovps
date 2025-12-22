@@ -443,8 +443,7 @@ async function startStream(streamId, options = {}) {
     
     // Transition YouTube broadcast to live if using YouTube API
     if (stream.use_youtube_api && stream.youtube_broadcast_id) {
-      // Wait for stream to become active before transitioning
-      // YouTube needs time to receive and process the stream
+      // Use smart transition with stream status checking
       setTimeout(async () => {
         try {
           const { getTokensForUser } = require('../routes/youtube');
@@ -452,80 +451,28 @@ async function startStream(streamId, options = {}) {
           
           const tokens = await getTokensForUser(stream.user_id);
           if (tokens && tokens.access_token) {
-            console.log(`[StreamingService] Waiting for stream to become active before transitioning...`);
+            console.log(`[StreamingService] Starting smart transition for broadcast ${stream.youtube_broadcast_id}...`);
             
-            // Retry transition up to 10 times with 3 second delay
-            let retries = 10;
-            let transitioned = false;
-            
-            while (retries > 0 && !transitioned) {
-              try {
-                console.log(`[StreamingService] Attempting to transition YouTube broadcast ${stream.youtube_broadcast_id} to live (attempt ${11 - retries}/10)`);
-                
-                // First, try to transition to testing, then to live
-                // This is the recommended flow for new broadcasts
-                try {
-                  await youtubeService.transition(tokens, {
-                    broadcastId: stream.youtube_broadcast_id,
-                    status: 'testing'
-                  });
-                  console.log(`[StreamingService] ✓ Broadcast transitioned to testing, now transitioning to live...`);
-                  
-                  // Wait a moment before transitioning to live
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  
-                  await youtubeService.transition(tokens, {
-                    broadcastId: stream.youtube_broadcast_id,
-                    status: 'live'
-                  });
-                  console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live`);
-                  transitioned = true;
-                } catch (testingErr) {
-                  // If testing transition fails, try direct to live
-                  if (testingErr.message && testingErr.message.includes('Invalid transition')) {
-                    console.log(`[StreamingService] Testing transition failed, trying direct to live...`);
-                    await youtubeService.transition(tokens, {
-                      broadcastId: stream.youtube_broadcast_id,
-                      status: 'live'
-                    });
-                    console.log(`[StreamingService] ✓ YouTube broadcast transitioned to live (direct)`);
-                    transitioned = true;
-                  } else {
-                    throw testingErr;
-                  }
-                }
-              } catch (err) {
-                const errorMsg = err.message || '';
-                
-                if (errorMsg.includes('inactive')) {
-                  console.log(`[StreamingService] Stream still inactive, waiting 3 seconds... (${retries} retries left)`);
-                  retries--;
-                  if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                  }
-                } else if (errorMsg.includes('Invalid transition')) {
-                  console.log(`[StreamingService] Invalid transition, waiting 3 seconds... (${retries} retries left)`);
-                  retries--;
-                  if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                  }
-                } else {
-                  // Other error, don't retry
-                  console.error(`[StreamingService] Transition error: ${errorMsg}`);
-                  throw err;
-                }
-              }
-            }
-            
-            if (!transitioned) {
-              console.warn(`[StreamingService] Failed to transition broadcast to live after 10 attempts. Stream may need manual activation in YouTube Studio.`);
+            try {
+              // Use the new smart transition function
+              // It will wait for stream to be active before transitioning
+              await youtubeService.transitionBroadcastSmart(tokens, {
+                broadcastId: stream.youtube_broadcast_id,
+                streamId: stream.youtube_stream_id, // Pass stream ID for status checking
+                targetStatus: 'live'
+              });
+              
+              console.log(`[StreamingService] ✅ YouTube broadcast successfully transitioned to live`);
+            } catch (transitionErr) {
+              console.error(`[StreamingService] ⚠️ Failed to transition broadcast:`, transitionErr.message);
+              console.log(`[StreamingService] Stream will continue, but may need manual activation in YouTube Studio`);
             }
           }
         } catch (ytError) {
-          console.error('[StreamingService] Error transitioning YouTube broadcast to live:', ytError.message || ytError);
+          console.error('[StreamingService] Error in YouTube transition process:', ytError.message || ytError);
           // Don't fail the stream start, just log the error
         }
-      }, 5000); // Wait 5 seconds before first attempt
+      }, 5000); // Initial 5 second delay before starting transition process
     }
     
     // Clear manual_stop flag when stream starts
