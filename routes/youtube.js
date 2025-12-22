@@ -123,9 +123,17 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       enableAutoStart, 
       enableAutoStop,
       selfDeclaredMadeForKids,
-      ageRestricted,
-      syntheticContent
+      ageRestricted
     } = req.body || {};
+    
+    console.log(`[YouTube] Bulk update for ${req.params.id}:`, {
+      title: title || '(unchanged)',
+      privacyStatus: privacyStatus || '(unchanged)',
+      enableAutoStart,
+      enableAutoStop,
+      selfDeclaredMadeForKids,
+      ageRestricted
+    });
     
     // Update broadcast metadata
     if (title || description || privacyStatus || 
@@ -143,6 +151,8 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
         enableAutoStart,
         enableAutoStop,
       });
+      
+      console.log(`[YouTube] ✓ Broadcast metadata updated for ${req.params.id}`);
     }
     
     // Update audience settings (made for kids, age restricted)
@@ -152,15 +162,30 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
         selfDeclaredMadeForKids,
         ageRestricted,
       });
+      
+      console.log(`[YouTube] ✓ Audience settings updated for ${req.params.id}`);
     }
-    
-    // Note: Synthetic content is not supported by YouTube API yet
-    // It's included in the UI for future compatibility
     
     return res.json({ success: true, message: 'Broadcast updated' });
   } catch (err) {
-    console.error('[YouTube] bulk update broadcast error:', JSON.stringify(err?.response?.data || err.message, null, 2));
-    return res.status(500).json({ error: 'Failed to update broadcast', details: err?.response?.data?.error?.message || err.message });
+    // Enhanced error logging
+    const errorDetail = err?.response?.data?.error;
+    const errorMessage = errorDetail?.message || err.message;
+    const errorCode = errorDetail?.code;
+    const errorStatus = errorDetail?.status;
+    
+    console.error(`[YouTube] ✗ Bulk update failed for ${req.params.id}:`, {
+      code: errorCode,
+      status: errorStatus,
+      message: errorMessage,
+      fullError: JSON.stringify(err?.response?.data || err.message, null, 2)
+    });
+    
+    return res.status(500).json({ 
+      error: 'Failed to update broadcast', 
+      details: errorMessage,
+      code: errorCode
+    });
   }
 });
 

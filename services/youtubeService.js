@@ -138,35 +138,41 @@ module.exports = {
   async updateBroadcast(tokensOrUserId, { broadcastId, title, description, privacyStatus, scheduledStartTime, enableAutoStart, enableAutoStop }) {
     const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
     
-    // Get current broadcast to preserve CDN settings (required by API)
+    // Get current broadcast to preserve existing values
     const currentBroadcast = await this.getBroadcast(tokensOrUserId, { broadcastId });
     
-    // Build request body
+    if (!currentBroadcast) {
+      throw new Error('Broadcast not found');
+    }
+    
+    // Build request body - NEVER include cdn or other read-only fields
     const requestBody = {
       id: broadcastId,
       snippet: {
-        title,
-        description,
-        scheduledStartTime,
+        // Use provided values or fall back to current values
+        title: title || currentBroadcast.snippet?.title,
+        description: description !== undefined ? description : currentBroadcast.snippet?.description,
+        scheduledStartTime: scheduledStartTime || currentBroadcast.snippet?.scheduledStartTime,
       },
       status: {
-        privacyStatus,
+        privacyStatus: privacyStatus || currentBroadcast.status?.privacyStatus,
       },
       contentDetails: {
-        // Only include if defined to avoid overriding unintentionally
-        ...(typeof enableAutoStart === 'boolean' ? { enableAutoStart } : {}),
-        ...(typeof enableAutoStop === 'boolean' ? { enableAutoStop } : {}),
-        enableMonitorStream: currentBroadcast?.contentDetails?.enableMonitorStream ?? true,
+        // Only include if explicitly provided, otherwise preserve current values
+        enableAutoStart: typeof enableAutoStart === 'boolean' ? enableAutoStart : currentBroadcast.contentDetails?.enableAutoStart,
+        enableAutoStop: typeof enableAutoStop === 'boolean' ? enableAutoStop : currentBroadcast.contentDetails?.enableAutoStop,
       },
     };
     
-    // Only include CDN if it exists and has properties
-    if (currentBroadcast?.cdn && Object.keys(currentBroadcast.cdn).length > 0) {
-      requestBody.cdn = currentBroadcast.cdn;
-    }
+    console.log(`[YouTubeService] Updating broadcast ${broadcastId}:`, {
+      title: requestBody.snippet.title,
+      enableAutoStart: requestBody.contentDetails.enableAutoStart,
+      enableAutoStop: requestBody.contentDetails.enableAutoStop,
+    });
     
+    // CRITICAL: Only send snippet, status, and contentDetails - NEVER cdn
     return yt.liveBroadcasts.update({
-      part: 'snippet,status,contentDetails' + (requestBody.cdn ? ',cdn' : ''),
+      part: 'snippet,status,contentDetails',
       requestBody,
     });
   },
