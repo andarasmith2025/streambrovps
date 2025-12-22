@@ -127,7 +127,7 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
       syntheticContent
     } = req.body || {};
     
-    // Update broadcast metadata (WITHOUT scheduledStartTime - it's unique per broadcast)
+    // Update broadcast metadata
     if (title || description || privacyStatus || 
         typeof enableAutoStart === 'boolean' || typeof enableAutoStop === 'boolean') {
       

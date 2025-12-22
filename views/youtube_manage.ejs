@@ -222,6 +222,43 @@
     </div>
   </div>
 
+  <!-- Bulk Stream Key Modal -->
+  <div id="ytBulkStreamKeyModal" class="hidden fixed inset-0 bg-black/50 z-[70] items-center justify-center p-4">
+    <div class="bg-dark-800 rounded-xl w-full max-w-3xl border border-gray-700 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-dark-800 z-10">
+        <h3 class="font-medium">Set Stream Key</h3>
+        <button onclick="closeBulkStreamKeyModal()" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+      </div>
+      <div class="p-4">
+        <div class="bg-green-900/20 border border-green-600/30 rounded-lg p-3 mb-4">
+          <div class="flex items-start gap-2">
+            <i class="ti ti-info-circle text-green-400 text-lg mt-0.5"></i>
+            <div class="text-sm text-gray-300">
+              <p class="font-medium mb-1">Binding stream key to <span id="bulkStreamKeyCount">0</span> broadcasts</p>
+              <p class="text-xs text-gray-400">Select a stream key below to bind to all selected broadcasts</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="space-y-2 mb-4" id="streamKeyList">
+          <!-- Stream cards will be inserted here -->
+        </div>
+        
+        <div id="bulkStreamKeyProgress" class="hidden bg-gray-900/50 border border-gray-700 rounded-lg p-3 mb-4">
+          <div class="flex items-center gap-2 mb-2">
+            <i class="ti ti-loader animate-spin text-green-400"></i>
+            <span class="text-sm text-gray-300">Binding stream keys...</span>
+          </div>
+          <div class="text-xs text-gray-400" id="bulkStreamKeyProgressText">0 / 0 completed</div>
+        </div>
+        
+        <div class="pt-2 flex justify-end gap-2 border-t border-gray-700">
+          <button type="button" onclick="closeBulkStreamKeyModal()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   
 </div>
 
@@ -577,9 +614,10 @@
       // Check if any modal is open
       const editModalOpen = !document.getElementById('ytEditModal').classList.contains('hidden');
       const bulkEditModalOpen = !document.getElementById('ytBulkEditModal').classList.contains('hidden');
+      const bulkStreamKeyModalOpen = !document.getElementById('ytBulkStreamKeyModal').classList.contains('hidden');
       const duplicateModalOpen = !document.getElementById('ytDuplicateModal').classList.contains('hidden');
       
-      if (editModalOpen || bulkEditModalOpen || duplicateModalOpen) {
+      if (editModalOpen || bulkEditModalOpen || bulkStreamKeyModalOpen || duplicateModalOpen) {
         console.log('[YouTube Manage] Skipping auto-refresh - modal is open');
         return;
       }
@@ -678,75 +716,8 @@
           return;
         }
         
-        // Show stream selection modal
-        const streamOptions = streams.map(s => 
-          `<option value="${s.id}">${s.title} (${s.streamKeyMasked || s.id})</option>`
-        ).join('');
-        
-        const streamId = prompt(`Select stream key to bind to ${ids.length} broadcasts:\n\nAvailable streams:\n${streams.map((s,i) => `${i+1}. ${s.title} - ${s.streamKeyMasked}`).join('\n')}\n\nEnter stream number (1-${streams.length}):`);
-        
-        if (!streamId) return;
-        
-        const streamIndex = parseInt(streamId) - 1;
-        if (isNaN(streamIndex) || streamIndex < 0 || streamIndex >= streams.length) {
-          toast('Invalid stream selection', 'error');
-          return;
-        }
-        
-        const selectedStream = streams[streamIndex];
-        
-        if (!confirm(`Bind ${ids.length} broadcasts to stream:\n${selectedStream.title}\n${selectedStream.streamKeyMasked}?`)) return;
-        
-        // Show progress
-        const progressToast = document.createElement('div');
-        progressToast.className = 'fixed bottom-4 right-4 bg-dark-800 border border-green-600 rounded-lg p-4 shadow-lg z-[100]';
-        progressToast.innerHTML = `
-          <div class="flex items-center gap-3">
-            <i class="ti ti-loader animate-spin text-green-400 text-xl"></i>
-            <div>
-              <div class="font-medium text-white">Binding stream keys...</div>
-              <div class="text-sm text-gray-400" id="bulk-streamkey-progress">0 / ${ids.length}</div>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(progressToast);
-        
-        let success = 0, failed = 0;
-        const progressEl = document.getElementById('bulk-streamkey-progress');
-        
-        for (let i = 0; i < ids.length; i++) {
-          const id = ids[i];
-          if (progressEl) progressEl.textContent = `${i + 1} / ${ids.length} processing...`;
-          
-          try {
-            const res = await fetch(`/youtube/broadcasts/${id}/bind-stream`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ streamId: selectedStream.id })
-            });
-            
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Bind failed');
-            
-            success++;
-          } catch (err) {
-            console.error(`Failed to bind stream for ${id}:`, err.message);
-            failed++;
-          }
-        }
-        
-        // Remove progress toast
-        document.body.removeChild(progressToast);
-        
-        // Show result
-        toast(`Bulk stream key binding complete — Success: ${success}, Failed: ${failed}`, failed > 0 ? 'error' : 'success');
-        
-        // Uncheck all and refresh
-        const selAll = document.getElementById('yt-select-all');
-        if (selAll) selAll.checked = false;
-        document.querySelectorAll('.yt-select-item').forEach(b => b.checked = false);
-        
-        loadList();
+        // Open modal with stream selection
+        openBulkStreamKeyModal(ids, streams);
       } catch (err) {
         toast('Failed to load streams: ' + err.message, 'error');
       }
@@ -905,6 +876,96 @@
       
       loadList();
     });
+  }
+  
+  // Bulk Stream Key Modal Functions
+  function openBulkStreamKeyModal(ids, streams){
+    const modal = document.getElementById('ytBulkStreamKeyModal');
+    const countSpan = document.getElementById('bulkStreamKeyCount');
+    if (countSpan) countSpan.textContent = ids.length;
+    
+    // Store selected IDs in modal
+    modal.dataset.selectedIds = JSON.stringify(ids);
+    
+    // Render stream cards
+    const streamKeyList = document.getElementById('streamKeyList');
+    streamKeyList.innerHTML = streams.map((stream, index) => `
+      <div class="stream-key-card border border-gray-700 rounded-lg p-4 hover:border-green-500 hover:bg-green-900/10 cursor-pointer transition-all" 
+           onclick="selectStreamKey('${stream.id}', ${index + 1})">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-lg font-medium text-white">${index + 1}</span>
+              <i class="ti ti-key text-green-400"></i>
+              <span class="font-medium text-white">${stream.title || 'Untitled Stream'}</span>
+            </div>
+            <div class="flex items-center gap-2 text-sm text-gray-400">
+              <i class="ti ti-shield-lock text-xs"></i>
+              <code class="bg-dark-700 px-2 py-1 rounded text-xs font-mono">${stream.streamKeyMasked || stream.id}</code>
+            </div>
+          </div>
+          <i class="ti ti-chevron-right text-gray-500"></i>
+        </div>
+      </div>
+    `).join('');
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  
+  function closeBulkStreamKeyModal(){
+    const modal = document.getElementById('ytBulkStreamKeyModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  
+  async function selectStreamKey(streamId, streamNumber){
+    const modal = document.getElementById('ytBulkStreamKeyModal');
+    const ids = JSON.parse(modal.dataset.selectedIds || '[]');
+    if (!ids.length) return;
+    
+    // Show progress
+    const progress = document.getElementById('bulkStreamKeyProgress');
+    const progressText = document.getElementById('bulkStreamKeyProgressText');
+    
+    if (progress) progress.classList.remove('hidden');
+    
+    let success = 0, failed = 0;
+    
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      if (progressText) progressText.textContent = `${i + 1} / ${ids.length} processing...`;
+      
+      try {
+        const res = await fetch(`/youtube/broadcasts/${id}/bind-stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ streamId })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Bind failed');
+        
+        success++;
+      } catch (err) {
+        console.error(`Failed to bind stream for ${id}:`, err.message);
+        failed++;
+      }
+    }
+    
+    if (progress) progress.classList.add('hidden');
+    
+    // Show result
+    toast(`Stream key binding complete — Success: ${success}, Failed: ${failed}`, failed > 0 ? 'error' : 'success');
+    
+    closeBulkStreamKeyModal();
+    
+    // Uncheck all and refresh
+    const selAll = document.getElementById('yt-select-all');
+    if (selAll) selAll.checked = false;
+    document.querySelectorAll('.yt-select-item').forEach(b => b.checked = false);
+    
+    loadList();
   }
   
   // Bulk Thumbnail Upload

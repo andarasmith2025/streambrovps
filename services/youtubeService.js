@@ -137,8 +137,12 @@ module.exports = {
   },
   async updateBroadcast(tokensOrUserId, { broadcastId, title, description, privacyStatus, scheduledStartTime, enableAutoStart, enableAutoStop }) {
     const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
+    
+    // Get current broadcast to preserve CDN settings (required by API)
+    const currentBroadcast = await this.getBroadcast(tokensOrUserId, { broadcastId });
+    
     return yt.liveBroadcasts.update({
-      part: 'snippet,status,contentDetails',
+      part: 'snippet,status,contentDetails,cdn',
       requestBody: {
         id: broadcastId,
         snippet: {
@@ -153,7 +157,9 @@ module.exports = {
           // Only include if defined to avoid overriding unintentionally
           ...(typeof enableAutoStart === 'boolean' ? { enableAutoStart } : {}),
           ...(typeof enableAutoStop === 'boolean' ? { enableAutoStop } : {}),
+          enableMonitorStream: currentBroadcast?.contentDetails?.enableMonitorStream ?? true,
         },
+        cdn: currentBroadcast?.cdn || {}, // Preserve existing CDN settings
       },
     });
   },
