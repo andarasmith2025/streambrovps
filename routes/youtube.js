@@ -161,6 +161,34 @@ router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
   }
 });
 
+// Bind broadcast to stream (set stream key)
+router.post('/broadcasts/:id/bind-stream', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    
+    const { streamId } = req.body || {};
+    if (!streamId) return res.status(400).json({ error: 'streamId is required' });
+    
+    const { getYouTubeClient } = require('../config/google');
+    const yt = getYouTubeClient(tokens);
+    
+    // Bind broadcast to stream
+    const response = await yt.liveBroadcasts.bind({
+      id: req.params.id,
+      part: 'id,contentDetails',
+      streamId: streamId,
+    });
+    
+    console.log(`[YouTube] Broadcast ${req.params.id} bound to stream ${streamId}`);
+    
+    return res.json({ success: true, result: response.data });
+  } catch (err) {
+    console.error('[YouTube] bind stream error:', err?.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to bind stream', details: err?.response?.data?.error?.message || err.message });
+  }
+});
+
 // Audience (made for kids) endpoint removed per API limitations
 
 // Transition broadcast status: testing | live | complete
@@ -423,21 +451,88 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     const src = (all || []).find(x => x.id === req.params.id);
     if (!src) return res.status(404).json({ error: 'Source broadcast not found' });
 
+    // Get bound stream ID from source broadcast
+    const boundStreamId = src.contentDetails?.boundStreamId || null;
+    
+    console.log(`[YouTube] ========================================`);
+    console.log(`[YouTube] DUPLICATING BROADCAST: ${req.params.id}`);
+    console.log(`[YouTube] ========================================`);
+    console.log(`[YouTube] Source Settings:`);
+    console.log(`[YouTube] - Title: ${src.snippet?.title}`);
+    console.log(`[YouTube] - Description: ${src.snippet?.description?.substring(0, 50)}...`);
+    console.log(`[YouTube] - Privacy: ${src.status?.privacyStatus}`);
+    console.log(`[YouTube] - Stream ID: ${boundStreamId || 'NONE'}`);
+    console.log(`[YouTube] - Auto Start: ${src.contentDetails?.enableAutoStart}`);
+    console.log(`[YouTube] - Auto Stop: ${src.contentDetails?.enableAutoStop}`);
+
+    // Get video details to read audience settings (Made for Kids, Age Restricted)
+    let madeForKids = undefined;
+    let ageRestricted = undefined;
+    try {
+      const { getYouTubeClient } = require('../config/google');
+      const yt = getYouTubeClient(tokens);
+      const videoRes = await yt.videos.list({
+        part: 'status,contentDetails',
+        id: req.params.id
+      });
+      
+      if (videoRes.data.items && videoRes.data.items.length > 0) {
+        const video = videoRes.data.items[0];
+        madeForKids = video.status?.selfDeclaredMadeForKids;
+        // Age restriction is in contentRating
+        ageRestricted = video.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted';
+        
+        console.log(`[YouTube] - Made for Kids: ${madeForKids}`);
+        console.log(`[YouTube] - Age Restricted: ${ageRestricted}`);
+      }
+    } catch (e) {
+      console.warn('[YouTube] Could not read audience settings:', e?.message || e);
+    }
+
+    // Copy ALL metadata including additional settings
     const payload = {
       title: src.snippet?.title || 'Untitled',
       description: src.snippet?.description || '',
       privacyStatus: src.status?.privacyStatus || 'unlisted',
       scheduledStartTime,
+      streamId: boundStreamId, // ✅ REUSE STREAM KEY
+      // Copy additional settings
+      enableAutoStart: src.contentDetails?.enableAutoStart !== undefined ? src.contentDetails.enableAutoStart : true,
+      enableAutoStop: src.contentDetails?.enableAutoStop !== undefined ? src.contentDetails.enableAutoStop : true,
     };
+    
+    console.log(`[YouTube] Creating duplicate with settings...`);
     const result = await youtubeService.scheduleLive(tokens, payload);
     const newId = result?.broadcast?.id;
+    
+    console.log(`[YouTube] ✓ Duplicate created: ${newId}`);
+    console.log(`[YouTube] ✓ Stream key ${boundStreamId ? 'REUSED ✓' : 'NEW ✗'}: ${result.stream?.id || boundStreamId}`);
 
-    // Try to copy thumbnail from source to new broadcast
+    // Copy audience settings (Made for Kids, Age Restricted) to new broadcast
+    let audienceCopied = false;
+    if (newId && (madeForKids !== undefined || ageRestricted !== undefined)) {
+      try {
+        console.log(`[YouTube] Copying audience settings to new broadcast...`);
+        await youtubeService.setAudience(tokens, {
+          videoId: newId,
+          selfDeclaredMadeForKids: madeForKids,
+          ageRestricted: ageRestricted,
+        });
+        audienceCopied = true;
+        console.log(`[YouTube] ✓ Audience settings copied: MadeForKids=${madeForKids}, AgeRestricted=${ageRestricted}`);
+      } catch (e) {
+        console.error('[YouTube] ✗ Failed to copy audience settings:', e?.message || e);
+      }
+    }
+
+    // Copy thumbnail from source to new broadcast
     let thumbUrl = null;
+    let thumbnailCopied = false;
     try {
       const t = src.snippet?.thumbnails || {};
       thumbUrl = t.maxres?.url || t.standard?.url || t.high?.url || t.medium?.url || t.default?.url || null;
       if (newId && thumbUrl) {
+        console.log(`[YouTube] Copying thumbnail from ${thumbUrl}`);
         const outPath = path.join(tmpDir, `dup_${newId}.jpg`);
         await new Promise((resolve, reject) => {
           const file = fs.createWriteStream(outPath);
@@ -456,20 +551,38 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
         if (fs.existsSync(outPath)) {
           try {
             await youtubeService.setThumbnail(tokens, { broadcastId: newId, filePath: outPath, mimeType: 'image/jpeg' });
+            thumbnailCopied = true;
+            console.log(`[YouTube] ✓ Thumbnail copied successfully`);
           } finally {
             try { fs.unlinkSync(outPath); } catch {}
           }
         }
       }
     } catch (e) {
-      console.warn('[YouTube] duplicate thumbnail copy skipped:', e?.message || e);
+      console.warn('[YouTube] ✗ Thumbnail copy failed:', e?.message || e);
     }
 
-    return res.json({ success: true, broadcast: result.broadcast, stream: result.stream, thumbnailCopied: !!thumbUrl });
+    console.log(`[YouTube] ========================================`);
+    console.log(`[YouTube] DUPLICATE SUMMARY:`);
+    console.log(`[YouTube] - New Broadcast ID: ${newId}`);
+    console.log(`[YouTube] - Stream Key: ${boundStreamId ? 'REUSED ✓' : 'NEW ✗'}`);
+    console.log(`[YouTube] - Thumbnail: ${thumbnailCopied ? 'COPIED ✓' : 'FAILED ✗'}`);
+    console.log(`[YouTube] - Audience Settings: ${audienceCopied ? 'COPIED ✓' : 'SKIPPED'}`);
+    console.log(`[YouTube] ========================================`);
+
+    return res.json({ 
+      success: true, 
+      broadcast: result.broadcast, 
+      stream: result.stream, 
+      thumbnailCopied,
+      audienceCopied,
+      streamKeyReused: !!boundStreamId,
+      message: `Duplicate created successfully`
+    });
   } catch (err) {
     const detail = err?.response?.data || null;
     const message = (detail && detail.error && detail.error.message) ? detail.error.message : (err && err.message ? err.message : 'Unknown error');
-    console.error('[YouTube] duplicate broadcast error:', detail || message);
+    console.error('[YouTube] ✗ Duplicate broadcast error:', detail || message);
     return res.status(500).json({ error: 'Failed to duplicate broadcast', message, detail });
   }
 });

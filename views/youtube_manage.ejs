@@ -7,6 +7,7 @@
         <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
         <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
         <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>Bulk Thumbnail</button>
+        <button id="yt-bulk-streamkey" class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>Set Stream Key</button>
         <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
       </div>
       <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
@@ -570,11 +571,22 @@
     // Initial load
     loadList();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 60 seconds (reduced from 30s since token management is stable)
+    // Pause when modal is open to prevent interrupting user edits
     let autoRefreshInterval = setInterval(() => {
+      // Check if any modal is open
+      const editModalOpen = !document.getElementById('ytEditModal').classList.contains('hidden');
+      const bulkEditModalOpen = !document.getElementById('ytBulkEditModal').classList.contains('hidden');
+      const duplicateModalOpen = !document.getElementById('ytDuplicateModal').classList.contains('hidden');
+      
+      if (editModalOpen || bulkEditModalOpen || duplicateModalOpen) {
+        console.log('[YouTube Manage] Skipping auto-refresh - modal is open');
+        return;
+      }
+      
       console.log('[YouTube Manage] Auto-refreshing broadcasts...');
       loadList();
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds (1 minute)
     
     // Listen for custom event from dashboard (when stream created)
     window.addEventListener('youtubeStreamCreated', () => {
@@ -596,9 +608,11 @@
       const any = boxes.some(b=>b.checked);
       const bulkEditBtn = document.getElementById('yt-bulk-edit');
       const bulkThumbBtn = document.getElementById('yt-bulk-thumbnail');
+      const bulkStreamKeyBtn = document.getElementById('yt-bulk-streamkey');
       if (bulkBtn) bulkBtn.disabled = !any;
       if (bulkEditBtn) bulkEditBtn.disabled = !any;
       if (bulkThumbBtn) bulkThumbBtn.disabled = !any;
+      if (bulkStreamKeyBtn) bulkStreamKeyBtn.disabled = !any;
       if (selAll) selAll.checked = boxes.length>0 && boxes.every(b=>b.checked);
     }
     if (selAll) selAll.addEventListener('change', ()=>{
@@ -644,6 +658,98 @@
       const ids = Array.from(document.querySelectorAll('.yt-select-item:checked')).map(b=>b.value);
       if (!ids.length) return;
       openBulkThumbnailUpload(ids);
+    });
+    
+    // Bulk Stream Key button
+    const bulkStreamKeyBtn = document.getElementById('yt-bulk-streamkey');
+    if (bulkStreamKeyBtn) bulkStreamKeyBtn.addEventListener('click', async ()=>{
+      const ids = Array.from(document.querySelectorAll('.yt-select-item:checked')).map(b=>b.value);
+      if (!ids.length) return;
+      
+      // Get list of available streams
+      try {
+        const res = await fetch('/youtube/api/streams');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch streams');
+        
+        const streams = data.items || [];
+        if (!streams.length) {
+          toast('No stream keys available. Create a stream first.', 'error');
+          return;
+        }
+        
+        // Show stream selection modal
+        const streamOptions = streams.map(s => 
+          `<option value="${s.id}">${s.title} (${s.streamKeyMasked || s.id})</option>`
+        ).join('');
+        
+        const streamId = prompt(`Select stream key to bind to ${ids.length} broadcasts:\n\nAvailable streams:\n${streams.map((s,i) => `${i+1}. ${s.title} - ${s.streamKeyMasked}`).join('\n')}\n\nEnter stream number (1-${streams.length}):`);
+        
+        if (!streamId) return;
+        
+        const streamIndex = parseInt(streamId) - 1;
+        if (isNaN(streamIndex) || streamIndex < 0 || streamIndex >= streams.length) {
+          toast('Invalid stream selection', 'error');
+          return;
+        }
+        
+        const selectedStream = streams[streamIndex];
+        
+        if (!confirm(`Bind ${ids.length} broadcasts to stream:\n${selectedStream.title}\n${selectedStream.streamKeyMasked}?`)) return;
+        
+        // Show progress
+        const progressToast = document.createElement('div');
+        progressToast.className = 'fixed bottom-4 right-4 bg-dark-800 border border-green-600 rounded-lg p-4 shadow-lg z-[100]';
+        progressToast.innerHTML = `
+          <div class="flex items-center gap-3">
+            <i class="ti ti-loader animate-spin text-green-400 text-xl"></i>
+            <div>
+              <div class="font-medium text-white">Binding stream keys...</div>
+              <div class="text-sm text-gray-400" id="bulk-streamkey-progress">0 / ${ids.length}</div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(progressToast);
+        
+        let success = 0, failed = 0;
+        const progressEl = document.getElementById('bulk-streamkey-progress');
+        
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          if (progressEl) progressEl.textContent = `${i + 1} / ${ids.length} processing...`;
+          
+          try {
+            const res = await fetch(`/youtube/broadcasts/${id}/bind-stream`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ streamId: selectedStream.id })
+            });
+            
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Bind failed');
+            
+            success++;
+          } catch (err) {
+            console.error(`Failed to bind stream for ${id}:`, err.message);
+            failed++;
+          }
+        }
+        
+        // Remove progress toast
+        document.body.removeChild(progressToast);
+        
+        // Show result
+        toast(`Bulk stream key binding complete — Success: ${success}, Failed: ${failed}`, failed > 0 ? 'error' : 'success');
+        
+        // Uncheck all and refresh
+        const selAll = document.getElementById('yt-select-all');
+        if (selAll) selAll.checked = false;
+        document.querySelectorAll('.yt-select-item').forEach(b => b.checked = false);
+        
+        loadList();
+      } catch (err) {
+        toast('Failed to load streams: ' + err.message, 'error');
+      }
     });
   
     const editForm = document.getElementById('ytEditForm');
