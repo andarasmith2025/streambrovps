@@ -68,12 +68,15 @@ async function fixAutoStartStop() {
           console.log(`  Current: Auto Start=${autoStart}, Auto Stop=${autoStop}`);
 
           try {
+            // Get full broadcast details first to preserve all fields
+            const fullBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId: id });
+            
             await youtubeService.updateBroadcast(tokens, {
               broadcastId: id,
-              title: broadcast.snippet?.title,
-              description: broadcast.snippet?.description,
-              privacyStatus: broadcast.status?.privacyStatus,
-              scheduledStartTime: broadcast.snippet?.scheduledStartTime,
+              title: fullBroadcast.snippet?.title,
+              description: fullBroadcast.snippet?.description,
+              privacyStatus: fullBroadcast.status?.privacyStatus,
+              scheduledStartTime: fullBroadcast.snippet?.scheduledStartTime,
               enableAutoStart: true,  // ✅ ENABLE
               enableAutoStop: true,   // ✅ ENABLE
             });
