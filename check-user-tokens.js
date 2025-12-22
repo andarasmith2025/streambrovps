@@ -14,9 +14,7 @@ db.all(`
     u.user_role,
     yt.access_token,
     yt.refresh_token,
-    yt.token_expiry,
-    yt.channel_id,
-    yt.channel_title,
+    yt.expiry_date,
     yt.created_at as token_created,
     yt.updated_at as token_updated
   FROM users u
@@ -38,15 +36,13 @@ db.all(`
     
     if (user.access_token) {
       console.log(`   ✅ YouTube Connected: YES`);
-      console.log(`   Channel: ${user.channel_title || 'Unknown'}`);
-      console.log(`   Channel ID: ${user.channel_id || 'Unknown'}`);
-      console.log(`   Token Expiry: ${user.token_expiry || 'Unknown'}`);
+      console.log(`   Token Expiry: ${user.expiry_date ? new Date(user.expiry_date).toLocaleString() : 'Unknown'}`);
       console.log(`   Token Created: ${user.token_created}`);
       console.log(`   Token Updated: ${user.token_updated}`);
       
       // Check if token is expired
-      if (user.token_expiry) {
-        const expiry = new Date(user.token_expiry);
+      if (user.expiry_date) {
+        const expiry = new Date(user.expiry_date);
         const now = new Date();
         if (expiry < now) {
           console.log(`   ⚠️ Token EXPIRED (${Math.floor((now - expiry) / 1000 / 60)} minutes ago)`);
