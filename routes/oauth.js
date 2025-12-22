@@ -202,17 +202,33 @@ router.get('/youtube/stream-keys', async (req, res) => {
   try {
     console.log('[OAuth] /youtube/stream-keys called');
     
-    if (!req.session.youtubeTokens) {
-      console.log('[OAuth] No YouTube tokens in session');
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    
+    if (!userId) {
+      console.log('[OAuth] No userId in session');
       return res.status(401).json({ 
         success: false, 
-        error: 'Not connected to YouTube. Please connect your YouTube account first.' 
+        error: 'Not authenticated. Please login first.' 
       });
     }
     
-    const userId = req.session && (req.session.userId || req.session.user_id);
     console.log('[OAuth] Fetching stream keys for user:', userId);
-    const yt = getYouTubeClient(req.session.youtubeTokens, userId);
+    
+    // Use token manager to get authenticated client (with auto-refresh)
+    const tokenManager = require('../services/youtubeTokenManager');
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    
+    if (!oauth2Client) {
+      console.log('[OAuth] Failed to get authenticated client');
+      return res.status(401).json({ 
+        success: false, 
+        error: 'YouTube not connected. Please connect your YouTube account first.' 
+      });
+    }
+    
+    // Create YouTube client with authenticated oauth2Client
+    const { google } = require('googleapis');
+    const yt = google.youtube({ version: 'v3', auth: oauth2Client });
     
     // Fetch live streams directly (this contains the stream keys)
     console.log('[OAuth] Calling YouTube API liveStreams.list...');
