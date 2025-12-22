@@ -403,26 +403,43 @@ async function startStream(streamId, options = {}) {
         const tokens = await getTokensForUser(stream.user_id);
         if (tokens && tokens.access_token) {
           console.log(`[StreamingService] Creating NEW YouTube broadcast for stream ${streamId}...`);
+          console.log(`[StreamingService] Using stream data: title="${stream.title}", description="${stream.youtube_description || stream.description || ''}", privacy="${stream.youtube_privacy}"`);
           
-          // Create new broadcast with current token
-          const newBroadcast = await youtubeService.scheduleLive(tokens, {
+          // Prepare broadcast options with ALL stream metadata
+          const broadcastOptions = {
             title: stream.title || 'Live Stream',
-            description: stream.description || '',
+            description: stream.youtube_description || stream.description || '',
             privacyStatus: stream.youtube_privacy || 'unlisted',
             scheduledStartTime: new Date().toISOString(),
             streamId: stream.youtube_stream_id, // Reuse existing stream key
-            enableAutoStart: true,
-            enableAutoStop: false
-          });
+            // Use stream settings if available, otherwise defaults
+            enableAutoStart: stream.youtube_auto_start ? true : false,
+            enableAutoStop: stream.youtube_auto_end ? true : false,
+            // Additional YouTube settings
+            madeForKids: stream.youtube_made_for_kids ? true : false,
+            ageRestricted: stream.youtube_age_restricted ? true : false,
+            syntheticContent: stream.youtube_synthetic_content ? true : false
+          };
+          
+          // Add thumbnail if available
+          if (stream.video_thumbnail) {
+            broadcastOptions.thumbnailPath = stream.video_thumbnail;
+            console.log(`[StreamingService] Using thumbnail: ${stream.video_thumbnail}`);
+          }
+          
+          // Create new broadcast with all metadata
+          const newBroadcast = await youtubeService.scheduleLive(tokens, broadcastOptions);
           
           const newBroadcastId = newBroadcast.broadcast.id;
+          const newStreamId = newBroadcast.stream.id;
           console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
+          console.log(`[StreamingService] ✓ Stream ID: ${newStreamId}`);
           
-          // Update stream with new broadcast ID
+          // Update stream with new broadcast ID AND stream ID
           await new Promise((resolve, reject) => {
             db.run(
-              `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
-              [newBroadcastId, streamId],
+              `UPDATE streams SET youtube_broadcast_id = ?, youtube_stream_id = ? WHERE id = ?`,
+              [newBroadcastId, newStreamId, streamId],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -430,10 +447,11 @@ async function startStream(streamId, options = {}) {
             );
           });
           
-          console.log(`[StreamingService] ✓ Stream updated with new broadcast ID`);
+          console.log(`[StreamingService] ✓ Stream updated with broadcast ID and stream ID`);
           
           // Update stream object
           stream.youtube_broadcast_id = newBroadcastId;
+          stream.youtube_stream_id = newStreamId;
         }
       } catch (createErr) {
         console.error(`[StreamingService] ⚠️ Failed to create new broadcast:`, createErr.message);
