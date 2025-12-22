@@ -1,29 +1,37 @@
 <% layout('layout') -%>
 <div class="space-y-4">
-  <div class="flex items-center justify-between">
-    <h2 class="text-xl font-semibold">YouTube Broadcasts</h2>
-    <div class="flex items-center gap-3">
-      <div class="hidden sm:flex items-center gap-2">
-        <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
-        <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
-        <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>Bulk Thumbnail</button>
-        <button id="yt-bulk-streamkey" class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>Set Stream Key</button>
-        <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
+  <!-- Sticky Header -->
+  <div class="sticky top-0 z-50 bg-dark-900/95 backdrop-blur-sm border-b border-gray-700 -mx-4 px-4 py-3 mb-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">YouTube Broadcasts</h2>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-2">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
+          <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
+          <button id="yt-bulk-thumbnail" class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50" disabled>Bulk Thumbnail</button>
+          <button id="yt-bulk-streamkey" class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded disabled:opacity-50" disabled>Set Stream Key</button>
+          <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
+        </div>
+        <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
+          <i class="ti ti-refresh text-gray-300"></i>
+        </button>
+        <label for="yt-status" class="text-sm text-gray-400">Status</label>
+        <select id="yt-status" class="bg-dark-700 border border-gray-600 text-sm rounded px-2 py-1">
+          <option value="all">All</option>
+          <option value="upcoming" selected>Upcoming</option>
+          <option value="active">Active (Live)</option>
+          <option value="completed">Completed</option>
+        </select>
       </div>
-      <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
-        <i class="ti ti-refresh text-gray-300"></i>
-      </button>
-      <label for="yt-status" class="text-sm text-gray-400">Status</label>
-      <select id="yt-status" class="bg-dark-700 border border-gray-600 text-sm rounded px-2 py-1">
-        <option value="all">All</option>
-        <option value="upcoming" selected>Upcoming</option>
-        <option value="active">Active (Live)</option>
-        <option value="completed">Completed</option>
-      </select>
     </div>
   </div>
 
   <div id="yt-broadcasts" class="space-y-3"></div>
+
+  <!-- Scroll to Top Button -->
+  <button id="scrollToTopBtn" class="hidden fixed bottom-6 right-6 z-40 p-3 bg-primary hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-300 hover:scale-110" title="Scroll to top">
+    <i class="ti ti-arrow-up text-xl"></i>
+  </button>
 
   <!-- Edit Broadcast Modal -->
   <div id="ytEditModal" class="hidden fixed inset-0 bg-black/50 z-[70] items-center justify-center p-4">
@@ -999,4 +1007,28 @@
     };
     input.click();
   }
+  
+  // Scroll to Top Button Logic
+  (function() {
+    const scrollBtn = document.getElementById('scrollToTopBtn');
+    if (!scrollBtn) return;
+    
+    // Show/hide button based on scroll position
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 300) {
+        scrollBtn.classList.remove('hidden');
+      } else {
+        scrollBtn.classList.add('hidden');
+      }
+    });
+    
+    // Scroll to top when clicked
+    scrollBtn.addEventListener('click', () => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+  })();
 </script>
+
