@@ -421,9 +421,11 @@ const csrfProtection = function (req, res, next) {
   next();
 };
 const isAuthenticated = (req, res, next) => {
+  console.log('[isAuthenticated] Checking session. userId:', req.session.userId, 'sessionID:', req.sessionID);
   if (req.session.userId) {
     return next();
   }
+  console.log('[isAuthenticated] No userId in session, redirecting to login');
   res.redirect('/login');
 };
 
