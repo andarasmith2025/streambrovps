@@ -110,6 +110,57 @@ router.patch('/broadcasts/:id', async (req, res) => {
   }
 });
 
+// Bulk update broadcast (supports additional settings)
+router.patch('/broadcasts/:id/bulk-update', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    
+    const { 
+      title, 
+      description, 
+      privacyStatus, 
+      scheduledStartTime, 
+      enableAutoStart, 
+      enableAutoStop,
+      selfDeclaredMadeForKids,
+      ageRestricted,
+      syntheticContent
+    } = req.body || {};
+    
+    // Update broadcast metadata
+    if (title || description || privacyStatus || scheduledStartTime || 
+        typeof enableAutoStart === 'boolean' || typeof enableAutoStop === 'boolean') {
+      await youtubeService.updateBroadcast(tokens, {
+        broadcastId: req.params.id,
+        title,
+        description,
+        privacyStatus,
+        scheduledStartTime,
+        enableAutoStart,
+        enableAutoStop,
+      });
+    }
+    
+    // Update audience settings (made for kids, age restricted)
+    if (typeof selfDeclaredMadeForKids === 'boolean' || typeof ageRestricted === 'boolean') {
+      await youtubeService.setAudience(tokens, {
+        videoId: req.params.id,
+        selfDeclaredMadeForKids,
+        ageRestricted,
+      });
+    }
+    
+    // Note: Synthetic content is not supported by YouTube API yet
+    // It's included in the UI for future compatibility
+    
+    return res.json({ success: true, message: 'Broadcast updated' });
+  } catch (err) {
+    console.error('[YouTube] bulk update broadcast error:', err?.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to update broadcast', details: err?.response?.data?.error?.message || err.message });
+  }
+});
+
 // Audience (made for kids) endpoint removed per API limitations
 
 // Transition broadcast status: testing | live | complete

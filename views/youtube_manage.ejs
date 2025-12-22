@@ -5,6 +5,7 @@
     <div class="flex items-center gap-3">
       <div class="hidden sm:flex items-center gap-2">
         <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="yt-select-all" type="checkbox"> Select all</label>
+        <button id="yt-bulk-edit" class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50" disabled>Bulk Edit</button>
         <button id="yt-bulk-delete" class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-500 rounded disabled:opacity-50" disabled>Delete selected</button>
       </div>
       <button id="yt-refresh-btn" onclick="loadList()" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Refresh">
@@ -60,6 +61,160 @@
         <div class="pt-2 flex justify-end gap-2">
           <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
           <button type="submit" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bulk Edit Modal -->
+  <div id="ytBulkEditModal" class="hidden fixed inset-0 bg-black/50 z-[70] items-center justify-center p-4">
+    <div class="bg-dark-800 rounded-xl w-full max-w-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-dark-800 z-10">
+        <h3 class="font-medium">Bulk Edit Broadcasts</h3>
+        <button onclick="closeBulkEditModal()" class="text-gray-400 hover:text-white"><i class="ti ti-x text-xl"></i></button>
+      </div>
+      <form id="ytBulkEditForm" class="p-4 space-y-4">
+        <div class="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-4">
+          <div class="flex items-start gap-2">
+            <i class="ti ti-info-circle text-blue-400 text-lg mt-0.5"></i>
+            <div class="text-sm text-gray-300">
+              <p class="font-medium mb-1">Editing <span id="bulkEditCount">0</span> broadcasts</p>
+              <p class="text-xs text-gray-400">Only filled fields will be updated. Leave fields empty to keep existing values.</p>
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-sm text-gray-300 mb-1">Title</label>
+          <input type="text" id="bulkEditTitle" placeholder="Leave empty to keep existing" class="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded">
+          <p class="text-xs text-gray-500 mt-1">Leave empty to keep each broadcast's current title</p>
+        </div>
+        
+        <div>
+          <label class="block text-sm text-gray-300 mb-1">Description</label>
+          <textarea id="bulkEditDescription" rows="3" placeholder="Leave empty to keep existing" class="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded"></textarea>
+          <p class="text-xs text-gray-500 mt-1">Leave empty to keep each broadcast's current description</p>
+        </div>
+        
+        <div>
+          <label class="block text-sm text-gray-300 mb-1">Privacy</label>
+          <select id="bulkEditPrivacy" class="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded">
+            <option value="">Keep existing</option>
+            <option value="private">Private</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+        
+        <div class="border-t border-gray-700 pt-4">
+          <label class="block text-sm font-medium text-white mb-3">Additional Settings</label>
+          
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">Made for Kids</label>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkMadeForKids" value="" checked class="w-4 h-4">
+                  <span>Keep existing</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkMadeForKids" value="yes" class="w-4 h-4">
+                  <span>Yes</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkMadeForKids" value="no" class="w-4 h-4">
+                  <span>No</span>
+                </label>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">Age Restriction</label>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkAgeRestricted" value="" checked class="w-4 h-4">
+                  <span>Keep existing</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkAgeRestricted" value="yes" class="w-4 h-4">
+                  <span>Age-restricted (18+)</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkAgeRestricted" value="no" class="w-4 h-4">
+                  <span>Not restricted</span>
+                </label>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">Synthetic Content</label>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkSyntheticContent" value="" checked class="w-4 h-4">
+                  <span>Keep existing</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkSyntheticContent" value="yes" class="w-4 h-4">
+                  <span>Contains AI content</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="bulkSyntheticContent" value="no" class="w-4 h-4">
+                  <span>No AI content</span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div>
+                <label class="block text-sm text-gray-300 mb-2">Auto Start</label>
+                <div class="flex items-center gap-4">
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoStart" value="" checked class="w-4 h-4">
+                    <span>Keep</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoStart" value="yes" class="w-4 h-4">
+                    <span>Enable</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoStart" value="no" class="w-4 h-4">
+                    <span>Disable</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm text-gray-300 mb-2">Auto End</label>
+                <div class="flex items-center gap-4">
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoEnd" value="" checked class="w-4 h-4">
+                    <span>Keep</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoEnd" value="yes" class="w-4 h-4">
+                    <span>Enable</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="radio" name="bulkAutoEnd" value="no" class="w-4 h-4">
+                    <span>Disable</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div id="bulkEditProgress" class="hidden bg-gray-900/50 border border-gray-700 rounded-lg p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <i class="ti ti-loader animate-spin text-blue-400"></i>
+            <span class="text-sm text-gray-300">Processing...</span>
+          </div>
+          <div class="text-xs text-gray-400" id="bulkEditProgressText">0 / 0 completed</div>
+        </div>
+        
+        <div class="pt-2 flex justify-end gap-2 border-t border-gray-700">
+          <button type="button" onclick="closeBulkEditModal()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded">Apply Changes</button>
         </div>
       </form>
     </div>
@@ -438,7 +593,9 @@
     function refreshBulkState(){
       const boxes = Array.from(document.querySelectorAll('.yt-select-item'));
       const any = boxes.some(b=>b.checked);
+      const bulkEditBtn = document.getElementById('yt-bulk-edit');
       if (bulkBtn) bulkBtn.disabled = !any;
+      if (bulkEditBtn) bulkEditBtn.disabled = !any;
       if (selAll) selAll.checked = boxes.length>0 && boxes.every(b=>b.checked);
     }
     if (selAll) selAll.addEventListener('change', ()=>{
@@ -468,6 +625,14 @@
       if (selAll) { selAll.disabled = false; selAll.checked = false; }
       bulkBtn.disabled = false;
       loadList();
+    });
+    
+    // Bulk Edit button
+    const bulkEditBtn = document.getElementById('yt-bulk-edit');
+    if (bulkEditBtn) bulkEditBtn.addEventListener('click', ()=>{
+      const ids = Array.from(document.querySelectorAll('.yt-select-item:checked')).map(b=>b.value);
+      if (!ids.length) return;
+      openBulkEditModal(ids);
     });
   
     const editForm = document.getElementById('ytEditForm');
@@ -500,4 +665,128 @@
       });
     }
   });
+  
+  // Bulk Edit Modal Functions
+  function openBulkEditModal(ids){
+    const modal = document.getElementById('ytBulkEditModal');
+    const countSpan = document.getElementById('bulkEditCount');
+    if (countSpan) countSpan.textContent = ids.length;
+    
+    // Store selected IDs in modal
+    modal.dataset.selectedIds = JSON.stringify(ids);
+    
+    // Reset form
+    document.getElementById('bulkEditTitle').value = '';
+    document.getElementById('bulkEditDescription').value = '';
+    document.getElementById('bulkEditPrivacy').value = '';
+    
+    // Reset radio buttons to "keep existing"
+    document.querySelectorAll('input[name="bulkMadeForKids"]').forEach(r => r.checked = r.value === '');
+    document.querySelectorAll('input[name="bulkAgeRestricted"]').forEach(r => r.checked = r.value === '');
+    document.querySelectorAll('input[name="bulkSyntheticContent"]').forEach(r => r.checked = r.value === '');
+    document.querySelectorAll('input[name="bulkAutoStart"]').forEach(r => r.checked = r.value === '');
+    document.querySelectorAll('input[name="bulkAutoEnd"]').forEach(r => r.checked = r.value === '');
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  
+  function closeBulkEditModal(){
+    const modal = document.getElementById('ytBulkEditModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  
+  // Bulk Edit Form Submit
+  const bulkEditForm = document.getElementById('ytBulkEditForm');
+  if (bulkEditForm) {
+    bulkEditForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      
+      const modal = document.getElementById('ytBulkEditModal');
+      const ids = JSON.parse(modal.dataset.selectedIds || '[]');
+      if (!ids.length) return;
+      
+      // Collect updates (only include fields that should be updated)
+      const updates = {};
+      
+      const title = document.getElementById('bulkEditTitle').value.trim();
+      if (title) updates.title = title;
+      
+      const description = document.getElementById('bulkEditDescription').value.trim();
+      if (description) updates.description = description;
+      
+      const privacy = document.getElementById('bulkEditPrivacy').value;
+      if (privacy) updates.privacyStatus = privacy;
+      
+      // Additional settings
+      const madeForKids = document.querySelector('input[name="bulkMadeForKids"]:checked')?.value;
+      if (madeForKids) updates.selfDeclaredMadeForKids = madeForKids === 'yes';
+      
+      const ageRestricted = document.querySelector('input[name="bulkAgeRestricted"]:checked')?.value;
+      if (ageRestricted) updates.ageRestricted = ageRestricted === 'yes';
+      
+      const syntheticContent = document.querySelector('input[name="bulkSyntheticContent"]:checked')?.value;
+      if (syntheticContent) updates.syntheticContent = syntheticContent === 'yes';
+      
+      const autoStart = document.querySelector('input[name="bulkAutoStart"]:checked')?.value;
+      if (autoStart) updates.enableAutoStart = autoStart === 'yes';
+      
+      const autoEnd = document.querySelector('input[name="bulkAutoEnd"]:checked')?.value;
+      if (autoEnd) updates.enableAutoStop = autoEnd === 'yes';
+      
+      // Check if any updates
+      if (Object.keys(updates).length === 0) {
+        toast('No changes to apply', 'info');
+        return;
+      }
+      
+      // Show progress
+      const progress = document.getElementById('bulkEditProgress');
+      const progressText = document.getElementById('bulkEditProgressText');
+      const submitBtn = bulkEditForm.querySelector('button[type="submit"]');
+      const cancelBtn = bulkEditForm.querySelector('button[type="button"]');
+      
+      if (progress) progress.classList.remove('hidden');
+      if (submitBtn) submitBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      
+      let success = 0, failed = 0;
+      
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        if (progressText) progressText.textContent = `${i + 1} / ${ids.length} processing...`;
+        
+        try {
+          const res = await fetch(`/youtube/broadcasts/${id}/bulk-update`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+          });
+          
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'Update failed');
+          success++;
+        } catch (err) {
+          console.error(`Failed to update ${id}:`, err.message);
+          failed++;
+        }
+      }
+      
+      if (progress) progress.classList.add('hidden');
+      if (submitBtn) submitBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      
+      toast(`Bulk edit complete — Success: ${success}, Failed: ${failed}`, failed > 0 ? 'error' : 'success');
+      
+      closeBulkEditModal();
+      
+      // Uncheck all and refresh
+      const selAll = document.getElementById('yt-select-all');
+      if (selAll) selAll.checked = false;
+      document.querySelectorAll('.yt-select-item').forEach(b => b.checked = false);
+      
+      loadList();
+    });
+  }
 </script>
