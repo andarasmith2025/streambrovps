@@ -166,43 +166,8 @@
               </div>
             </div>
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <div>
-                <label class="block text-sm text-gray-300 mb-2">Auto Start</label>
-                <div class="flex items-center gap-4">
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoStart" value="" checked class="w-4 h-4">
-                    <span>Keep</span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoStart" value="yes" class="w-4 h-4">
-                    <span>Enable</span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoStart" value="no" class="w-4 h-4">
-                    <span>Disable</span>
-                  </label>
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm text-gray-300 mb-2">Auto End</label>
-                <div class="flex items-center gap-4">
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoEnd" value="" checked class="w-4 h-4">
-                    <span>Keep</span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoEnd" value="yes" class="w-4 h-4">
-                    <span>Enable</span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="radio" name="bulkAutoEnd" value="no" class="w-4 h-4">
-                    <span>Disable</span>
-                  </label>
-                </div>
-              </div>
-            </div>
+            <!-- Auto Start/Stop removed from bulk edit due to YouTube API strict requirements -->
+            <!-- Use individual edit (Edit button) to change these settings -->
           </div>
         </div>
         
@@ -772,8 +737,6 @@
     document.querySelectorAll('input[name="bulkMadeForKids"]').forEach(r => r.checked = r.value === '');
     document.querySelectorAll('input[name="bulkAgeRestricted"]').forEach(r => r.checked = r.value === '');
     document.querySelectorAll('input[name="bulkSyntheticContent"]').forEach(r => r.checked = r.value === '');
-    document.querySelectorAll('input[name="bulkAutoStart"]').forEach(r => r.checked = r.value === '');
-    document.querySelectorAll('input[name="bulkAutoEnd"]').forEach(r => r.checked = r.value === '');
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -817,11 +780,8 @@
       const syntheticContent = document.querySelector('input[name="bulkSyntheticContent"]:checked')?.value;
       if (syntheticContent) updates.syntheticContent = syntheticContent === 'yes';
       
-      const autoStart = document.querySelector('input[name="bulkAutoStart"]:checked')?.value;
-      if (autoStart) updates.enableAutoStart = autoStart === 'yes';
-      
-      const autoEnd = document.querySelector('input[name="bulkAutoEnd"]:checked')?.value;
-      if (autoEnd) updates.enableAutoStop = autoEnd === 'yes';
+      // Auto Start/Stop removed from bulk edit due to YouTube API strict requirements
+      // Use individual edit (Edit button) to change these settings
       
       // Check if any updates
       if (Object.keys(updates).length === 0) {

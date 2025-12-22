@@ -157,9 +157,12 @@ module.exports = {
         privacyStatus: currentBroadcast.status?.privacyStatus || 'unlisted',
       },
       contentDetails: {
+        // CRITICAL: Always include these required fields with proper defaults
         enableAutoStart: currentBroadcast.contentDetails?.enableAutoStart ?? false,
         enableAutoStop: currentBroadcast.contentDetails?.enableAutoStop ?? false,
-        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream ?? true,
+        enableMonitorStream: currentBroadcast.contentDetails?.enableMonitorStream !== undefined 
+          ? currentBroadcast.contentDetails.enableMonitorStream 
+          : true, // Default to true if not set
       },
     };
     
@@ -191,6 +194,7 @@ module.exports = {
       enableAutoStart: requestBody.contentDetails.enableAutoStart,
       enableAutoStop: requestBody.contentDetails.enableAutoStop,
       enableMonitorStream: requestBody.contentDetails.enableMonitorStream,
+      hasContentDetails: !!currentBroadcast.contentDetails,
     });
     
     // CRITICAL: Only send snippet, status, and contentDetails - NEVER cdn
