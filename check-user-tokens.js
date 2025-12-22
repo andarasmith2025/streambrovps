@@ -11,7 +11,6 @@ db.all(`
   SELECT 
     u.id,
     u.username,
-    u.email,
     u.user_role,
     yt.access_token,
     yt.refresh_token,
@@ -33,7 +32,7 @@ db.all(`
   console.log(`Found ${users.length} user(s):\n`);
 
   users.forEach((user, idx) => {
-    console.log(`${idx + 1}. ${user.username} (${user.email})`);
+    console.log(`${idx + 1}. ${user.username}`);
     console.log(`   User ID: ${user.id}`);
     console.log(`   Role: ${user.user_role}`);
     
@@ -72,8 +71,7 @@ db.all(`
       s.youtube_broadcast_id,
       s.use_youtube_api,
       s.user_id,
-      u.username,
-      u.email
+      u.username
     FROM streams s
     JOIN users u ON s.user_id = u.id
     WHERE s.status = 'live'
@@ -90,7 +88,7 @@ db.all(`
     streams.forEach((stream, idx) => {
       console.log(`${idx + 1}. ${stream.title}`);
       console.log(`   Stream ID: ${stream.id}`);
-      console.log(`   Owner: ${stream.username} (${stream.email})`);
+      console.log(`   Owner: ${stream.username}`);
       console.log(`   User ID: ${stream.user_id}`);
       console.log(`   Use YouTube API: ${stream.use_youtube_api ? 'YES' : 'NO'}`);
       console.log(`   Broadcast ID: ${stream.youtube_broadcast_id || 'NOT SET'}`);
