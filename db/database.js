@@ -404,7 +404,103 @@ function createTables() {
       console.error('Error creating stream_templates table:', err.message);
     }
   });
+
+  // ========================================
+  // Gemini AI & YouTube Metadata Migrations
+  // ========================================
+  
+  // Add Gemini API key to users table
+  db.run(`ALTER TABLE users ADD COLUMN gemini_api_key TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding gemini_api_key column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added gemini_api_key column to users table');
+    }
+  });
+
+  // Add YouTube metadata fields to streams table
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_tags TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_tags column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_tags column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_category_id TEXT DEFAULT '22'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_category_id column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_category_id column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_language TEXT DEFAULT 'en'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_language column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_language column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_enable_dvr BOOLEAN DEFAULT 1`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_enable_dvr column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_enable_dvr column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_enable_embed BOOLEAN DEFAULT 1`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_enable_embed column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_enable_embed column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_record_from_start BOOLEAN DEFAULT 1`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_record_from_start column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_record_from_start column to streams table');
+    }
+  });
+
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_latency_preference TEXT DEFAULT 'normal'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_latency_preference column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_latency_preference column to streams table');
+    }
+  });
+
+  // Add same fields to stream_templates table
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_tags TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_tags column to templates:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_tags column to stream_templates table');
+    }
+  });
+
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_category_id TEXT DEFAULT '22'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_category_id column to templates:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_category_id column to stream_templates table');
+    }
+  });
+
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_language TEXT DEFAULT 'en'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_language column to templates:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_language column to stream_templates table');
+    }
+  });
 }
+
 function checkIfUsersExist() {
   return new Promise((resolve, reject) => {
     db.get('SELECT COUNT(*) as count FROM users', [], (err, result) => {

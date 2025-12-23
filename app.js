@@ -367,6 +367,10 @@ app.use('/api/youtube-broadcasts', youtubeBroadcastsRoutes);
 const templatesRoutes = require('./routes/templates');
 app.use('/api/templates', templatesRoutes);
 
+// Gemini AI routes
+const geminiRoutes = require('./routes/gemini');
+app.use('/api/gemini', geminiRoutes);
+
 // Expose session-based flags to views (after session is set up and body parsers)
 // Ensure youtubeChannel is populated if tokens exist
 app.use(async (req, res, next) => {
