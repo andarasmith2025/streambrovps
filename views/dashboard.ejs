@@ -629,16 +629,15 @@
               return;
             }
             
-            // ⚠️ CRITICAL: Validate that YouTube Stream ID is present
+            // YouTube Stream ID is optional - user can input manually OR select from list
             const youtubeStreamIdInput = document.getElementById('youtubeStreamId');
             const youtubeStreamId = youtubeStreamIdInput?.value || sessionStorage.getItem('selectedYouTubeStreamId');
             
-            if (!youtubeStreamId || youtubeStreamId === 'null' || youtubeStreamId === 'undefined') {
-              showNotification('Warning', 'Please select a stream from YouTube streamlist first. Click "Select Stream Key" button to choose an existing stream.', 'warning');
-              return;
+            if (youtubeStreamId && youtubeStreamId !== 'null' && youtubeStreamId !== 'undefined') {
+              console.log('[Form Submit] YouTube Stream ID provided:', youtubeStreamId);
+            } else {
+              console.log('[Form Submit] No YouTube Stream ID - using manual input mode');
             }
-            
-            console.log('[Form Submit] YouTube Stream ID validated:', youtubeStreamId);
           } else {
             // Manual RTMP mode validation
             const rtmpUrl = document.getElementById('rtmpUrl')?.value.trim();

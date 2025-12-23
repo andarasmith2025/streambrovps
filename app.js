@@ -2473,79 +2473,80 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           console.log(`[CREATE STREAM] - Title: ${req.body.streamTitle}`);
           console.log(`[CREATE STREAM] - Scheduled: ${scheduledStartTime}`);
           console.log(`[CREATE STREAM] - Privacy: ${streamData.youtube_privacy}`);
-          console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED - will create new'}`);
+          console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED - manual input mode'}`);
           
-          // ⚠️ CRITICAL: YouTube Stream ID MUST be provided when using YouTube API mode
-          // If not provided, we cannot create the broadcast because we don't know which stream key to use
-          if (!youtubeStreamId) {
-            console.error(`[CREATE STREAM] ❌ YouTube Stream ID is required for YouTube API mode`);
-            console.error(`[CREATE STREAM] User must select a stream from YouTube streamlist first`);
+          // If YouTube Stream ID is provided, create broadcast with existing stream
+          // If not provided, user is using manual input mode (no broadcast creation needed)
+          if (youtubeStreamId) {
+            console.log(`[CREATE STREAM] Using existing YouTube stream: ${youtubeStreamId}`);
             
-            // Delete the stream we just created since we can't proceed
-            await Stream.delete(stream.id);
-            
-            return res.status(400).json({ 
-              success: false, 
-              error: 'YouTube Stream ID is required. Please select a stream from YouTube streamlist first.' 
-            });
-          }
-          
-          // Create broadcast via YouTube API with the selected stream ID
-          const broadcastResult = await youtubeService.scheduleLive(tokens, {
-            title: req.body.streamTitle,
-            description: streamData.youtube_description || '',
-            privacyStatus: streamData.youtube_privacy || 'unlisted',
-            scheduledStartTime: scheduledStartTime,
-            streamId: youtubeStreamId, // MUST use the stream ID selected by user
-            enableAutoStart: streamData.youtube_auto_start || false,
-            enableAutoStop: streamData.youtube_auto_end || false
-          });
-          
-          // Update stream with broadcast ID
-          if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
-            await Stream.update(stream.id, {
-              youtube_broadcast_id: broadcastResult.broadcast.id
+            // Create broadcast via YouTube API with the selected stream ID
+            const broadcastResult = await youtubeService.scheduleLive(tokens, {
+              title: req.body.streamTitle,
+              description: streamData.youtube_description || '',
+              privacyStatus: streamData.youtube_privacy || 'unlisted',
+              scheduledStartTime: scheduledStartTime,
+              streamId: youtubeStreamId, // Use the stream ID selected by user
+              enableAutoStart: streamData.youtube_auto_start || false,
+              enableAutoStop: streamData.youtube_auto_end || false
             });
             
-            console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
-            stream.youtube_broadcast_id = broadcastResult.broadcast.id;
-            
-            // Set audience settings (Made for Kids, Age Restricted)
-            if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted) {
-              try {
-                await youtubeService.setAudience(tokens, {
-                  videoId: broadcastResult.broadcast.id,
-                  selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
-                  ageRestricted: streamData.youtube_age_restricted
-                });
-                console.log(`[CREATE STREAM] ✓ Audience settings applied (Made for Kids: ${streamData.youtube_made_for_kids}, Age Restricted: ${streamData.youtube_age_restricted})`);
-              } catch (audienceError) {
-                console.error('[CREATE STREAM] Error setting audience:', audienceError);
-              }
-            }
-            
-            // Upload thumbnail if provided (multer stores file in req.file)
-            if (req.file) {
-              try {
-                console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
-                
-                await youtubeService.setThumbnail(tokens, {
-                  broadcastId: broadcastResult.broadcast.id,
-                  filePath: req.file.path,
-                  mimeType: req.file.mimetype
-                });
-                
-                console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
-                
-                // Clean up file after upload
-                fs.unlinkSync(req.file.path);
-              } catch (thumbnailError) {
-                console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
-                // Clean up file even on error
-                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                  fs.unlinkSync(req.file.path);
+            // Update stream with broadcast ID
+            if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
+              await Stream.update(stream.id, {
+                youtube_broadcast_id: broadcastResult.broadcast.id
+              });
+              
+              console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
+              stream.youtube_broadcast_id = broadcastResult.broadcast.id;
+              
+              // Set audience settings (Made for Kids, Age Restricted)
+              if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted) {
+                try {
+                  await youtubeService.setAudience(tokens, {
+                    videoId: broadcastResult.broadcast.id,
+                    selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
+                    ageRestricted: streamData.youtube_age_restricted
+                  });
+                  console.log(`[CREATE STREAM] ✓ Audience settings applied (Made for Kids: ${streamData.youtube_made_for_kids}, Age Restricted: ${streamData.youtube_age_restricted})`);
+                } catch (audienceError) {
+                  console.error('[CREATE STREAM] Error setting audience:', audienceError);
                 }
               }
+              
+              // Upload thumbnail if provided (multer stores file in req.file)
+              if (req.file) {
+                try {
+                  console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
+                  
+                  await youtubeService.setThumbnail(tokens, {
+                    broadcastId: broadcastResult.broadcast.id,
+                    filePath: req.file.path,
+                    mimeType: req.file.mimetype
+                  });
+                  
+                  console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
+                  
+                  // Clean up file after upload
+                  fs.unlinkSync(req.file.path);
+                } catch (thumbnailError) {
+                  console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
+                  // Clean up file even on error
+                  if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                    fs.unlinkSync(req.file.path);
+                  }
+                }
+              }
+            }
+          } else {
+            console.log(`[CREATE STREAM] ⚠️  No YouTube Stream ID provided - Manual input mode`);
+            console.log(`[CREATE STREAM] User will use manually entered RTMP URL and Stream Key`);
+            console.log(`[CREATE STREAM] No YouTube broadcast will be created`);
+            
+            // Clean up thumbnail file if uploaded (not needed for manual mode)
+            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+              fs.unlinkSync(req.file.path);
+              console.log(`[CREATE STREAM] Thumbnail file cleaned up (not used in manual mode)`);
             }
           }
         } else {
