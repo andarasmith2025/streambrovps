@@ -907,10 +907,22 @@ function switchStreamTab(tab) {
   currentStreamTab = tab;
   window.currentStreamTab = tab; // Update global reference
   
-  const tabManual = document.getElementById('tabManual');
-  const tabYouTube = document.getElementById('tabYouTube');
+  // Auto-detect which modal is open (New Stream or Edit Stream)
+  const isEditModal = document.getElementById('editStreamModal') && 
+                      !document.getElementById('editStreamModal').classList.contains('hidden');
+  
+  const tabPrefix = isEditModal ? 'editTab' : 'tab';
+  console.log('[switchStreamTab] Modal type:', isEditModal ? 'Edit' : 'New', 'tabPrefix:', tabPrefix);
+  
+  const tabManual = document.getElementById(tabPrefix + 'Manual');
+  const tabYouTube = document.getElementById(tabPrefix + 'YouTube');
   const youtubeApiFields = document.getElementById('youtubeApiFields');
   const manualRtmpFields = document.getElementById('manualRtmpFields');
+  
+  if (!tabManual || !tabYouTube) {
+    console.error('[switchStreamTab] Tab buttons not found:', { tabManual, tabYouTube });
+    return;
+  }
   
   if (tab === 'manual') {
     // Activate Manual tab
@@ -925,11 +937,13 @@ function switchStreamTab(tab) {
     if (youtubeApiFields) youtubeApiFields.classList.add('hidden');
     if (manualRtmpFields) manualRtmpFields.classList.remove('hidden');
     
-    // Make RTMP fields required
-    const rtmpUrl = document.getElementById('rtmpUrl');
-    const streamKey = document.getElementById('streamKey');
-    if (rtmpUrl) rtmpUrl.required = true;
-    if (streamKey) streamKey.required = true;
+    // Make RTMP fields required (only for New Stream Modal)
+    if (!isEditModal) {
+      const rtmpUrl = document.getElementById('rtmpUrl');
+      const streamKey = document.getElementById('streamKey');
+      if (rtmpUrl) rtmpUrl.required = true;
+      if (streamKey) streamKey.required = true;
+    }
     
   } else if (tab === 'youtube') {
     // Activate YouTube tab
@@ -944,11 +958,13 @@ function switchStreamTab(tab) {
     if (youtubeApiFields) youtubeApiFields.classList.remove('hidden');
     if (manualRtmpFields) manualRtmpFields.classList.add('hidden');
     
-    // Make RTMP fields not required
-    const rtmpUrl = document.getElementById('rtmpUrl');
-    const streamKey = document.getElementById('streamKey');
-    if (rtmpUrl) rtmpUrl.required = false;
-    if (streamKey) streamKey.required = false;
+    // Make RTMP fields not required (only for New Stream Modal)
+    if (!isEditModal) {
+      const rtmpUrl = document.getElementById('rtmpUrl');
+      const streamKey = document.getElementById('streamKey');
+      if (rtmpUrl) rtmpUrl.required = false;
+      if (streamKey) streamKey.required = false;
+    }
     
     // Don't auto-load stream keys - user will click Load button
     // loadYouTubeStreamKeys();
