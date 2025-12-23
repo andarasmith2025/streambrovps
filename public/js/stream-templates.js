@@ -387,9 +387,15 @@ function closeSaveTemplateModal() {
     modal.classList.add('hidden');
     document.body.style.overflow = 'auto';
     
-    // Clear form
-    document.getElementById('templateName').value = '';
-    document.getElementById('templateDescription').value = '';
+    // Clear form inputs
+    const templateNameInput = document.getElementById('templateName');
+    const templateDescInput = document.getElementById('templateDescription');
+    
+    if (templateNameInput) templateNameInput.value = '';
+    if (templateDescInput) templateDescInput.value = '';
+    
+    // Clear temporary data
+    window._templateData = null;
   }, 200);
 }
 

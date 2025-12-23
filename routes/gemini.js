@@ -117,13 +117,22 @@ router.post('/test-key', isAuthenticated, async (req, res) => {
       });
     }
     
-    const isValid = await geminiService.testApiKey(apiKey);
+    const result = await geminiService.testApiKey(apiKey);
     
-    res.json({
-      success: true,
-      valid: isValid,
-      message: isValid ? 'API key is valid' : 'API key is invalid'
-    });
+    if (result.valid) {
+      res.json({
+        success: true,
+        valid: true,
+        model: result.model,
+        message: 'API key is valid'
+      });
+    } else {
+      res.json({
+        success: false,
+        valid: false,
+        error: result.error || 'API key is invalid'
+      });
+    }
   } catch (error) {
     console.error('[Gemini API] Test key error:', error);
     res.status(500).json({

@@ -2128,6 +2128,15 @@
             // Store stream data for later use
             window.currentEditStream = stream;
             
+            // Reset thumbnail preview first
+            const thumbnailInput = document.getElementById('youtubeThumbnail');
+            const thumbnailPreview = document.getElementById('youtubeThumbnailPreview');
+            const thumbnailInfo = document.getElementById('youtubeThumbnailInfo');
+            
+            if (thumbnailInput) thumbnailInput.value = '';
+            if (thumbnailPreview) thumbnailPreview.classList.add('hidden');
+            if (thumbnailInfo) thumbnailInfo.innerHTML = '';
+            
             originalStreamKey = stream.stream_key;
             safeSetValue('editStreamId', stream.id);
             safeSetValue('editStreamTitle', stream.title);
@@ -2283,6 +2292,15 @@
           
           const selectedVideo = document.getElementById('editSelectedVideo');
           if (selectedVideo) selectedVideo.textContent = 'Choose a video...';
+          
+          // Reset thumbnail preview
+          const thumbnailInput = document.getElementById('youtubeThumbnail');
+          const thumbnailPreview = document.getElementById('youtubeThumbnailPreview');
+          const thumbnailInfo = document.getElementById('youtubeThumbnailInfo');
+          
+          if (thumbnailInput) thumbnailInput.value = '';
+          if (thumbnailPreview) thumbnailPreview.classList.add('hidden');
+          if (thumbnailInfo) thumbnailInfo.innerHTML = '';
           
           const desktopPreview = document.getElementById('editVideoPreview');
           const desktopEmptyPreview = document.getElementById('editEmptyPreview');
@@ -3221,9 +3239,22 @@
           
           // Check file size (max 2MB for YouTube)
           if (file.size > 2 * 1024 * 1024) {
-            alert('Thumbnail file size must be less than 2MB');
+            showNotification('Error', 'Thumbnail file size must be less than 2MB. Please choose a smaller image.', 'error');
             input.value = '';
             preview.classList.add('hidden');
+            info.innerHTML = '<i class="ti ti-alert-circle text-red-500"></i> File too large (max 2MB)';
+            info.className = 'text-xs text-red-400 mt-1';
+            return;
+          }
+          
+          // Check file type
+          const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+          if (!validTypes.includes(file.type)) {
+            showNotification('Error', 'Invalid file type. Please use JPG or PNG format.', 'error');
+            input.value = '';
+            preview.classList.add('hidden');
+            info.innerHTML = '<i class="ti ti-alert-circle text-red-500"></i> Invalid format (use JPG/PNG)';
+            info.className = 'text-xs text-red-400 mt-1';
             return;
           }
           
@@ -3237,11 +3268,13 @@
               const ratio = this.width / this.height;
               const is16by9 = Math.abs(ratio - (16/9)) < 0.01;
               
+              const fileSizeKB = (file.size / 1024).toFixed(1);
+              
               if (is16by9) {
-                info.innerHTML = `<i class="ti ti-check text-green-500"></i> ${this.width}x${this.height} (16:9 ratio ✓)`;
+                info.innerHTML = `<i class="ti ti-check text-green-500"></i> ${this.width}x${this.height} (16:9 ratio ✓) - ${fileSizeKB} KB`;
                 info.className = 'text-xs text-green-400 mt-1';
               } else {
-                info.innerHTML = `<i class="ti ti-alert-triangle text-yellow-500"></i> ${this.width}x${this.height} (Recommended: 16:9 ratio, e.g. 1280x720)`;
+                info.innerHTML = `<i class="ti ti-alert-triangle text-yellow-500"></i> ${this.width}x${this.height} (Recommended: 16:9 ratio, e.g. 1280x720) - ${fileSizeKB} KB`;
                 info.className = 'text-xs text-yellow-400 mt-1';
               }
             };
@@ -3252,8 +3285,10 @@
         function clearYoutubeThumbnail() {
           const input = document.getElementById('youtubeThumbnail');
           const preview = document.getElementById('youtubeThumbnailPreview');
+          const info = document.getElementById('youtubeThumbnailInfo');
           input.value = '';
           preview.classList.add('hidden');
+          info.innerHTML = '';
         }
         
         // Platform Selectors - Use event delegation to work with dynamically loaded modals

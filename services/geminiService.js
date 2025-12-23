@@ -137,7 +137,7 @@ Example format: tag1, tag2, tag3, tag4`;
   /**
    * Test API key validity
    * @param {string} apiKey - Gemini API key to test
-   * @returns {Promise<boolean>} True if valid
+   * @returns {Promise<Object>} { valid: boolean, model: string }
    */
   async testApiKey(apiKey) {
     try {
@@ -148,10 +148,16 @@ Example format: tag1, tag2, tag3, tag4`;
       const result = await model.generateContent("Say 'OK' if you can read this.");
       const text = result.response.text();
       
-      return text.length > 0;
+      return {
+        valid: text.length > 0,
+        model: 'gemini-pro'
+      };
     } catch (error) {
       console.error('[GeminiService] API key test failed:', error.message);
-      return false;
+      return {
+        valid: false,
+        error: error.message
+      };
     }
   }
 }

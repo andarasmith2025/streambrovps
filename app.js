@@ -1675,6 +1675,34 @@ app.post('/settings/password', isAuthenticated, [
     });
   }
 });
+
+// Gemini API key settings endpoint
+app.post('/settings/gemini', isAuthenticated, async (req, res) => {
+  try {
+    const { gemini_api_key } = req.body;
+    
+    // Update Gemini API key in database
+    await User.updateGeminiApiKey(req.session.userId, gemini_api_key || null);
+    
+    return res.render('settings', {
+      title: 'Settings',
+      active: 'settings',
+      user: await User.findById(req.session.userId),
+      success: gemini_api_key ? 'Gemini API key saved successfully!' : 'Gemini API key removed',
+      activeTab: 'profile'
+    });
+  } catch (error) {
+    console.error('Error saving Gemini API key:', error);
+    res.render('settings', {
+      title: 'Settings',
+      active: 'settings',
+      user: await User.findById(req.session.userId),
+      error: 'An error occurred while saving Gemini API key',
+      activeTab: 'profile'
+    });
+  }
+});
+
 app.get('/settings', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
@@ -2484,6 +2512,17 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
           if (youtubeStreamId) {
             console.log(`[CREATE STREAM] Using existing YouTube stream: ${youtubeStreamId}`);
             
+            // Parse tags from request (comma-separated string to array)
+            let tags = null;
+            if (req.body.youtube_tags && typeof req.body.youtube_tags === 'string') {
+              tags = req.body.youtube_tags
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0)
+                .slice(0, 500); // YouTube limit
+              console.log(`[CREATE STREAM] Parsed ${tags.length} tags from request`);
+            }
+            
             // Create broadcast via YouTube API with the selected stream ID
             const broadcastResult = await youtubeService.scheduleLive(tokens, {
               title: req.body.streamTitle,
@@ -2492,7 +2531,10 @@ app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
               scheduledStartTime: scheduledStartTime,
               streamId: youtubeStreamId, // Use the stream ID selected by user
               enableAutoStart: streamData.youtube_auto_start || false,
-              enableAutoStop: streamData.youtube_auto_end || false
+              enableAutoStop: streamData.youtube_auto_end || false,
+              tags: tags,
+              category: streamData.youtube_category || null,
+              language: streamData.youtube_language || null
             });
             
             // Update stream with broadcast ID

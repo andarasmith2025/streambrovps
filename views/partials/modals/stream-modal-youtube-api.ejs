@@ -9,6 +9,57 @@
       placeholder="Stream description (optional)"></textarea>
   </div>
   
+  <!-- Tags Input with Gemini AI -->
+  <div>
+    <div class="flex items-center justify-between mb-2">
+      <label class="text-sm font-medium text-white">
+        Tags
+        <span class="text-gray-500 text-xs ml-2">(Optional - improves discoverability)</span>
+      </label>
+      <button
+        type="button"
+        onclick="generateTagsWithGemini()"
+        class="flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors"
+      >
+        <i class="ti ti-sparkles text-sm"></i>
+        <span>Generate with AI</span>
+      </button>
+    </div>
+    
+    <!-- Tags Container -->
+    <div id="tagsContainer" class="flex flex-wrap gap-2 p-3 bg-dark-700 border border-gray-600 rounded-lg min-h-[60px]">
+      <span class="text-gray-500 text-sm">No tags added yet. Click "Generate with AI" or add manually.</span>
+    </div>
+    
+    <!-- Tag Input -->
+    <div class="mt-2 flex gap-2">
+      <input
+        type="text"
+        id="tagInput"
+        placeholder="Type a tag and press Enter"
+        class="flex-1 px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+        onkeypress="handleTagInput(event)"
+        maxlength="30"
+      />
+      <button
+        type="button"
+        onclick="addTag()"
+        class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+      >
+        Add
+      </button>
+    </div>
+    
+    <!-- Tag Stats -->
+    <div class="mt-2 flex items-center justify-between text-xs">
+      <span id="tagCount" class="text-gray-500">0 / 30 tags</span>
+      <span id="tagLength" class="text-gray-500">0 / 500 characters</span>
+    </div>
+    
+    <!-- Hidden input for form submission -->
+    <input type="hidden" id="youtubeTags" name="youtubeTags" value="[]" />
+  </div>
+  
   <!-- Stream Configuration -->
   <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
   <div class="space-y-2">

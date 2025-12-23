@@ -13,22 +13,45 @@ async function getYouTubeClientFromTokensOrUserId(tokensOrUserId) {
   return getYouTubeClient(tokensOrUserId);
 }
 
-async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false }) {
+async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false, tags = null, category = null, language = null }) {
   const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
   
   console.log(`[YouTubeService.scheduleLive] Called with:`);
   console.log(`[YouTubeService.scheduleLive] - Title: ${title}`);
   console.log(`[YouTubeService.scheduleLive] - Existing Stream ID: ${existingStreamId || 'NOT PROVIDED'}`);
+  console.log(`[YouTubeService.scheduleLive] - Tags: ${tags ? tags.length : 0} tags`);
   console.log(`[YouTubeService.scheduleLive] - Will create new stream: ${!existingStreamId ? 'YES ❌' : 'NO ✓'}`);
+  
+  // Build snippet with optional metadata
+  const snippet = {
+    title: title || 'Untitled Stream',
+    description: description || '',
+    scheduledStartTime,
+  };
+  
+  // Add tags if provided (max 500 characters total, YouTube limit)
+  if (tags && Array.isArray(tags) && tags.length > 0) {
+    snippet.tags = tags;
+    console.log(`[YouTubeService.scheduleLive] - Adding ${tags.length} tags to broadcast`);
+  }
+  
+  // Add category if provided
+  if (category) {
+    snippet.categoryId = category;
+    console.log(`[YouTubeService.scheduleLive] - Category ID: ${category}`);
+  }
+  
+  // Add language if provided
+  if (language) {
+    snippet.defaultLanguage = language;
+    snippet.defaultAudioLanguage = language;
+    console.log(`[YouTubeService.scheduleLive] - Language: ${language}`);
+  }
   
   const broadcastRes = await yt.liveBroadcasts.insert({
     part: 'snippet,status,contentDetails',
     requestBody: {
-      snippet: {
-        title: title || 'Untitled Stream',
-        description: description || '',
-        scheduledStartTime,
-      },
+      snippet,
       status: {
         privacyStatus: privacyStatus || 'private',
       },

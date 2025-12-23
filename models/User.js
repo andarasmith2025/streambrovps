@@ -310,5 +310,38 @@ class User {
       );
     });
   }
+
+  // Gemini API key management
+  static updateGeminiApiKey(userId, apiKey) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE users SET gemini_api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [apiKey || null, userId],
+        function (err) {
+          if (err) {
+            console.error('Database error in updateGeminiApiKey:', err);
+            return reject(err);
+          }
+          resolve({ id: userId, gemini_configured: !!apiKey });
+        }
+      );
+    });
+  }
+
+  static getGeminiApiKey(userId) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        'SELECT gemini_api_key FROM users WHERE id = ?',
+        [userId],
+        (err, row) => {
+          if (err) {
+            console.error('Database error in getGeminiApiKey:', err);
+            return reject(err);
+          }
+          resolve(row?.gemini_api_key || null);
+        }
+      );
+    });
+  }
 }
 module.exports = User;

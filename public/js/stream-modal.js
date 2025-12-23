@@ -34,6 +34,11 @@ function openNewStreamModal() {
     modalContent.scrollTop = 0;
   }
   
+  // Initialize tags
+  if (typeof initializeTags === 'function') {
+    initializeTags();
+  }
+  
   // Set default tab to Manual and set required fields
   switchStreamTab('manual');
   

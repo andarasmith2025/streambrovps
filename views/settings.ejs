@@ -76,6 +76,44 @@
         </form>
       </div>
       <div class="px-6 pb-6 space-y-4">
+        <!-- Gemini AI Configuration -->
+        <div class="p-4 rounded-lg bg-dark-800 border border-gray-700">
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div class="flex-1">
+                <div class="font-medium flex items-center">
+                  <svg class="w-5 h-5 mr-2 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                  </svg>
+                  Gemini AI API Key
+                </div>
+                <div class="text-sm text-gray-400 mt-1">Generate YouTube tags automatically using Google Gemini AI</div>
+              </div>
+            </div>
+            <form id="gemini-form" class="space-y-3" action="/settings/gemini" method="post">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="activeTab" value="profile">
+              <div class="flex gap-2">
+                <input type="password" id="gemini-api-key" name="gemini_api_key"
+                  class="bg-dark-900 text-white px-4 py-2 rounded-lg flex-1 focus:outline-none focus:ring-1 focus:ring-primary font-mono text-sm"
+                  placeholder="Enter your Gemini API key (optional)"
+                  value="<%= user.gemini_api_key ? '••••••••••••••••' : '' %>">
+                <button type="button" id="test-gemini-key"
+                  class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors whitespace-nowrap">
+                  Test Key
+                </button>
+                <button type="submit"
+                  class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors whitespace-nowrap">
+                  Save
+                </button>
+              </div>
+              <div class="text-xs text-gray-400">
+                Get your free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-primary hover:underline">Google AI Studio</a>
+              </div>
+            </form>
+          </div>
+        </div>
+        
         <!-- YouTube API Configuration -->
         <div class="p-4 rounded-lg bg-dark-800 border border-gray-700">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -266,6 +304,45 @@
         } else {
           newPasswordField.type = 'password';
           togglePassword.innerHTML = '<i class="ti ti-eye"></i>';
+        }
+      });
+
+      // Gemini API key test
+      const testGeminiBtn = document.getElementById('test-gemini-key');
+      const geminiApiKeyInput = document.getElementById('gemini-api-key');
+      
+      testGeminiBtn.addEventListener('click', async () => {
+        const apiKey = geminiApiKeyInput.value.trim();
+        
+        if (!apiKey || apiKey.includes('•')) {
+          showToast('error', 'Please enter a valid API key');
+          return;
+        }
+        
+        testGeminiBtn.disabled = true;
+        testGeminiBtn.innerHTML = '<i class="ti ti-loader animate-spin mr-1"></i> Testing...';
+        
+        try {
+          const response = await fetch('/api/gemini/test-key', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ apiKey })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            showToast('success', 'API key is valid! Model: ' + result.model);
+          } else {
+            showToast('error', result.error || 'API key test failed');
+          }
+        } catch (error) {
+          showToast('error', 'Failed to test API key: ' + error.message);
+        } finally {
+          testGeminiBtn.disabled = false;
+          testGeminiBtn.innerHTML = 'Test Key';
         }
       });
 
