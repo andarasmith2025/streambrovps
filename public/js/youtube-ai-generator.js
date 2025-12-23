@@ -8,6 +8,8 @@
  * @param {string} titleFieldId - ID of the title input field
  */
 async function generateTitleWithGemini(titleFieldId = 'streamTitle') {
+  console.log('[AI Generator] generateTitleWithGemini called with titleFieldId:', titleFieldId);
+  
   const titleInput = document.getElementById(titleFieldId);
   
   if (!titleInput) {
@@ -79,6 +81,8 @@ async function generateTitleWithGemini(titleFieldId = 'streamTitle') {
  * Generate SEO-optimized description from title
  */
 async function generateDescriptionWithGemini() {
+  console.log('[AI Generator] generateDescriptionWithGemini called');
+  
   const titleInput = document.getElementById('streamTitle');
   const descriptionInput = document.getElementById('youtubeDescription');
   
