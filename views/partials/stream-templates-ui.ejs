@@ -4,13 +4,30 @@
     <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container transform transition-all duration-200 scale-95 opacity-0">
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-        <h3 class="text-lg font-semibold flex items-center gap-2">
-          <i class="ti ti-template text-primary"></i>
-          Load Template
-        </h3>
-        <button onclick="closeTemplateSelector()" class="text-gray-400 hover:text-white transition-colors">
-          <i class="ti ti-x text-xl"></i>
-        </button>
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-semibold flex items-center gap-2">
+            <i class="ti ti-template text-primary"></i>
+            My Templates
+          </h3>
+          <span id="selectedTemplatesCount" class="hidden text-xs px-2 py-1 bg-primary/20 text-primary rounded">
+            0 selected
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="exportSelectedTemplates()" id="exportSelectedBtn"
+            class="hidden flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors">
+            <i class="ti ti-download text-sm"></i>
+            <span>Export Selected</span>
+          </button>
+          <button onclick="exportAllTemplates()"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm transition-colors">
+            <i class="ti ti-file-export text-sm"></i>
+            <span>Export All</span>
+          </button>
+          <button onclick="closeTemplateSelector()" class="text-gray-400 hover:text-white transition-colors">
+            <i class="ti ti-x text-xl"></i>
+          </button>
+        </div>
       </div>
       
       <!-- Content -->
@@ -28,7 +45,7 @@
       <div class="flex items-center justify-between px-6 py-4 border-t border-gray-700 bg-dark-900">
         <p class="text-xs text-gray-400">
           <i class="ti ti-info-circle mr-1"></i>
-          Click on a template to load it into the form
+          Click template to load, or select multiple to export
         </p>
         <button onclick="closeTemplateSelector()" 
           class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded transition-colors">

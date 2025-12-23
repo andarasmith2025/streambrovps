@@ -300,4 +300,112 @@ router.post('/import', (req, res) => {
   );
 });
 
+// Export selected templates
+router.post('/export', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { ids } = req.body;
+  
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'No template IDs provided' });
+  }
+  
+  console.log(`[Templates] Exporting ${ids.length} template(s) for user ${req.session.userId}`);
+  
+  // Create placeholders for SQL IN clause
+  const placeholders = ids.map(() => '?').join(',');
+  const query = `SELECT * FROM stream_templates WHERE id IN (${placeholders}) AND user_id = ?`;
+  
+  db.all(query, [...ids, req.session.userId], (err, templates) => {
+    if (err) {
+      console.error('[Templates] Export error:', err);
+      return res.status(500).json({ error: 'Failed to export templates' });
+    }
+    
+    if (!templates || templates.length === 0) {
+      return res.status(404).json({ error: 'No templates found' });
+    }
+    
+    // Parse JSON fields and remove sensitive data
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      templates: templates.map(t => {
+        // Parse JSON fields
+        const template = { ...t };
+        if (template.schedules) {
+          template.schedules = JSON.parse(template.schedules);
+        }
+        if (template.advanced_settings) {
+          template.advanced_settings = JSON.parse(template.advanced_settings);
+        }
+        
+        // Remove sensitive/unnecessary fields
+        delete template.id;
+        delete template.user_id;
+        
+        return template;
+      })
+    };
+    
+    // Send as JSON file
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="templates-export-${Date.now()}.json"`);
+    res.json(exportData);
+  });
+});
+
+// Export all templates
+router.get('/export-all', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  console.log(`[Templates] Exporting all templates for user ${req.session.userId}`);
+  
+  db.all(
+    `SELECT * FROM stream_templates WHERE user_id = ? ORDER BY created_at DESC`,
+    [req.session.userId],
+    (err, templates) => {
+      if (err) {
+        console.error('[Templates] Export all error:', err);
+        return res.status(500).json({ error: 'Failed to export templates' });
+      }
+      
+      if (!templates || templates.length === 0) {
+        return res.status(404).json({ error: 'No templates found' });
+      }
+      
+      // Parse JSON fields and remove sensitive data
+      const exportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        templates: templates.map(t => {
+          // Parse JSON fields
+          const template = { ...t };
+          if (template.schedules) {
+            template.schedules = JSON.parse(template.schedules);
+          }
+          if (template.advanced_settings) {
+            template.advanced_settings = JSON.parse(template.advanced_settings);
+          }
+          
+          // Remove sensitive/unnecessary fields
+          delete template.id;
+          delete template.user_id;
+          
+          return template;
+        })
+      };
+      
+      // Send as JSON file
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="all-templates-export-${Date.now()}.json"`);
+      res.json(exportData);
+    }
+  );
+});
+
 module.exports = router;

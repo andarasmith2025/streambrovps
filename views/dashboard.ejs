@@ -559,15 +559,78 @@
                           </div>
                         </div>
                       </div>
-                      <div class="relative">
-                        <input type="password" id="streamKey" name="streamKey"
-                          class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="Stream Key">
-                        <i class="ti ti-key absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                        <button type="button" onclick="toggleStreamKeyVisibility()"
-                          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
-                          <i class="ti ti-eye" id="streamKeyToggle"></i>
-                        </button>
+                      
+                      <!-- Stream Key with Load Button (Manual RTMP) -->
+                      <div>
+                        <label class="text-sm font-medium text-white block mb-2">Stream Key</label>
+                        <div class="flex gap-2">
+                          <div class="relative flex-1">
+                            <input type="password" id="streamKey" name="streamKey"
+                              class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
+                              placeholder="Enter stream key or load from YouTube">
+                            <i class="ti ti-key absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <button type="button" onclick="toggleStreamKeyVisibility()"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                              <i class="ti ti-eye" id="streamKeyToggle"></i>
+                            </button>
+                          </div>
+                          <button type="button" onclick="toggleManualRTMPStreamKeysDropdown()"
+                            class="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors whitespace-nowrap">
+                            <i class="ti ti-download text-sm"></i>
+                            <span>Load</span>
+                          </button>
+                        </div>
+                        
+                        <!-- Dropdown for Stream Keys (Manual RTMP) -->
+                        <div id="manualRTMPStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg">
+                          <div class="p-2">
+                            <!-- Header -->
+                            <div class="flex items-center justify-between mb-2 px-2 pb-2 border-b border-gray-600">
+                              <div class="flex items-center gap-2">
+                                <span class="text-xs font-medium text-gray-300">Stream Keys</span>
+                                <span id="manualStreamKeysCount" class="text-xs text-gray-500"></span>
+                              </div>
+                              <div class="flex items-center gap-2">
+                                <span id="manualStreamKeysCacheInfo" class="text-xs text-gray-500"></span>
+                                <button type="button" onclick="refreshManualRTMPStreamKeys()"
+                                  class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600" 
+                                  title="Refresh stream keys">
+                                  <i class="ti ti-refresh text-sm"></i>
+                                </button>
+                                <button type="button" onclick="toggleManualRTMPStreamKeysDropdown()"
+                                  class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600"
+                                  title="Close">
+                                  <i class="ti ti-x text-sm"></i>
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <!-- List Container with max height and scroll -->
+                            <div class="max-h-64 overflow-y-auto">
+                              <div id="manualRTMPStreamKeysList" class="space-y-1">
+                                <div class="text-center py-4 text-gray-400">
+                                  <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+                                  <p class="text-xs">Loading stream keys...</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <!-- Footer with legend -->
+                            <div class="mt-2 pt-2 border-t border-gray-600 px-2">
+                              <div class="flex items-center gap-3 text-xs text-gray-500">
+                                <span class="flex items-center gap-1">
+                                  <i class="ti ti-link text-blue-400"></i> RTMP
+                                </span>
+                                <span class="flex items-center gap-1">
+                                  <i class="ti ti-key text-yellow-400"></i> Key
+                                </span>
+                                <span class="flex items-center gap-1">
+                                  <i class="ti ti-check text-green-400"></i> Select
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div><!-- Close manualRtmpFields -->

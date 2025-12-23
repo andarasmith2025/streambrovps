@@ -39,10 +39,16 @@ async function openTemplateSelector() {
   } else {
     templates.forEach(template => {
       const templateCard = document.createElement('div');
-      templateCard.className = 'template-card p-3 bg-dark-700 rounded-lg border border-gray-600 hover:border-primary transition-colors cursor-pointer';
+      templateCard.className = 'template-card p-3 bg-dark-700 rounded-lg border border-gray-600 hover:border-primary transition-colors';
       templateCard.innerHTML = `
-        <div class="flex items-start justify-between">
-          <div class="flex-1" onclick="loadTemplate('${template.id}')">
+        <div class="flex items-start gap-3">
+          <!-- Checkbox -->
+          <input type="checkbox" 
+            class="template-checkbox w-4 h-4 mt-1 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700 cursor-pointer"
+            onchange="toggleTemplateSelection('${template.id}', this)">
+          
+          <!-- Template Content (clickable) -->
+          <div class="flex-1 cursor-pointer" onclick="loadTemplate('${template.id}')">
             <h4 class="font-medium text-white mb-1">${template.name}</h4>
             ${template.description ? `<p class="text-xs text-gray-400 mb-2">${template.description}</p>` : ''}
             <div class="flex flex-wrap gap-2 text-xs">
@@ -50,18 +56,13 @@ async function openTemplateSelector() {
               ${template.platform ? `<span class="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded"><i class="ti ti-brand-${template.platform.toLowerCase()} text-xs mr-1"></i>${template.platform}</span>` : ''}
             </div>
           </div>
-          <div class="flex gap-1 ml-2">
-            <button type="button" onclick="event.stopPropagation(); exportTemplate('${template.id}')" 
-              class="w-7 h-7 flex items-center justify-center bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors" 
-              title="Export">
-              <i class="ti ti-download text-sm"></i>
-            </button>
-            <button type="button" onclick="event.stopPropagation(); deleteTemplate('${template.id}')" 
-              class="w-7 h-7 flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors" 
-              title="Delete">
-              <i class="ti ti-trash text-sm"></i>
-            </button>
-          </div>
+          
+          <!-- Delete Button -->
+          <button type="button" onclick="event.stopPropagation(); deleteTemplate('${template.id}')" 
+            class="w-7 h-7 flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors flex-shrink-0" 
+            title="Delete">
+            <i class="ti ti-trash text-sm"></i>
+          </button>
         </div>
       `;
       container.appendChild(templateCard);
@@ -555,3 +556,129 @@ function openImportTemplate() {
   };
   input.click();
 }
+
+// ============================================================================
+// TEMPLATE EXPORT FUNCTIONS
+// ============================================================================
+
+// Template selection state
+let selectedTemplateIds = new Set();
+
+// Toggle template selection
+function toggleTemplateSelection(templateId, checkbox) {
+  if (checkbox.checked) {
+    selectedTemplateIds.add(templateId);
+  } else {
+    selectedTemplateIds.delete(templateId);
+  }
+  
+  updateTemplateSelectionUI();
+}
+
+// Update UI based on selection
+function updateTemplateSelectionUI() {
+  const count = selectedTemplateIds.size;
+  const countElement = document.getElementById('selectedTemplatesCount');
+  const exportBtn = document.getElementById('exportSelectedBtn');
+  
+  if (count > 0) {
+    if (countElement) {
+      countElement.textContent = `${count} selected`;
+      countElement.classList.remove('hidden');
+    }
+    if (exportBtn) {
+      exportBtn.classList.remove('hidden');
+    }
+  } else {
+    if (countElement) {
+      countElement.classList.add('hidden');
+    }
+    if (exportBtn) {
+      exportBtn.classList.add('hidden');
+    }
+  }
+}
+
+// Export selected templates
+async function exportSelectedTemplates() {
+  if (selectedTemplateIds.size === 0) {
+    showNotification('Warning', 'Please select at least one template to export', 'warning');
+    return;
+  }
+  
+  try {
+    const ids = Array.from(selectedTemplateIds);
+    console.log('[exportSelectedTemplates] Exporting templates:', ids);
+    
+    const response = await fetch('/api/templates/export', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ids })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to export templates');
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `templates-export-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    showNotification('Success', `Exported ${ids.length} template(s)`, 'success');
+    
+    // Clear selection
+    selectedTemplateIds.clear();
+    updateTemplateSelectionUI();
+    
+    // Uncheck all checkboxes
+    document.querySelectorAll('.template-checkbox').forEach(cb => cb.checked = false);
+    
+  } catch (error) {
+    console.error('[exportSelectedTemplates] Error:', error);
+    showNotification('Error', 'Failed to export templates', 'error');
+  }
+}
+
+// Export all templates
+async function exportAllTemplates() {
+  try {
+    console.log('[exportAllTemplates] Exporting all templates...');
+    
+    const response = await fetch('/api/templates/export-all');
+    
+    if (!response.ok) {
+      throw new Error('Failed to export templates');
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all-templates-export-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    showNotification('Success', 'All templates exported successfully', 'success');
+    
+  } catch (error) {
+    console.error('[exportAllTemplates] Error:', error);
+    showNotification('Error', 'Failed to export templates', 'error');
+  }
+}
+
+// Expose functions globally
+window.toggleTemplateSelection = toggleTemplateSelection;
+window.exportSelectedTemplates = exportSelectedTemplates;
+window.exportAllTemplates = exportAllTemplates;
+
+console.log('[stream-templates.js] Export functions loaded');

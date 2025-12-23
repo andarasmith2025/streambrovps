@@ -1380,6 +1380,207 @@ window.toggleYouTubeAdditionalSettings = toggleYouTubeAdditionalSettings;
 window.toggleScheduleSection = toggleScheduleSection;
 
 console.log('[stream-modal.js] YouTube API functions exposed globally');
+
+// ============================================================================
+// MANUAL RTMP STREAM KEYS DROPDOWN FUNCTIONS
+// ============================================================================
+
+// Toggle Manual RTMP Stream Keys Dropdown
+function toggleManualRTMPStreamKeysDropdown() {
+  const dropdown = document.getElementById('manualRTMPStreamKeysDropdown');
+  if (!dropdown) return;
+  
+  if (dropdown.classList.contains('hidden')) {
+    dropdown.classList.remove('hidden');
+    // Load stream keys if not already loaded or cache expired
+    loadManualRTMPStreamKeys();
+  } else {
+    dropdown.classList.add('hidden');
+  }
+}
+
+// Load Manual RTMP Stream Keys (reuses YouTube cache)
+async function loadManualRTMPStreamKeys(forceRefresh = false) {
+  try {
+    // Check cache first (reuse YouTube cache)
+    const now = Date.now();
+    if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime) {
+      const cacheAge = now - youtubeStreamKeysCacheTime;
+      if (cacheAge < STREAM_KEYS_CACHE_DURATION) {
+        console.log('[loadManualRTMPStreamKeys] Using cached stream keys (age:', Math.round(cacheAge / 1000), 'seconds)');
+        displayManualRTMPStreamKeys(youtubeStreamKeysCache);
+        
+        if (typeof showToast === 'function') {
+          const minutes = Math.floor(cacheAge / 60000);
+          showToast('info', `Using cached data (${minutes}m old)`);
+        }
+        return;
+      } else {
+        console.log('[loadManualRTMPStreamKeys] Cache expired, fetching fresh data...');
+      }
+    }
+    
+    // Show loading state
+    const container = document.getElementById('manualRTMPStreamKeysList');
+    if (container) {
+      container.innerHTML = `
+        <div class="text-center py-4 text-gray-400">
+          <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+          <p class="text-xs">Loading stream keys from YouTube...</p>
+        </div>
+      `;
+    }
+    
+    console.log('[loadManualRTMPStreamKeys] Fetching stream keys from YouTube API...');
+    const response = await fetch('/oauth2/youtube/stream-keys');
+    const data = await response.json();
+    
+    if (data.success && data.streamKeys) {
+      // Update cache (shared with YouTube API tab)
+      youtubeStreamKeysCache = data.streamKeys;
+      youtubeStreamKeysCacheTime = now;
+      console.log('[loadManualRTMPStreamKeys] Stream keys cached');
+      
+      displayManualRTMPStreamKeys(data.streamKeys);
+      
+      if (typeof showToast === 'function') {
+        showToast('success', `Loaded ${data.streamKeys.length} stream key(s)`);
+      }
+    } else {
+      console.error('[loadManualRTMPStreamKeys] Failed:', data.error);
+      showManualRTMPStreamKeysError(data.error || 'Failed to load stream keys');
+      if (typeof showToast === 'function') {
+        showToast('error', data.error || 'Failed to load stream keys');
+      }
+    }
+  } catch (error) {
+    console.error('[loadManualRTMPStreamKeys] Error:', error);
+    showManualRTMPStreamKeysError('Error connecting to YouTube API');
+    if (typeof showToast === 'function') {
+      showToast('error', 'Error connecting to YouTube API');
+    }
+  }
+}
+
+// Display Manual RTMP Stream Keys
+function displayManualRTMPStreamKeys(streamKeys) {
+  const container = document.getElementById('manualRTMPStreamKeysList');
+  if (!container) return;
+  
+  // Update count
+  const countElement = document.getElementById('manualStreamKeysCount');
+  if (countElement) {
+    countElement.textContent = `(${streamKeys.length})`;
+  }
+  
+  // Update cache info
+  const cacheInfoElement = document.getElementById('manualStreamKeysCacheInfo');
+  if (cacheInfoElement && youtubeStreamKeysCacheTime) {
+    const cacheAge = Math.floor((Date.now() - youtubeStreamKeysCacheTime) / 1000);
+    const minutes = Math.floor(cacheAge / 60);
+    const seconds = cacheAge % 60;
+    
+    if (minutes > 0) {
+      cacheInfoElement.textContent = `Cached ${minutes}m ago`;
+    } else {
+      cacheInfoElement.textContent = `Cached ${seconds}s ago`;
+    }
+  }
+  
+  if (streamKeys.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-gray-400">
+        <i class="ti ti-alert-circle text-2xl mb-2"></i>
+        <p class="text-sm">No stream keys found</p>
+        <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = streamKeys.map(key => `
+    <button type="button" onclick="selectStreamKeyForManualRTMP('${key.id}')" 
+      class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-key text-red-500 text-lg flex-shrink-0"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">${key.ingestionInfo?.streamName || 'N/A'}</p>
+      </div>
+      <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
+    </button>
+  `).join('');
+}
+
+// Show error message for Manual RTMP stream keys
+function showManualRTMPStreamKeysError(message) {
+  const container = document.getElementById('manualRTMPStreamKeysList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="text-center py-4 text-red-400">
+      <i class="ti ti-alert-circle text-2xl mb-2"></i>
+      <p class="text-sm">${message}</p>
+      <button type="button" onclick="loadManualRTMPStreamKeys(true)" 
+        class="mt-3 px-3 py-1.5 bg-primary hover:bg-blue-600 text-white rounded text-xs transition-colors">
+        Try Again
+      </button>
+    </div>
+  `;
+}
+
+// Select stream key for Manual RTMP
+function selectStreamKeyForManualRTMP(keyId) {
+  console.log('[selectStreamKeyForManualRTMP] Selecting key:', keyId);
+  
+  // Find the stream key from cache
+  const streamKey = youtubeStreamKeysCache?.find(k => k.id === keyId);
+  if (!streamKey) {
+    console.error('[selectStreamKeyForManualRTMP] Stream key not found in cache');
+    return;
+  }
+  
+  // Fill RTMP URL
+  const rtmpUrlInput = document.getElementById('rtmpUrl');
+  if (rtmpUrlInput && streamKey.ingestionInfo?.rtmpsIngestionAddress) {
+    rtmpUrlInput.value = streamKey.ingestionInfo.rtmpsIngestionAddress;
+  }
+  
+  // Fill Stream Key
+  const streamKeyInput = document.getElementById('streamKey');
+  if (streamKeyInput && streamKey.ingestionInfo?.streamName) {
+    streamKeyInput.value = streamKey.ingestionInfo.streamName;
+  }
+  
+  // Fill Stream Title (optional)
+  const streamTitleInput = document.getElementById('streamTitle');
+  if (streamTitleInput && streamKey.title && !streamTitleInput.value) {
+    streamTitleInput.value = streamKey.title;
+  }
+  
+  // Close dropdown
+  toggleManualRTMPStreamKeysDropdown();
+  
+  // Show success message
+  if (typeof showToast === 'function') {
+    showToast('success', `Stream key loaded: ${streamKey.title || 'Untitled'}`);
+  }
+  
+  console.log('[selectStreamKeyForManualRTMP] Stream key loaded successfully');
+}
+
+// Refresh Manual RTMP stream keys
+function refreshManualRTMPStreamKeys() {
+  console.log('[refreshManualRTMPStreamKeys] Force refreshing stream keys...');
+  loadManualRTMPStreamKeys(true);
+}
+
+// Expose Manual RTMP functions globally
+window.toggleManualRTMPStreamKeysDropdown = toggleManualRTMPStreamKeysDropdown;
+window.loadManualRTMPStreamKeys = loadManualRTMPStreamKeys;
+window.selectStreamKeyForManualRTMP = selectStreamKeyForManualRTMP;
+window.refreshManualRTMPStreamKeys = refreshManualRTMPStreamKeys;
+
+console.log('[stream-modal.js] Manual RTMP functions exposed globally');
 console.log('[stream-modal.js] Loaded successfully');
 
 // Note: YouTube platform selector is handled by event delegation in dashboard.ejs inline JavaScript
