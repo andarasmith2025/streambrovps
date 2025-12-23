@@ -22,7 +22,19 @@ class GeminiService {
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Try Gemini 3 Flash first, fallback to 2.5 Flash if not available
+      let model;
+      let modelName = 'gemini-3-flash-preview';
+      
+      try {
+        model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        console.log('[GeminiService] Using model: gemini-3-flash-preview');
+      } catch (e) {
+        console.log('[GeminiService] Gemini 3 not available, falling back to 2.5 Flash');
+        model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
+        modelName = 'gemini-2.5-flash-preview-05-20';
+      }
       
       const prompt = `Generate 8-10 relevant YouTube tags for this video. 
 Return ONLY comma-separated tags, no explanation, no numbering, no quotes.
@@ -41,11 +53,13 @@ Requirements:
 
 Example format: tag1, tag2, tag3, tag4`;
       
-      console.log('[GeminiService] Generating tags for:', title.substring(0, 50));
+      console.log('[GeminiService] Generating tags with model:', modelName);
+      console.log('[GeminiService] Title:', title.substring(0, 50));
       
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       
+      console.log('[GeminiService] Model used:', modelName);
       console.log('[GeminiService] Raw response:', text);
       
       // Parse tags - handle various formats
@@ -142,7 +156,17 @@ Example format: tag1, tag2, tag3, tag4`;
   async testApiKey(apiKey) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Try Gemini 3 Flash first, fallback to 2.5 Flash
+      let model;
+      let modelName = 'gemini-3-flash-preview';
+      
+      try {
+        model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+      } catch (e) {
+        model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
+        modelName = 'gemini-2.5-flash-preview-05-20';
+      }
       
       // Simple test prompt
       const result = await model.generateContent("Say 'OK' if you can read this.");
@@ -150,7 +174,7 @@ Example format: tag1, tag2, tag3, tag4`;
       
       return {
         valid: text.length > 0,
-        model: 'gemini-pro'
+        model: modelName
       };
     } catch (error) {
       console.error('[GeminiService] API key test failed:', error.message);
