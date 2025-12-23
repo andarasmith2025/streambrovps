@@ -19,7 +19,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('./models/User');
 const { db, checkIfUsersExist } = require('./db/database');
 const systemMonitor = require('./services/systemMonitor');
-const { uploadVideo, upload } = require('./middleware/uploadMiddleware');
+const { uploadVideo, upload, uploadThumbnail } = require('./middleware/uploadMiddleware');
 const { ensureDirectories } = require('./utils/storage');
 const { getVideoInfo, generateThumbnail } = require('./utils/videoProcessor');
 const Video = require('./models/Video');
@@ -2342,7 +2342,7 @@ app.get('/api/streams', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch streams' });
   }
 });
-app.post('/api/streams', isAuthenticated, upload.single('youtubeThumbnail'), [
+app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbnail'), [
   body('streamTitle').trim().isLength({ min: 1 }).withMessage('Title is required'),
   body('rtmpUrl').trim().isLength({ min: 1 }).withMessage('RTMP URL is required'),
   body('streamKey').trim().isLength({ min: 1 }).withMessage('Stream key is required')

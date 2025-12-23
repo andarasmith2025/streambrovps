@@ -60,7 +60,38 @@ const upload = multer({
   }
 });
 
+// YouTube thumbnail upload (2MB max, JPG/PNG only)
+const thumbnailStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, paths.thumbnails || 'public/uploads/thumbnails');
+  },
+  filename: (req, file, cb) => {
+    const uniqueFilename = getUniqueFilename(file.originalname);
+    cb(null, uniqueFilename);
+  }
+});
+
+const thumbnailFilter = (req, file, cb) => {
+  const allowedFormats = ['image/jpeg', 'image/jpg', 'image/png'];
+  const fileExt = path.extname(file.originalname).toLowerCase();
+  const allowedExts = ['.jpg', '.jpeg', '.png'];
+  if (allowedFormats.includes(file.mimetype) || allowedExts.includes(fileExt)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .jpg, .jpeg, and .png formats are allowed for thumbnails'), false);
+  }
+};
+
+const uploadThumbnail = multer({
+  storage: thumbnailStorage,
+  fileFilter: thumbnailFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024 // 2MB max for YouTube thumbnails
+  }
+});
+
 module.exports = {
   uploadVideo,
-  upload
+  upload,
+  uploadThumbnail
 };

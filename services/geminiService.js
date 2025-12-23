@@ -126,7 +126,7 @@ Example format: tag1, tag2, tag3, tag4`;
       const prompt = `Generate a catchy, SEO-optimized YouTube video title based on these keywords: "${keywords}"
 
 Requirements:
-- Maximum 70 characters (YouTube optimal length)
+- Maximum 100 characters (YouTube limit - STRICT!)
 - Include the main keywords naturally
 - Make it engaging and clickable
 - Use title case (capitalize important words)
@@ -149,7 +149,7 @@ Example good titles:
       title = title.replace(/^["']|["']$/g, ''); // Remove quotes
       title = title.replace(/^Title:\s*/i, ''); // Remove "Title:" prefix
       
-      // Ensure it's not too long
+      // Ensure it's not too long (YouTube limit: 100 characters)
       if (title.length > 100) {
         title = title.substring(0, 97) + '...';
       }
