@@ -202,8 +202,7 @@ class BroadcastScheduler {
       db.run(
         `UPDATE stream_schedules 
          SET youtube_broadcast_id = ?, 
-             broadcast_status = ?,
-             updated_at = CURRENT_TIMESTAMP
+             broadcast_status = ?
          WHERE id = ?`,
         [broadcastId, status, scheduleId],
         (err) => {
@@ -225,8 +224,7 @@ class BroadcastScheduler {
     return new Promise((resolve, reject) => {
       db.run(
         `UPDATE stream_schedules 
-         SET broadcast_status = ?,
-             updated_at = CURRENT_TIMESTAMP
+         SET broadcast_status = ?
          WHERE id = ?`,
         [status, scheduleId],
         (err) => {
@@ -248,8 +246,7 @@ class BroadcastScheduler {
     return new Promise((resolve) => {
       db.run(
         `UPDATE stream_schedules 
-         SET broadcast_status = 'failed',
-             updated_at = CURRENT_TIMESTAMP
+         SET broadcast_status = 'failed'
          WHERE id = ?`,
         [scheduleId],
         () => {
