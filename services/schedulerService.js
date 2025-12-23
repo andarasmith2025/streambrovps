@@ -194,10 +194,12 @@ async function checkScheduledStreams() {
         
         // Update stream duration and active_schedule_id to match this specific schedule
         // This ensures auto-stop uses the correct duration and we know which schedule is active
+        console.log(`[Scheduler] Setting active_schedule_id=${schedule.id} for stream ${schedule.stream_id}`);
         await Stream.update(schedule.stream_id, { 
           duration: schedule.duration,
           active_schedule_id: schedule.id
         });
+        console.log(`[Scheduler] ✓ Stream ${schedule.stream_id} updated with active_schedule_id=${schedule.id}`);
         
         const result = await streamingService.startStream(stream.id);
         
