@@ -2252,47 +2252,13 @@
             
             // ⭐ Switch to correct tab based on stream mode
             if (isYouTubeAPI) {
-              // Switch to YouTube API tab
               console.log('[Edit Modal] Switching to YouTube API tab, use_youtube_api:', stream.use_youtube_api);
-              const youtubeTab = document.getElementById('editTabYouTube');
-              const manualTab = document.getElementById('editTabManual');
-              const youtubeContent = document.getElementById('youtubeApiFields');
-              const manualContent = document.getElementById('manualRtmpFields');
-              
-              if (youtubeTab && manualTab) {
-                // Activate YouTube API tab
-                youtubeTab.classList.add('bg-primary', 'text-white');
-                youtubeTab.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
-                manualTab.classList.remove('bg-primary', 'text-white');
-                manualTab.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
-                
-                // Show YouTube API content
-                if (youtubeContent) youtubeContent.classList.remove('hidden');
-                if (manualContent) manualContent.classList.add('hidden');
-              } else {
-                console.error('[Edit Modal] Tab elements not found:', { youtubeTab, manualTab });
-              }
+              window.currentEditStreamTab = 'youtube'; // Set before calling switchStreamTab
+              switchStreamTab('youtube');
             } else {
-              // Switch to Manual RTMP tab
               console.log('[Edit Modal] Switching to Manual RTMP tab, use_youtube_api:', stream.use_youtube_api);
-              const youtubeTab = document.getElementById('editTabYouTube');
-              const manualTab = document.getElementById('editTabManual');
-              const youtubeContent = document.getElementById('youtubeApiFields');
-              const manualContent = document.getElementById('manualRtmpFields');
-              
-              if (youtubeTab && manualTab) {
-                // Activate Manual RTMP tab
-                manualTab.classList.add('bg-primary', 'text-white');
-                manualTab.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
-                youtubeTab.classList.remove('bg-primary', 'text-white');
-                youtubeTab.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
-                
-                // Show Manual RTMP content
-                if (manualContent) manualContent.classList.remove('hidden');
-                if (youtubeContent) youtubeContent.classList.add('hidden');
-              } else {
-                console.error('[Edit Modal] Tab elements not found:', { youtubeTab, manualTab });
-              }
+              window.currentEditStreamTab = 'manual'; // Set before calling switchStreamTab
+              switchStreamTab('manual');
             }
             
             // Load schedules for this stream

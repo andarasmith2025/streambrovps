@@ -914,6 +914,14 @@ function switchStreamTab(tab) {
   const tabPrefix = isEditModal ? 'editTab' : 'tab';
   console.log('[switchStreamTab] Modal type:', isEditModal ? 'Edit' : 'New', 'tabPrefix:', tabPrefix);
   
+  // Set the appropriate global variable based on modal type
+  if (isEditModal) {
+    window.currentEditStreamTab = tab;
+    console.log('[switchStreamTab] Set currentEditStreamTab:', tab);
+  } else {
+    window.currentStreamTab = tab;
+  }
+  
   const tabManual = document.getElementById(tabPrefix + 'Manual');
   const tabYouTube = document.getElementById(tabPrefix + 'YouTube');
   const youtubeApiFields = document.getElementById('youtubeApiFields');
