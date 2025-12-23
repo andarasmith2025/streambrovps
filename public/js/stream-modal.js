@@ -1584,3 +1584,376 @@ console.log('[stream-modal.js] Manual RTMP functions exposed globally');
 console.log('[stream-modal.js] Loaded successfully');
 
 // Note: YouTube platform selector is handled by event delegation in dashboard.ejs inline JavaScript
+
+
+// ============================================================================
+// EDIT MODAL FUNCTIONS
+// ============================================================================
+
+// Edit Modal - Toggle Manual RTMP Stream Keys Dropdown
+function toggleEditManualRTMPStreamKeysDropdown() {
+  const dropdown = document.getElementById('editManualRTMPStreamKeysDropdown');
+  if (!dropdown) return;
+  
+  if (dropdown.classList.contains('hidden')) {
+    dropdown.classList.remove('hidden');
+    // Load stream keys if not already loaded or cache expired
+    loadEditManualRTMPStreamKeys();
+  } else {
+    dropdown.classList.add('hidden');
+  }
+}
+
+// Edit Modal - Load Manual RTMP Stream Keys
+async function loadEditManualRTMPStreamKeys(forceRefresh = false) {
+  console.log('[loadEditManualRTMPStreamKeys] Loading stream keys...', { forceRefresh });
+  
+  const container = document.getElementById('editManualRTMPStreamKeysList');
+  if (!container) {
+    console.error('[loadEditManualRTMPStreamKeys] Container not found');
+    return;
+  }
+  
+  // Check cache (5 minutes)
+  const cacheExpiry = 5 * 60 * 1000;
+  const now = Date.now();
+  
+  if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime && (now - youtubeStreamKeysCacheTime < cacheExpiry)) {
+    console.log('[loadEditManualRTMPStreamKeys] Using cached stream keys');
+    displayEditManualRTMPStreamKeys(youtubeStreamKeysCache);
+    return;
+  }
+  
+  // Show loading
+  container.innerHTML = `
+    <div class="text-center py-4 text-gray-400">
+      <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+      <p class="text-xs">Loading stream keys...</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch('/oauth2/youtube/stream-keys');
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to load stream keys');
+    }
+    
+    if (!data.streamKeys || data.streamKeys.length === 0) {
+      showEditManualRTMPStreamKeysError('No stream keys found. Create a stream in YouTube Studio first.');
+      return;
+    }
+    
+    // Update cache
+    youtubeStreamKeysCache = data.streamKeys;
+    youtubeStreamKeysCacheTime = now;
+    
+    console.log('[loadEditManualRTMPStreamKeys] Loaded stream keys:', data.streamKeys.length);
+    displayEditManualRTMPStreamKeys(data.streamKeys);
+    
+    if (typeof showToast === 'function') {
+      showToast('success', `Loaded ${data.streamKeys.length} stream key(s)`);
+    }
+  } catch (error) {
+    console.error('[loadEditManualRTMPStreamKeys] Error:', error);
+    showEditManualRTMPStreamKeysError(error.message || 'Failed to load stream keys');
+    
+    if (typeof showToast === 'function') {
+      showToast('error', 'Failed to load stream keys');
+    }
+  }
+}
+
+// Edit Modal - Display Manual RTMP Stream Keys
+function displayEditManualRTMPStreamKeys(streamKeys) {
+  const container = document.getElementById('editManualRTMPStreamKeysList');
+  if (!container) return;
+  
+  // Update count
+  const countElement = document.getElementById('editManualStreamKeysCount');
+  if (countElement) {
+    countElement.textContent = `(${streamKeys.length})`;
+  }
+  
+  // Update cache info
+  const cacheInfoElement = document.getElementById('editManualStreamKeysCacheInfo');
+  if (cacheInfoElement && youtubeStreamKeysCacheTime) {
+    const cacheAge = Math.floor((Date.now() - youtubeStreamKeysCacheTime) / 1000);
+    const minutes = Math.floor(cacheAge / 60);
+    const seconds = cacheAge % 60;
+    
+    if (minutes > 0) {
+      cacheInfoElement.textContent = `Cached ${minutes}m ago`;
+    } else {
+      cacheInfoElement.textContent = `Cached ${seconds}s ago`;
+    }
+  }
+  
+  if (streamKeys.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-gray-400">
+        <i class="ti ti-alert-circle text-2xl mb-2"></i>
+        <p class="text-sm">No stream keys found</p>
+        <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = streamKeys.map(key => `
+    <button type="button" onclick="selectEditManualStreamKey('${key.id}')" 
+      class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-key text-red-500 text-lg flex-shrink-0"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">${key.ingestionInfo?.streamName || 'N/A'}</p>
+      </div>
+      <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
+    </button>
+  `).join('');
+}
+
+// Edit Modal - Show error message for Manual RTMP stream keys
+function showEditManualRTMPStreamKeysError(message) {
+  const container = document.getElementById('editManualRTMPStreamKeysList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="text-center py-4 text-red-400">
+      <i class="ti ti-alert-circle text-2xl mb-2"></i>
+      <p class="text-sm">${message}</p>
+      <button type="button" onclick="refreshEditManualRTMPStreamKeys()" 
+        class="mt-2 px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors">
+        Try Again
+      </button>
+    </div>
+  `;
+}
+
+// Edit Modal - Refresh Manual RTMP stream keys
+function refreshEditManualRTMPStreamKeys() {
+  console.log('[refreshEditManualRTMPStreamKeys] Force refreshing stream keys...');
+  loadEditManualRTMPStreamKeys(true);
+}
+
+// Edit Modal - Select Manual Stream Key
+function selectEditManualStreamKey(streamKeyId) {
+  console.log('[selectEditManualStreamKey] Selecting stream key:', streamKeyId);
+  
+  if (!youtubeStreamKeysCache) {
+    console.error('[selectEditManualStreamKey] No cached stream keys');
+    return;
+  }
+  
+  const streamKey = youtubeStreamKeysCache.find(key => key.id === streamKeyId);
+  if (!streamKey) {
+    console.error('[selectEditManualStreamKey] Stream key not found:', streamKeyId);
+    return;
+  }
+  
+  // Fill in the form fields
+  const rtmpUrlInput = document.getElementById('editRtmpUrl');
+  const streamKeyInput = document.getElementById('editStreamKey');
+  
+  if (rtmpUrlInput && streamKey.ingestionInfo?.ingestionAddress) {
+    rtmpUrlInput.value = streamKey.ingestionInfo.ingestionAddress;
+  }
+  
+  if (streamKeyInput && streamKey.ingestionInfo?.streamName) {
+    streamKeyInput.value = streamKey.ingestionInfo.streamName;
+  }
+  
+  // Close dropdown
+  toggleEditManualRTMPStreamKeysDropdown();
+  
+  if (typeof showToast === 'function') {
+    showToast('success', 'Stream key loaded successfully');
+  }
+}
+
+// Edit Modal - Toggle YouTube Stream Key Visibility
+function toggleEditYouTubeStreamKeyVisibility() {
+  const streamKeyInput = document.getElementById('editYoutubeStreamKey');
+  const streamKeyToggle = document.getElementById('editYoutubeStreamKeyToggle');
+  
+  if (!streamKeyInput || !streamKeyToggle) return;
+  
+  if (streamKeyInput.type === 'password') {
+    streamKeyInput.type = 'text';
+    streamKeyToggle.classList.remove('ti-eye');
+    streamKeyToggle.classList.add('ti-eye-off');
+  } else {
+    streamKeyInput.type = 'password';
+    streamKeyToggle.classList.remove('ti-eye-off');
+    streamKeyToggle.classList.add('ti-eye');
+  }
+}
+
+// Edit Modal - Toggle Edit Stream Key Visibility (for Manual RTMP)
+function toggleEditStreamKeyVisibility() {
+  const streamKeyInput = document.getElementById('editStreamKey');
+  const streamKeyToggle = document.getElementById('editStreamKeyToggle');
+  
+  if (!streamKeyInput || !streamKeyToggle) return;
+  
+  if (streamKeyInput.type === 'password') {
+    streamKeyInput.type = 'text';
+    streamKeyToggle.classList.remove('ti-eye');
+    streamKeyToggle.classList.add('ti-eye-off');
+  } else {
+    streamKeyInput.type = 'password';
+    streamKeyToggle.classList.remove('ti-eye-off');
+    streamKeyToggle.classList.add('ti-eye');
+  }
+}
+
+// Edit Modal - Load YouTube API Stream Keys
+async function loadEditYouTubeStreamKeys() {
+  console.log('[loadEditYouTubeStreamKeys] Loading YouTube stream keys...');
+  
+  const container = document.getElementById('editYoutubeStreamKeysList');
+  if (!container) {
+    console.error('[loadEditYouTubeStreamKeys] Container not found');
+    return;
+  }
+  
+  // Show loading
+  container.innerHTML = `
+    <div class="text-center py-4 text-gray-400">
+      <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+      <p class="text-xs">Loading stream keys...</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch('/oauth2/youtube/stream-keys');
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to load stream keys');
+    }
+    
+    if (!data.streamKeys || data.streamKeys.length === 0) {
+      showEditYouTubeStreamKeysError('No stream keys found. Create a stream in YouTube Studio first.');
+      return;
+    }
+    
+    // Update cache
+    youtubeStreamKeysCache = data.streamKeys;
+    youtubeStreamKeysCacheTime = Date.now();
+    
+    console.log('[loadEditYouTubeStreamKeys] Loaded stream keys:', data.streamKeys.length);
+    displayEditYouTubeStreamKeys(data.streamKeys);
+    
+    if (typeof showToast === 'function') {
+      showToast('success', `Loaded ${data.streamKeys.length} stream key(s)`);
+    }
+  } catch (error) {
+    console.error('[loadEditYouTubeStreamKeys] Error:', error);
+    showEditYouTubeStreamKeysError(error.message || 'Failed to load stream keys');
+    
+    if (typeof showToast === 'function') {
+      showToast('error', 'Failed to load stream keys');
+    }
+  }
+}
+
+// Edit Modal - Display YouTube Stream Keys
+function displayEditYouTubeStreamKeys(streamKeys) {
+  const container = document.getElementById('editYoutubeStreamKeysList');
+  if (!container) return;
+  
+  if (streamKeys.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-gray-400">
+        <i class="ti ti-alert-circle text-2xl mb-2"></i>
+        <p class="text-sm">No stream keys found</p>
+        <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = streamKeys.map(key => `
+    <button type="button" onclick="selectEditYouTubeStreamKey('${key.id}')" 
+      class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-brand-youtube text-red-500 text-lg flex-shrink-0"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">${key.ingestionInfo?.streamName || 'N/A'}</p>
+      </div>
+      <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
+    </button>
+  `).join('');
+}
+
+// Edit Modal - Show error message for YouTube stream keys
+function showEditYouTubeStreamKeysError(message) {
+  const container = document.getElementById('editYoutubeStreamKeysList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="text-center py-4 text-red-400">
+      <i class="ti ti-alert-circle text-2xl mb-2"></i>
+      <p class="text-sm">${message}</p>
+      <button type="button" onclick="loadEditYouTubeStreamKeys()" 
+        class="mt-2 px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors">
+        Try Again
+      </button>
+    </div>
+  `;
+}
+
+// Edit Modal - Select YouTube Stream Key
+function selectEditYouTubeStreamKey(streamKeyId) {
+  console.log('[selectEditYouTubeStreamKey] Selecting stream key:', streamKeyId);
+  
+  if (!youtubeStreamKeysCache) {
+    console.error('[selectEditYouTubeStreamKey] No cached stream keys');
+    return;
+  }
+  
+  const streamKey = youtubeStreamKeysCache.find(key => key.id === streamKeyId);
+  if (!streamKey) {
+    console.error('[selectEditYouTubeStreamKey] Stream key not found:', streamKeyId);
+    return;
+  }
+  
+  // Fill in the form fields
+  const rtmpUrlInput = document.getElementById('editYoutubeRtmpUrl');
+  const streamKeyInput = document.getElementById('editYoutubeStreamKey');
+  const streamIdInput = document.getElementById('editYoutubeStreamId');
+  const titleInput = document.getElementById('editStreamTitle');
+  const descriptionInput = document.getElementById('editYoutubeDescription');
+  
+  if (rtmpUrlInput && streamKey.ingestionInfo?.ingestionAddress) {
+    rtmpUrlInput.value = streamKey.ingestionInfo.ingestionAddress;
+  }
+  
+  if (streamKeyInput && streamKey.ingestionInfo?.streamName) {
+    streamKeyInput.value = streamKey.ingestionInfo.streamName;
+  }
+  
+  if (streamIdInput) {
+    streamIdInput.value = streamKeyId;
+  }
+  
+  if (titleInput && streamKey.title) {
+    titleInput.value = streamKey.title;
+  }
+  
+  if (descriptionInput && streamKey.description) {
+    descriptionInput.value = streamKey.description;
+  }
+  
+  // Close dropdown
+  const dropdown = document.getElementById('editYoutubeStreamKeysDropdown');
+  if (dropdown) {
+    dropdown.classList.add('hidden');
+  }
+  
+  if (typeof showToast === 'function') {
+    showToast('success', 'YouTube stream key loaded successfully');
+  }
+}

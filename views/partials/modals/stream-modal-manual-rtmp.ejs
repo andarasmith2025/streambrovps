@@ -61,12 +61,22 @@
             class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
             placeholder="Enter stream key or load from YouTube">
           <i class="ti ti-key absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-          <button type="button" onclick="toggleStreamKeyVisibility()"
+          <button type="button" 
+            <% if (streamKeyId === 'editStreamKey') { %>
+              onclick="toggleEditStreamKeyVisibility()"
+            <% } else { %>
+              onclick="toggleStreamKeyVisibility()"
+            <% } %>
             class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
             <i class="ti ti-eye" id="<%= streamKeyToggleId %>"></i>
           </button>
         </div>
-        <button type="button" onclick="toggleManualRTMPStreamKeysDropdown()"
+        <button type="button" 
+          <% if (streamKeysDropdownId === 'editManualRTMPStreamKeysDropdown') { %>
+            onclick="toggleEditManualRTMPStreamKeysDropdown()"
+          <% } else { %>
+            onclick="toggleManualRTMPStreamKeysDropdown()"
+          <% } %>
           class="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors whitespace-nowrap">
           <i class="ti ti-download text-sm"></i>
           <span>Load</span>
@@ -84,12 +94,22 @@
             </div>
             <div class="flex items-center gap-2">
               <span id="<%= streamKeysCacheInfoId %>" class="text-xs text-gray-500"></span>
-              <button type="button" onclick="refreshManualRTMPStreamKeys()"
+              <button type="button" 
+                <% if (streamKeysDropdownId === 'editManualRTMPStreamKeysDropdown') { %>
+                  onclick="refreshEditManualRTMPStreamKeys()"
+                <% } else { %>
+                  onclick="refreshManualRTMPStreamKeys()"
+                <% } %>
                 class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600" 
                 title="Refresh stream keys">
                 <i class="ti ti-refresh text-sm"></i>
               </button>
-              <button type="button" onclick="toggleManualRTMPStreamKeysDropdown()"
+              <button type="button" 
+                <% if (streamKeysDropdownId === 'editManualRTMPStreamKeysDropdown') { %>
+                  onclick="toggleEditManualRTMPStreamKeysDropdown()"
+                <% } else { %>
+                  onclick="toggleManualRTMPStreamKeysDropdown()"
+                <% } %>
                 class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600"
                 title="Close">
                 <i class="ti ti-x text-sm"></i>

@@ -682,3 +682,136 @@ window.exportSelectedTemplates = exportSelectedTemplates;
 window.exportAllTemplates = exportAllTemplates;
 
 console.log('[stream-templates.js] Export functions loaded');
+
+
+// Save Edit Modal configuration as template
+async function saveEditAsTemplate() {
+  // Check which tab is active in edit modal
+  const isYouTubeMode = window.currentEditStreamTab === 'youtube';
+  console.log('[saveEditAsTemplate] Current tab:', window.currentEditStreamTab, 'isYouTubeMode:', isYouTubeMode);
+  
+  // Get current form data from edit modal
+  const videoId = document.getElementById('editSelectedVideoId')?.value;
+  const videoName = document.getElementById('editSelectedVideo')?.textContent;
+  const streamTitle = document.getElementById('editStreamTitle')?.value;
+  const loopVideo = document.getElementById('editLoopVideo')?.checked;
+  
+  // Get RTMP URL and Stream Key based on mode
+  let rtmpUrl, streamKey, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd;
+  
+  if (isYouTubeMode) {
+    rtmpUrl = document.getElementById('editYoutubeRtmpUrl')?.value;
+    streamKey = document.getElementById('editYoutubeStreamKey')?.value;
+    youtubeDescription = document.getElementById('editYoutubeDescription')?.value;
+    youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value;
+    youtubeMadeForKids = document.querySelector('input[name="editYoutubeMadeForKids"]:checked')?.value === 'yes';
+    youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked;
+    youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked;
+    youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked;
+  } else {
+    rtmpUrl = document.getElementById('editRtmpUrl')?.value;
+    streamKey = document.getElementById('editStreamKey')?.value;
+  }
+  
+  // Get schedules from edit modal
+  const schedules = [];
+  document.querySelectorAll('#editScheduleSlotsContainer .schedule-slot').forEach(slot => {
+    const time = slot.querySelector('.schedule-time')?.value;
+    
+    // Get duration from hours and minutes inputs
+    const hoursInput = slot.querySelector('.duration-hours');
+    const minutesInput = slot.querySelector('.duration-minutes');
+    const hours = parseInt(hoursInput?.value) || 0;
+    const minutes = parseInt(minutesInput?.value) || 0;
+    const duration = hours * 60 + minutes;
+    
+    // Check if any recurring day button is selected
+    const selectedDayButtons = Array.from(slot.querySelectorAll('.recurring-day.bg-primary'));
+    const isRecurring = selectedDayButtons.length > 0;
+    
+    let recurringDays = '';
+    if (isRecurring) {
+      const selectedDays = selectedDayButtons.map(btn => btn.getAttribute('data-day'));
+      recurringDays = selectedDays.join(',');
+    }
+    
+    if (time && duration > 0) {
+      schedules.push({
+        time,
+        duration,
+        is_recurring: isRecurring ? 1 : 0,
+        recurring_days: recurringDays
+      });
+    }
+  });
+  
+  // Validate required fields
+  if (!videoId) {
+    if (typeof showToast === 'function') {
+      showToast('error', 'Please select a video first');
+    }
+    return;
+  }
+  
+  if (!streamTitle) {
+    if (typeof showToast === 'function') {
+      showToast('error', 'Please enter a stream title');
+    }
+    return;
+  }
+  
+  // Ask for template name
+  const templateName = prompt('Enter template name:', streamTitle);
+  if (!templateName) return;
+  
+  // Prepare template data
+  const templateData = {
+    name: templateName,
+    video_id: videoId,
+    video_name: videoName,
+    stream_title: streamTitle,
+    rtmp_url: rtmpUrl,
+    stream_key: streamKey,
+    loop_video: loopVideo ? 1 : 0,
+    use_youtube_api: isYouTubeMode ? 1 : 0,
+    youtube_description: youtubeDescription,
+    youtube_privacy: youtubePrivacy,
+    youtube_made_for_kids: youtubeMadeForKids ? 1 : 0,
+    youtube_age_restricted: youtubeAgeRestricted ? 1 : 0,
+    youtube_auto_start: youtubeAutoStart ? 1 : 0,
+    youtube_auto_end: youtubeAutoEnd ? 1 : 0,
+    schedules: schedules
+  };
+  
+  console.log('[saveEditAsTemplate] Saving template:', templateData);
+  
+  try {
+    const response = await fetch('/api/templates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(templateData)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      if (typeof showToast === 'function') {
+        showToast('success', 'Template saved successfully!');
+      }
+      
+      // Reload templates list if function exists
+      if (typeof loadTemplates === 'function') {
+        loadTemplates();
+      }
+    } else {
+      throw new Error(result.error || 'Failed to save template');
+    }
+  } catch (error) {
+    console.error('[saveEditAsTemplate] Error:', error);
+    if (typeof showToast === 'function') {
+      showToast('error', error.message || 'Failed to save template');
+    }
+  }
+}
