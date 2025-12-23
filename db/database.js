@@ -265,6 +265,24 @@ function createTables() {
     }
   });
 
+  // Add youtube_broadcast_id column for lazy broadcast creation
+  db.run(`ALTER TABLE stream_schedules ADD COLUMN youtube_broadcast_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_broadcast_id column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_broadcast_id column to stream_schedules table');
+    }
+  });
+
+  // Add broadcast_status column to track broadcast creation status
+  db.run(`ALTER TABLE stream_schedules ADD COLUMN broadcast_status TEXT DEFAULT 'pending'`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding broadcast_status column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added broadcast_status column to stream_schedules table');
+    }
+  });
+
   db.run(`ALTER TABLE users ADD COLUMN user_role TEXT DEFAULT 'admin'`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding user_role column:', err.message);

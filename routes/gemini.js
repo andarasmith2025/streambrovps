@@ -142,4 +142,117 @@ router.post('/test-key', isAuthenticated, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/gemini/generate-title
+ * Generate SEO-optimized YouTube title from keywords
+ */
+router.post('/generate-title', isAuthenticated, async (req, res) => {
+  try {
+    const { keywords } = req.body;
+    const userId = req.session.userId;
+    
+    console.log('[Gemini API] Generate title request:', { keywords, userId });
+    
+    // Validate input
+    if (!keywords || keywords.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Keywords are required (2-3 words minimum)'
+      });
+    }
+    
+    // Get user's Gemini API key
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    if (!user.gemini_api_key) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gemini API key not configured. Please add it in Settings → Gemini AI Settings.'
+      });
+    }
+    
+    // Generate title
+    const title = await geminiService.generateTitle(
+      keywords,
+      user.gemini_api_key
+    );
+    
+    console.log('[Gemini API] Generated title:', title);
+    
+    res.json({
+      success: true,
+      title
+    });
+  } catch (error) {
+    console.error('[Gemini API] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate title'
+    });
+  }
+});
+
+/**
+ * POST /api/gemini/generate-description
+ * Generate SEO-optimized YouTube description
+ */
+router.post('/generate-description', isAuthenticated, async (req, res) => {
+  try {
+    const { title, keywords } = req.body;
+    const userId = req.session.userId;
+    
+    console.log('[Gemini API] Generate description request:', { title: title?.substring(0, 50), userId });
+    
+    // Validate input
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title is required'
+      });
+    }
+    
+    // Get user's Gemini API key
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    if (!user.gemini_api_key) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gemini API key not configured. Please add it in Settings → Gemini AI Settings.'
+      });
+    }
+    
+    // Generate description
+    const description = await geminiService.generateDescription(
+      title,
+      keywords || '',
+      user.gemini_api_key
+    );
+    
+    console.log('[Gemini API] Generated description:', description.substring(0, 100) + '...');
+    
+    res.json({
+      success: true,
+      description
+    });
+  } catch (error) {
+    console.error('[Gemini API] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate description'
+    });
+  }
+});
+
 module.exports = router;

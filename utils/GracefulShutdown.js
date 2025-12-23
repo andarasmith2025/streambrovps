@@ -202,6 +202,11 @@ class GracefulShutdown {
   _clearSchedulers() {
     try {
       this.schedulerService.clearAll();
+      
+      // Stop broadcast scheduler
+      const broadcastScheduler = require('../services/broadcastScheduler');
+      broadcastScheduler.stop();
+      console.log('[GracefulShutdown] Broadcast scheduler stopped');
     } catch (error) {
       console.error('[GracefulShutdown] Error clearing schedulers:', error.message);
     }

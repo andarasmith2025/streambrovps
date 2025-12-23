@@ -13,13 +13,14 @@ async function getYouTubeClientFromTokensOrUserId(tokensOrUserId) {
   return getYouTubeClient(tokensOrUserId);
 }
 
-async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false, tags = null, category = null, language = null }) {
+async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, enableAutoStart = false, enableAutoStop = false, tags = null, category = null, language = null, thumbnailPath = null }) {
   const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
   
   console.log(`[YouTubeService.scheduleLive] Called with:`);
   console.log(`[YouTubeService.scheduleLive] - Title: ${title}`);
   console.log(`[YouTubeService.scheduleLive] - Existing Stream ID: ${existingStreamId || 'NOT PROVIDED'}`);
   console.log(`[YouTubeService.scheduleLive] - Tags: ${tags ? tags.length : 0} tags`);
+  console.log(`[YouTubeService.scheduleLive] - Thumbnail: ${thumbnailPath || 'NOT PROVIDED'}`);
   console.log(`[YouTubeService.scheduleLive] - Will create new stream: ${!existingStreamId ? 'YES ❌' : 'NO ✓'}`);
   
   // Build snippet with optional metadata
@@ -98,6 +99,37 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
       streamId: createdStreamId,
     });
     console.log(`[YouTubeService.scheduleLive] ✓ Broadcast bound to stream successfully`);
+  }
+
+  // Upload thumbnail if provided
+  if (thumbnailPath && broadcastId) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      if (fs.existsSync(thumbnailPath)) {
+        console.log(`[YouTubeService.scheduleLive] Uploading thumbnail: ${thumbnailPath}`);
+        
+        // Get mime type from file extension
+        const ext = path.extname(thumbnailPath).toLowerCase();
+        const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+        
+        await yt.thumbnails.set({
+          videoId: broadcastId,
+          media: {
+            mimeType: mimeType,
+            body: fs.createReadStream(thumbnailPath)
+          }
+        });
+        
+        console.log(`[YouTubeService.scheduleLive] ✓ Thumbnail uploaded successfully`);
+      } else {
+        console.warn(`[YouTubeService.scheduleLive] ⚠️ Thumbnail file not found: ${thumbnailPath}`);
+      }
+    } catch (thumbnailError) {
+      console.error(`[YouTubeService.scheduleLive] ❌ Error uploading thumbnail:`, thumbnailError.message);
+      // Don't fail the broadcast creation, just log the error
+    }
   }
 
   return {
