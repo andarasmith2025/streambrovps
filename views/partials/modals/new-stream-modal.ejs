@@ -1,0 +1,81 @@
+<!-- New Stream Modal -->
+<div id="newStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay flex items-center justify-center p-2 md:p-4">
+  <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-2xl modal-container max-h-[95vh] md:max-h-[92vh] flex flex-col relative">
+    
+    <!-- Header -->
+    <%- include('stream-modal-header', {
+      title: 'Create New Stream',
+      showSaveTemplate: true,
+      saveTemplateFunction: 'saveAsTemplate',
+      showImport: true,
+      closeFunction: 'closeNewStreamModal'
+    }) %>
+    
+    <!-- Tabs -->
+    <%- include('stream-modal-tabs', {
+      tabPrefix: 'tab'
+    }) %>
+    
+    <!-- Form Content -->
+    <div class="flex-1 overflow-y-auto">
+      <form id="newStreamForm" class="px-4 pt-3 pb-3 space-y-3" novalidate>
+        <input type="hidden" id="selectedVideoId" name="videoId" value="">
+        
+        <div class="space-y-3">
+          <!-- Video Selector -->
+          <%- include('stream-modal-video-selector', {
+            videoIdField: 'selectedVideoId',
+            selectedVideoField: 'selectedVideo',
+            dropdownId: 'videoSelectorDropdown',
+            searchInputId: 'videoSearchInput',
+            listContainerId: 'videoListContainer'
+          }) %>
+          
+          <!-- Stream Title -->
+          <%- include('stream-modal-title', {
+            titleFieldId: 'streamTitle',
+            titleFieldName: 'streamTitle'
+          }) %>
+          
+          <!-- YouTube API Fields -->
+          <%- include('stream-modal-youtube-api') %>
+          
+          <!-- Manual RTMP Fields -->
+          <%- include('stream-modal-manual-rtmp', {
+            rtmpUrlId: 'rtmpUrl',
+            streamKeyId: 'streamKey',
+            platformSelectorId: 'platformSelector',
+            platformDropdownId: 'platformDropdown',
+            streamKeyToggleId: 'streamKeyToggle',
+            streamKeysDropdownId: 'manualRTMPStreamKeysDropdown',
+            streamKeysListId: 'manualRTMPStreamKeysList',
+            streamKeysCountId: 'manualStreamKeysCount',
+            streamKeysCacheInfoId: 'manualStreamKeysCacheInfo'
+          }) %>
+          
+          <!-- Schedule Settings -->
+          <%- include('stream-modal-schedule', {
+            scheduleSlotsContainerId: 'scheduleSlotsContainer',
+            loopVideoId: 'loopVideo',
+            addSlotFunction: 'addScheduleSlot',
+            serverTimeDisplayId: 'serverTimeDisplay'
+          }) %>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Footer -->
+    <%- include('stream-modal-footer', {
+      formId: 'newStreamForm',
+      cancelFunction: 'closeNewStreamModal',
+      submitButtonText: 'Create Stream'
+    }) %>
+    
+    <!-- Scroll to Top Button -->
+    <button type="button" id="scrollToTopBtn" onclick="scrollModalToTop('newStreamModal')"
+      class="hidden absolute bottom-20 right-4 md:right-6 w-11 h-11 bg-primary hover:bg-blue-600 active:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-20 items-center justify-center"
+      title="Scroll to top">
+      <i class="ti ti-arrow-up text-lg"></i>
+    </button>
+  </div>
+</div>
