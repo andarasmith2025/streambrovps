@@ -2249,6 +2249,48 @@
 
             // Note: Advanced settings (bitrate, resolution, fps) have been removed
             // Video settings are now auto-detected from the video file itself
+            
+            // ⭐ Switch to correct tab based on stream mode
+            if (isYouTubeAPI) {
+              // Switch to YouTube API tab
+              console.log('[Edit Modal] Switching to YouTube API tab');
+              const youtubeTab = document.querySelector('[data-tab="editTabYoutubeApi"]');
+              const manualTab = document.querySelector('[data-tab="editTabManualRtmp"]');
+              const youtubeContent = document.getElementById('editTabYoutubeApi');
+              const manualContent = document.getElementById('editTabManualRtmp');
+              
+              if (youtubeTab && manualTab && youtubeContent && manualContent) {
+                // Activate YouTube API tab
+                youtubeTab.classList.add('border-primary', 'text-primary');
+                youtubeTab.classList.remove('border-transparent', 'text-gray-400');
+                manualTab.classList.remove('border-primary', 'text-primary');
+                manualTab.classList.add('border-transparent', 'text-gray-400');
+                
+                // Show YouTube API content
+                youtubeContent.classList.remove('hidden');
+                manualContent.classList.add('hidden');
+              }
+            } else {
+              // Switch to Manual RTMP tab
+              console.log('[Edit Modal] Switching to Manual RTMP tab');
+              const youtubeTab = document.querySelector('[data-tab="editTabYoutubeApi"]');
+              const manualTab = document.querySelector('[data-tab="editTabManualRtmp"]');
+              const youtubeContent = document.getElementById('editTabYoutubeApi');
+              const manualContent = document.getElementById('editTabManualRtmp');
+              
+              if (youtubeTab && manualTab && youtubeContent && manualContent) {
+                // Activate Manual RTMP tab
+                manualTab.classList.add('border-primary', 'text-primary');
+                manualTab.classList.remove('border-transparent', 'text-gray-400');
+                youtubeTab.classList.remove('border-primary', 'text-primary');
+                youtubeTab.classList.add('border-transparent', 'text-gray-400');
+                
+                // Show Manual RTMP content
+                manualContent.classList.remove('hidden');
+                youtubeContent.classList.add('hidden');
+              }
+            }
+            
             // Load schedules for this stream
             loadStreamSchedules(stream.id);
 
