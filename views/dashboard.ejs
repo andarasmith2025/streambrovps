@@ -1390,20 +1390,20 @@
                       }
                       
                       // NO CHECKLIST in Schedule column - only show label
-                      recurringInfo = `<div class="flex items-center gap-1">
-                        <i class="ti ti-repeat text-blue-400 text-xs"></i>
-                        <span class="text-xs text-blue-400">${dayLabel}</span>
-                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors ml-auto" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
-                          <i class="ti ti-player-stop text-red-400 text-xs"></i>
+                      recurringInfo = `<div class="flex items-center gap-2 w-full">
+                        <i class="ti ti-repeat text-blue-400 text-xs flex-shrink-0"></i>
+                        <span class="text-xs text-blue-400 flex-1 min-w-0">${dayLabel}</span>
+                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex-shrink-0" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
+                          <i class="ti ti-x text-red-400 text-sm font-bold"></i>
                         </button>` : ''}
                       </div>`;
                     } else {
                       const schDate = new Date(sch.schedule_time);
-                      recurringInfo = `<div class="flex items-center gap-1 text-xs text-gray-500">
-                        ${formatDate(schDate)}
-                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-xs ml-1"></i>' : ''}
-                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1 hover:bg-red-500/20 rounded transition-colors ml-auto" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
-                          <i class="ti ti-player-stop text-red-400 text-xs"></i>
+                      recurringInfo = `<div class="flex items-center gap-2 w-full text-xs text-gray-500">
+                        <span class="flex-1 min-w-0">${formatDate(schDate)}</span>
+                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-xs flex-shrink-0"></i>' : ''}
+                        ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex-shrink-0" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
+                          <i class="ti ti-x text-red-400 text-sm font-bold"></i>
                         </button>` : ''}
                       </div>`;
                     }
