@@ -1389,10 +1389,11 @@
                         dayLabel = days.join(', ');
                       }
                       
-                      // NO CHECKLIST in Schedule column - only show label
+                      // Show checklist for active schedule indicator
                       recurringInfo = `<div class="flex items-center gap-2 w-full">
                         <i class="ti ti-repeat text-blue-400 text-xs flex-shrink-0"></i>
                         <span class="text-xs text-blue-400 flex-1 min-w-0">${dayLabel}</span>
+                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm flex-shrink-0" title="Currently Active"></i>' : ''}
                         ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex-shrink-0" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                           <i class="ti ti-x text-red-400 text-sm font-bold"></i>
                         </button>` : ''}
