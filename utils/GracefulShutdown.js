@@ -178,7 +178,8 @@ class GracefulShutdown {
             }, 10000); // 10 second timeout per stream
           });
           
-          const stopPromise = this.streamingService.stopStream(stream.id);
+          // Pass isGracefulShutdown flag to prevent setting manual_stop
+          const stopPromise = this.streamingService.stopStream(stream.id, { isGracefulShutdown: true });
           
           await Promise.race([stopPromise, timeoutPromise]);
           console.log(`[GracefulShutdown] Stopped stream: ${stream.id}`);

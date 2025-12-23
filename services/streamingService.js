@@ -772,11 +772,12 @@ async function startStream(streamId, options = {}) {
     return { success: false, error: error.message };
   }
 }
-async function stopStream(streamId) {
+async function stopStream(streamId, options = {}) {
   try {
+    const { isGracefulShutdown = false } = options;
     const ffmpegProcess = activeStreams.get(streamId);
     const isActive = ffmpegProcess !== undefined;
-    console.log(`[StreamingService] Stop request for stream ${streamId}, isActive: ${isActive}`);
+    console.log(`[StreamingService] Stop request for stream ${streamId}, isActive: ${isActive}, isGracefulShutdown: ${isGracefulShutdown}`);
     if (!isActive) {
       const stream = await Stream.findById(streamId);
       if (stream && stream.status === 'live') {
@@ -789,27 +790,32 @@ async function stopStream(streamId) {
       }
       return { success: false, error: 'Stream is not active' };
     }
-    addStreamLog(streamId, 'Stopping stream...');
-    console.log(`[StreamingService] Stopping active stream ${streamId} (manual stop)`);
+    addStreamLog(streamId, isGracefulShutdown ? 'Stopping stream (graceful shutdown)...' : 'Stopping stream...');
+    console.log(`[StreamingService] Stopping active stream ${streamId} (${isGracefulShutdown ? 'graceful shutdown' : 'manual stop'})`);
     manuallyStoppingStreams.add(streamId);
     
     // Mark stream as manually stopped in database to prevent auto-recovery
-    try {
-      await new Promise((resolve, reject) => {
-        db.run(
-          `UPDATE streams SET manual_stop = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-          [streamId],
-          (err) => {
-            if (err) {
-              // Column might not exist yet, ignore error
-              console.log(`[StreamingService] Note: manual_stop flag not set (column may not exist yet)`);
+    // BUT: Don't set manual_stop flag during graceful shutdown (allow auto-recovery after restart)
+    if (!isGracefulShutdown) {
+      try {
+        await new Promise((resolve, reject) => {
+          db.run(
+            `UPDATE streams SET manual_stop = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [streamId],
+            (err) => {
+              if (err) {
+                // Column might not exist yet, ignore error
+                console.log(`[StreamingService] Note: manual_stop flag not set (column may not exist yet)`);
+              }
+              resolve();
             }
-            resolve();
-          }
-        );
-      });
-    } catch (err) {
-      // Ignore error if column doesn't exist
+          );
+        });
+      } catch (err) {
+        // Ignore error if column doesn't exist
+      }
+    } else {
+      console.log(`[StreamingService] Skipping manual_stop flag (graceful shutdown - allow auto-recovery)`);
     }
     
     try {
