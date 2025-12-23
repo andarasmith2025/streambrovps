@@ -18,16 +18,34 @@
 
 ---
 
-## 📊 Resource Usage Table
+## 📊 Capacity by Server Specs
 
-| Streams | CPU | RAM | Network | Status |
-|---------|-----|-----|---------|--------|
-| 5 | 10% | 447 MB | 20 Mbps | ✅ Very Safe |
-| 10 | 20% | 747 MB | 40 Mbps | ✅ Safe |
-| 15 | 30% | 1.05 GB | 60 Mbps | ✅ Recommended |
-| 18 | 36% | 1.23 GB | 72 Mbps | ⚠️ Optimal |
-| 20 | 40% | 1.35 GB | 80 Mbps | ⚠️ Maximum |
-| 25 | 50% | 1.65 GB | 100 Mbps | ❌ Over Limit |
+**Formula:** Per stream = 2% CPU + 60 MB RAM + 4 Mbps bandwidth
+
+| CPU Cores | RAM | Bandwidth | Max Streams | Cost/Month (est) |
+|-----------|-----|-----------|-------------|------------------|
+| 1 core | 1 GB | 50 Mbps | 5-8 streams | $5-10 |
+| 2 cores | 2 GB | 100 Mbps | 10-15 streams | $10-20 |
+| 2 cores | 4 GB | 100 Mbps | 15-20 streams | $20-30 |
+| 2 cores | 8 GB | 200 Mbps | 30-40 streams | $30-40 |
+| 4 cores | 8 GB | 500 Mbps | 80-100 streams | $40-50 |
+| 6 cores | 16 GB | 1 Gbps | 150-200 streams | $50-80 |
+
+**Note:** Bandwidth is usually the bottleneck, not CPU/RAM!
+
+---
+
+## 📊 Your Current Server Usage
+
+| Streams | CPU Usage | RAM Usage | Bandwidth | Status |
+|---------|-----------|-----------|-----------|--------|
+| 0 | 1% | 150 MB | 0 Mbps | 🟢 Idle |
+| 5 | 11% | 450 MB | 20 Mbps | 🟢 Very Safe |
+| 10 | 21% | 750 MB | 40 Mbps | 🟢 Safe |
+| 15 | 31% | 1.05 GB | 60 Mbps | 🟢 Recommended |
+| 18 | 37% | 1.23 GB | 72 Mbps | 🟡 Optimal |
+| 20 | 41% | 1.35 GB | 80 Mbps | 🟡 Maximum |
+| 25 | 51% | 1.65 GB | 100 Mbps | 🔴 Over Limit |
 
 ---
 
@@ -101,4 +119,4 @@ Consider:
 
 ## 🔗 Full Documentation
 
-See `SERVER_CAPACITY_PLANNING.md` for detailed analysis.
+See `SERVER_CAPACITY_PLANNING.md` for detailed analysis
