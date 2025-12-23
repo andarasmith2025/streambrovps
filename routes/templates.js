@@ -74,7 +74,15 @@ router.post('/', (req, res) => {
     loop_video,
     schedules,
     use_advanced_settings,
-    advanced_settings
+    advanced_settings,
+    use_youtube_api,
+    youtube_description,
+    youtube_privacy,
+    youtube_made_for_kids,
+    youtube_age_restricted,
+    youtube_synthetic_content,
+    youtube_auto_start,
+    youtube_auto_end
   } = req.body;
 
   if (!name) {
@@ -88,8 +96,10 @@ router.post('/', (req, res) => {
   db.run(
     `INSERT INTO stream_templates 
      (id, name, description, video_id, video_name, stream_title, rtmp_url, stream_key, 
-      platform, loop_video, schedules, use_advanced_settings, advanced_settings, user_id) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      platform, loop_video, schedules, use_advanced_settings, advanced_settings, 
+      use_youtube_api, youtube_description, youtube_privacy, youtube_made_for_kids, 
+      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, user_id) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       templateId,
       name,
@@ -104,6 +114,15 @@ router.post('/', (req, res) => {
       schedulesJson,
       use_advanced_settings ? 1 : 0,
       advancedSettingsJson,
+      // YouTube API fields - only save if use_youtube_api is true
+      use_youtube_api ? 1 : 0,
+      use_youtube_api ? (youtube_description || '') : null,
+      use_youtube_api ? (youtube_privacy || 'unlisted') : null,
+      use_youtube_api ? (youtube_made_for_kids ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_age_restricted ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_synthetic_content ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_auto_start ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_auto_end ? 1 : 0) : 0,
       req.session.userId
     ],
     function (err) {
@@ -138,7 +157,16 @@ router.put('/:id', (req, res) => {
     loop_video,
     schedules,
     use_advanced_settings,
-    advanced_settings
+    advanced_settings,
+    // YouTube API specific fields
+    use_youtube_api,
+    youtube_description,
+    youtube_privacy,
+    youtube_made_for_kids,
+    youtube_age_restricted,
+    youtube_synthetic_content,
+    youtube_auto_start,
+    youtube_auto_end
   } = req.body;
 
   const schedulesJson = JSON.stringify(schedules || []);
@@ -148,7 +176,11 @@ router.put('/:id', (req, res) => {
     `UPDATE stream_templates 
      SET name = ?, description = ?, video_id = ?, video_name = ?, stream_title = ?, 
          rtmp_url = ?, stream_key = ?, platform = ?, loop_video = ?, schedules = ?, 
-         use_advanced_settings = ?, advanced_settings = ?, updated_at = CURRENT_TIMESTAMP
+         use_advanced_settings = ?, advanced_settings = ?,
+         use_youtube_api = ?, youtube_description = ?, youtube_privacy = ?, 
+         youtube_made_for_kids = ?, youtube_age_restricted = ?, youtube_synthetic_content = ?,
+         youtube_auto_start = ?, youtube_auto_end = ?,
+         updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND user_id = ?`,
     [
       name,
@@ -163,6 +195,15 @@ router.put('/:id', (req, res) => {
       schedulesJson,
       use_advanced_settings ? 1 : 0,
       advancedSettingsJson,
+      // YouTube API fields - only save if use_youtube_api is true
+      use_youtube_api ? 1 : 0,
+      use_youtube_api ? (youtube_description || '') : null,
+      use_youtube_api ? (youtube_privacy || 'unlisted') : null,
+      use_youtube_api ? (youtube_made_for_kids ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_age_restricted ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_synthetic_content ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_auto_start ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_auto_end ? 1 : 0) : 0,
       req.params.id,
       req.session.userId
     ],
@@ -268,8 +309,10 @@ router.post('/import', (req, res) => {
   db.run(
     `INSERT INTO stream_templates 
      (id, name, description, video_id, video_name, stream_title, rtmp_url, stream_key, 
-      platform, loop_video, schedules, use_advanced_settings, advanced_settings, user_id) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      platform, loop_video, schedules, use_advanced_settings, advanced_settings,
+      use_youtube_api, youtube_description, youtube_privacy, youtube_made_for_kids,
+      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, user_id) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       templateId,
       templateData.name + ' (Imported)',
@@ -284,6 +327,15 @@ router.post('/import', (req, res) => {
       schedulesJson,
       templateData.use_advanced_settings ? 1 : 0,
       advancedSettingsJson,
+      // YouTube API fields
+      templateData.use_youtube_api ? 1 : 0,
+      templateData.use_youtube_api ? (templateData.youtube_description || '') : null,
+      templateData.use_youtube_api ? (templateData.youtube_privacy || 'unlisted') : null,
+      templateData.use_youtube_api ? (templateData.youtube_made_for_kids ? 1 : 0) : 0,
+      templateData.use_youtube_api ? (templateData.youtube_age_restricted ? 1 : 0) : 0,
+      templateData.use_youtube_api ? (templateData.youtube_synthetic_content ? 1 : 0) : 0,
+      templateData.use_youtube_api ? (templateData.youtube_auto_start ? 1 : 0) : 0,
+      templateData.use_youtube_api ? (templateData.youtube_auto_end ? 1 : 0) : 0,
       req.session.userId
     ],
     function (err) {

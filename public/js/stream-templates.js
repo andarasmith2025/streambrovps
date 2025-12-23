@@ -107,9 +107,18 @@ async function loadTemplate(templateId) {
     setTimeout(() => {
       // Switch to correct tab first
       const isYouTubeMode = template.use_youtube_api === true || template.use_youtube_api === 1;
+      console.log('[loadTemplate] Template data:', {
+        name: template.name,
+        use_youtube_api: template.use_youtube_api,
+        isYouTubeMode: isYouTubeMode,
+        platform: template.platform
+      });
+      
       if (isYouTubeMode) {
+        console.log('[loadTemplate] Switching to YouTube API tab');
         switchStreamTab('youtube');
       } else {
+        console.log('[loadTemplate] Switching to Manual RTMP tab');
         switchStreamTab('manual');
       }
       

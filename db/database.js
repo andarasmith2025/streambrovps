@@ -413,6 +413,14 @@ function createTables() {
     schedules TEXT,
     use_advanced_settings BOOLEAN DEFAULT 0,
     advanced_settings TEXT,
+    use_youtube_api BOOLEAN DEFAULT 0,
+    youtube_description TEXT,
+    youtube_privacy TEXT DEFAULT 'unlisted',
+    youtube_made_for_kids BOOLEAN DEFAULT 0,
+    youtube_age_restricted BOOLEAN DEFAULT 0,
+    youtube_synthetic_content BOOLEAN DEFAULT 0,
+    youtube_auto_start BOOLEAN DEFAULT 0,
+    youtube_auto_end BOOLEAN DEFAULT 0,
     user_id TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -420,6 +428,55 @@ function createTables() {
   )`, (err) => {
     if (err) {
       console.error('Error creating stream_templates table:', err.message);
+    }
+  });
+  
+  // Add YouTube API metadata columns to existing stream_templates table
+  db.run(`ALTER TABLE stream_templates ADD COLUMN use_youtube_api BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding use_youtube_api column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_description TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_description column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_privacy TEXT DEFAULT 'unlisted'`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_privacy column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_made_for_kids BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_made_for_kids column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_age_restricted BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_age_restricted column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_synthetic_content BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_synthetic_content column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_auto_start BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_auto_start column:', err.message);
+    }
+  });
+  
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_auto_end BOOLEAN DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_auto_end column:', err.message);
     }
   });
 

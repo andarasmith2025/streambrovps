@@ -58,8 +58,7 @@ async function generateTitleWithGemini(titleFieldId = 'streamTitle') {
       titleInput.value = data.title;
       showNotification('Success', 'Title generated successfully!', 'success');
       
-      // Trigger input event for any listeners
-      titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+      // Note: Removed dispatchEvent to prevent potential auto-trigger issues
     } else {
       throw new Error(data.error || 'Failed to generate title');
     }
@@ -122,8 +121,7 @@ async function generateDescriptionWithGemini() {
       descriptionInput.value = data.description;
       showNotification('Success', 'Description generated successfully!', 'success');
       
-      // Trigger input event for any listeners
-      descriptionInput.dispatchEvent(new Event('input', { bubbles: true }));
+      // Note: Removed dispatchEvent to prevent potential issues
     } else {
       throw new Error(data.error || 'Failed to generate description');
     }
