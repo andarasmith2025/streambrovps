@@ -24,6 +24,18 @@ async function generateTitleWithGemini(titleFieldId = 'streamTitle') {
     return;
   }
   
+  // Warn if title is already long (might be a full title, not keywords)
+  if (keywords.length > 50) {
+    const confirmed = confirm(
+      'The current title seems complete. Do you want to regenerate it?\n\n' +
+      'Current: ' + keywords.substring(0, 60) + (keywords.length > 60 ? '...' : '') + '\n\n' +
+      'Click OK to generate a new title, or Cancel to keep the current one.'
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+  
   // Show loading state
   const originalValue = titleInput.value;
   titleInput.value = 'Generating title with AI...';
