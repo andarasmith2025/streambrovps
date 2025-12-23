@@ -1,0 +1,25 @@
+<!-- Video Selector Component -->
+<!-- Parameters: videoIdField, selectedVideoField, dropdownId, searchInputId, listContainerId -->
+<div class="relative">
+  <label class="text-sm font-medium text-white block mb-2">Select Video</label>
+  <div class="relative">
+    <button type="button" onclick="toggleVideoSelector()"
+      class="w-full flex items-center justify-between px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg hover:border-primary focus:border-primary focus:ring-1 focus:ring-primary transition-colors text-left">
+      <span class="text-sm text-gray-300" id="<%= selectedVideoField %>">Choose a video...</span>
+      <i class="ti ti-chevron-down text-gray-400"></i>
+    </button>
+    <div id="<%= dropdownId %>"
+      class="hidden absolute z-10 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
+      <div class="p-2 border-b border-gray-600/50">
+        <div class="relative">
+          <input type="text" id="<%= searchInputId %>"
+            class="w-full bg-dark-800 text-white pl-8 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700"
+            placeholder="Search videos...">
+          <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        </div>
+      </div>
+      <div id="<%= listContainerId %>" class="p-2 space-y-1 max-h-60 overflow-y-auto">
+      </div>
+    </div>
+  </div>
+</div>

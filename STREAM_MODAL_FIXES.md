@@ -108,14 +108,20 @@
 5. Cache persists when switching between tabs
 
 ## Status
-- [ ] Manual RTMP: "Load from YouTube" button
-- [ ] Manual RTMP: Dropdown for stream key selection
-- [ ] Manual RTMP: Form submission fix
-- [ ] Templates: Checkbox on each card
-- [ ] Templates: "Export Selected" button
-- [ ] Templates: "Export All" button
-- [ ] Templates: Backend export endpoints
-- [ ] Testing: All features
+- [x] Manual RTMP: "Load from YouTube" button
+- [x] Manual RTMP: Dropdown for stream key selection
+- [x] Manual RTMP: Form submission fix
+- [x] Templates: Checkbox on each card
+- [x] Templates: "Export Selected" button
+- [x] Templates: "Export All" button
+- [x] Templates: Backend export endpoints
+- [x] Testing: All features
+
+## Deployment Status
+✅ **DEPLOYED TO SERVER 2** (85.9.195.103)
+- Commit: a1f0e68
+- Date: 2025-12-23
+- All features implemented and deployed successfully
 
 ## Notes
 - Cache duration: 5 minutes (already implemented)
