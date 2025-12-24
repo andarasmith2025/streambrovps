@@ -2530,19 +2530,19 @@
                 // ⭐ YOUTUBE API TAB - Use YouTube API fields
                 console.log('[Edit Stream] Using YouTube API fields');
                 formData.useYouTubeAPI = true;
-                formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
-                formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
-                formData.youtubeStreamId = document.getElementById('youtubeStreamId')?.value || '';
-                formData.youtubeDescription = document.getElementById('youtubeDescription')?.value || '';
+                formData.rtmpUrl = document.getElementById('editYoutubeRtmpUrl')?.value || '';
+                formData.streamKey = document.getElementById('editYoutubeStreamKey')?.value || '';
+                formData.youtubeStreamId = document.getElementById('editYoutubeStreamId')?.value || '';
+                formData.youtubeDescription = document.getElementById('editYoutubeDescription')?.value || '';
                 
                 // YouTube Additional Settings
-                formData.youtubePrivacy = document.getElementById('youtubePrivacy')?.value || 'unlisted';
-                formData.youtubeTags = document.getElementById('youtubeTags')?.value || '';
+                formData.youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value || 'unlisted';
+                formData.youtubeTags = document.getElementById('editYoutubeTags')?.value || '';
                 formData.youtubeMadeForKids = document.querySelector('input[name="editYoutubeMadeForKids"]:checked')?.value === 'yes';
-                formData.youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked || false;
-                formData.youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked || false;
-                formData.youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked || false;
-                formData.youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked || false;
+                formData.youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked || false;
+                formData.youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked || false;
+                formData.youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked || false;
+                formData.youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked || false;
                 
                 // Check if thumbnail file is uploaded
                 const thumbnailInput = document.getElementById('editYoutubeThumbnail');
