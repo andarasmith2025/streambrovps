@@ -82,7 +82,9 @@ router.post('/', (req, res) => {
     youtube_age_restricted,
     youtube_synthetic_content,
     youtube_auto_start,
-    youtube_auto_end
+    youtube_auto_end,
+    youtube_tags,
+    youtube_thumbnail_path
   } = req.body;
 
   if (!name) {
@@ -98,8 +100,9 @@ router.post('/', (req, res) => {
      (id, name, description, video_id, video_name, stream_title, rtmp_url, stream_key, 
       platform, loop_video, schedules, use_advanced_settings, advanced_settings, 
       use_youtube_api, youtube_description, youtube_privacy, youtube_made_for_kids, 
-      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, user_id) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, 
+      youtube_tags, youtube_thumbnail_path, user_id) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       templateId,
       name,
@@ -123,6 +126,8 @@ router.post('/', (req, res) => {
       use_youtube_api ? (youtube_synthetic_content ? 1 : 0) : 0,
       use_youtube_api ? (youtube_auto_start ? 1 : 0) : 0,
       use_youtube_api ? (youtube_auto_end ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_tags || null) : null,
+      use_youtube_api ? (youtube_thumbnail_path || null) : null,
       req.session.userId
     ],
     function (err) {
@@ -166,7 +171,9 @@ router.put('/:id', (req, res) => {
     youtube_age_restricted,
     youtube_synthetic_content,
     youtube_auto_start,
-    youtube_auto_end
+    youtube_auto_end,
+    youtube_tags,
+    youtube_thumbnail_path
   } = req.body;
 
   const schedulesJson = JSON.stringify(schedules || []);
@@ -179,7 +186,7 @@ router.put('/:id', (req, res) => {
          use_advanced_settings = ?, advanced_settings = ?,
          use_youtube_api = ?, youtube_description = ?, youtube_privacy = ?, 
          youtube_made_for_kids = ?, youtube_age_restricted = ?, youtube_synthetic_content = ?,
-         youtube_auto_start = ?, youtube_auto_end = ?,
+         youtube_auto_start = ?, youtube_auto_end = ?, youtube_tags = ?, youtube_thumbnail_path = ?,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND user_id = ?`,
     [
@@ -204,6 +211,8 @@ router.put('/:id', (req, res) => {
       use_youtube_api ? (youtube_synthetic_content ? 1 : 0) : 0,
       use_youtube_api ? (youtube_auto_start ? 1 : 0) : 0,
       use_youtube_api ? (youtube_auto_end ? 1 : 0) : 0,
+      use_youtube_api ? (youtube_tags || null) : null,
+      use_youtube_api ? (youtube_thumbnail_path || null) : null,
       req.params.id,
       req.session.userId
     ],
@@ -311,8 +320,9 @@ router.post('/import', (req, res) => {
      (id, name, description, video_id, video_name, stream_title, rtmp_url, stream_key, 
       platform, loop_video, schedules, use_advanced_settings, advanced_settings,
       use_youtube_api, youtube_description, youtube_privacy, youtube_made_for_kids,
-      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, user_id) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, 
+      youtube_tags, youtube_thumbnail_path, user_id) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       templateId,
       templateData.name + ' (Imported)',
@@ -336,6 +346,8 @@ router.post('/import', (req, res) => {
       templateData.use_youtube_api ? (templateData.youtube_synthetic_content ? 1 : 0) : 0,
       templateData.use_youtube_api ? (templateData.youtube_auto_start ? 1 : 0) : 0,
       templateData.use_youtube_api ? (templateData.youtube_auto_end ? 1 : 0) : 0,
+      templateData.use_youtube_api ? (templateData.youtube_tags || null) : null,
+      templateData.use_youtube_api ? (templateData.youtube_thumbnail_path || null) : null,
       req.session.userId
     ],
     function (err) {

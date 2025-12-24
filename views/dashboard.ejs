@@ -2180,59 +2180,6 @@
               }
             }
             
-            // Disable RTMP fields if using YouTube API (managed by broadcast)
-            const rtmpUrlField = document.getElementById('editRtmpUrl');
-            const streamKeyField = document.getElementById('editStreamKey');
-            const platformSelector = document.getElementById('editPlatformSelector');
-            
-            if (isYouTubeAPI) {
-              if (rtmpUrlField) {
-                rtmpUrlField.disabled = true;
-                rtmpUrlField.classList.add('opacity-50', 'cursor-not-allowed');
-                rtmpUrlField.title = 'RTMP URL is managed by YouTube broadcast';
-              }
-              if (streamKeyField) {
-                streamKeyField.disabled = true;
-                streamKeyField.classList.add('opacity-50', 'cursor-not-allowed');
-                streamKeyField.title = 'Stream Key is managed by YouTube broadcast';
-              }
-              if (platformSelector) {
-                platformSelector.disabled = true;
-                platformSelector.classList.add('opacity-50', 'cursor-not-allowed');
-                platformSelector.title = 'Platform is managed by YouTube API';
-              }
-              
-              // Add info badge
-              const rtmpUrlContainer = rtmpUrlField?.parentElement;
-              if (rtmpUrlContainer && !rtmpUrlContainer.querySelector('.youtube-api-badge')) {
-                const badge = document.createElement('div');
-                badge.className = 'youtube-api-badge mt-2 text-xs text-blue-400 flex items-center gap-1';
-                badge.innerHTML = '<i class="ti ti-info-circle"></i><span>This stream uses YouTube API. RTMP settings are managed automatically.</span>';
-                rtmpUrlContainer.appendChild(badge);
-              }
-            } else {
-              // Enable fields for manual RTMP
-              if (rtmpUrlField) {
-                rtmpUrlField.disabled = false;
-                rtmpUrlField.classList.remove('opacity-50', 'cursor-not-allowed');
-                rtmpUrlField.title = '';
-              }
-              if (streamKeyField) {
-                streamKeyField.disabled = false;
-                streamKeyField.classList.remove('opacity-50', 'cursor-not-allowed');
-                streamKeyField.title = '';
-              }
-              if (platformSelector) {
-                platformSelector.disabled = false;
-                platformSelector.classList.remove('opacity-50', 'cursor-not-allowed');
-                platformSelector.title = '';
-              }
-              
-              // Remove info badge if exists
-              const badge = document.querySelector('.youtube-api-badge');
-              if (badge) badge.remove();
-            }
-            
             if (stream.video_id) {
               safeSetValue('editSelectedVideoId', stream.video_id);
               const displayName = stream.video_type === 'playlist' ? (stream.playlist_name || stream.video_title) : stream.video_title;

@@ -259,8 +259,17 @@ async function saveAsTemplate() {
     youtubePrivacy = document.getElementById('youtubePrivacy')?.value;
     youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
     youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked;
+    const youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked;
     youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked;
     youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked;
+    
+    // Get tags from hidden input
+    const youtubeTagsInput = document.getElementById('youtubeTags');
+    const youtubeTags = youtubeTagsInput?.value || '[]';
+    
+    // Get thumbnail path (if file was selected, it will be in the form data)
+    // Note: Thumbnail file itself cannot be saved in template, only the path reference
+    const youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
   } else {
     rtmpUrl = document.getElementById('rtmpUrl')?.value;
     streamKey = document.getElementById('streamKey')?.value;
@@ -336,8 +345,11 @@ async function saveAsTemplate() {
     youtube_privacy: youtubePrivacy || 'unlisted',
     youtube_made_for_kids: youtubeMadeForKids || false,
     youtube_age_restricted: youtubeAgeRestricted || false,
+    youtube_synthetic_content: youtubeSyntheticContent || false,
     youtube_auto_start: youtubeAutoStart || false,
-    youtube_auto_end: youtubeAutoEnd || false
+    youtube_auto_end: youtubeAutoEnd || false,
+    youtube_tags: youtubeTags || '[]',
+    youtube_thumbnail_path: youtubeThumbnailPath || null
   };
   
   // Show modal
@@ -721,8 +733,17 @@ async function saveEditAsTemplate() {
     youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value;
     youtubeMadeForKids = document.querySelector('input[name="editYoutubeMadeForKids"]:checked')?.value === 'yes';
     youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked;
+    const youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked;
     youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked;
     youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked;
+    
+    // Get tags from hidden input
+    const youtubeTagsInput = document.getElementById('editYoutubeTags');
+    const youtubeTags = youtubeTagsInput?.value || '[]';
+    
+    // Get thumbnail path (if file was selected, it will be in the form data)
+    // Note: Thumbnail file itself cannot be saved in template, only the path reference
+    const youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
   } else {
     rtmpUrl = document.getElementById('editRtmpUrl')?.value;
     streamKey = document.getElementById('editStreamKey')?.value;
@@ -793,8 +814,11 @@ async function saveEditAsTemplate() {
     youtube_privacy: youtubePrivacy,
     youtube_made_for_kids: youtubeMadeForKids ? 1 : 0,
     youtube_age_restricted: youtubeAgeRestricted ? 1 : 0,
+    youtube_synthetic_content: youtubeSyntheticContent ? 1 : 0,
     youtube_auto_start: youtubeAutoStart ? 1 : 0,
     youtube_auto_end: youtubeAutoEnd ? 1 : 0,
+    youtube_tags: youtubeTags || '[]',
+    youtube_thumbnail_path: youtubeThumbnailPath || null,
     schedules: schedules
   };
   

@@ -583,6 +583,15 @@ function createTables() {
       console.log('✅ Added youtube_language column to stream_templates table');
     }
   });
+
+  // Add youtube_thumbnail_path column for custom thumbnails in templates
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_thumbnail_path TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_thumbnail_path column to templates:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_thumbnail_path column to stream_templates table');
+    }
+  });
 }
 
 function checkIfUsersExist() {
