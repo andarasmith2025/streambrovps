@@ -903,13 +903,20 @@ let youtubeStreamKeysCacheTime = null; // Cache timestamp
 const STREAM_KEYS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
 function switchStreamTab(tab) {
+  console.log('[switchStreamTab] ========== START ==========');
   console.log('[switchStreamTab] Switching to tab:', tab);
   currentStreamTab = tab;
   window.currentStreamTab = tab; // Update global reference
   
   // Auto-detect which modal is open (New Stream or Edit Stream)
-  const isEditModal = document.getElementById('editStreamModal') && 
-                      !document.getElementById('editStreamModal').classList.contains('hidden');
+  const editModal = document.getElementById('editStreamModal');
+  const newModal = document.getElementById('newStreamModal');
+  
+  console.log('[switchStreamTab] Edit modal element:', editModal ? 'found' : 'NOT FOUND');
+  console.log('[switchStreamTab] Edit modal hidden class:', editModal?.classList.contains('hidden'));
+  
+  // Check if edit modal is visible (not hidden AND has active class)
+  const isEditModal = editModal && !editModal.classList.contains('hidden');
   
   const tabPrefix = isEditModal ? 'editTab' : 'tab';
   console.log('[switchStreamTab] Modal type:', isEditModal ? 'Edit' : 'New', 'tabPrefix:', tabPrefix);
@@ -924,15 +931,33 @@ function switchStreamTab(tab) {
   
   const tabManual = document.getElementById(tabPrefix + 'Manual');
   const tabYouTube = document.getElementById(tabPrefix + 'YouTube');
-  const youtubeApiFields = document.getElementById('youtubeApiFields');
+  
+  // Use different IDs for edit modal vs new modal
+  const youtubeApiFields = isEditModal ? 
+    document.getElementById('editYoutubeApiFields') : 
+    document.getElementById('youtubeApiFields');
   const manualRtmpFields = document.getElementById('manualRtmpFields');
   
+  console.log('[switchStreamTab] Elements found:', {
+    tabManual: tabManual ? 'YES' : 'NO',
+    tabYouTube: tabYouTube ? 'YES' : 'NO',
+    youtubeApiFields: youtubeApiFields ? 'YES' : 'NO',
+    youtubeApiFieldsId: isEditModal ? 'editYoutubeApiFields' : 'youtubeApiFields',
+    manualRtmpFields: manualRtmpFields ? 'YES' : 'NO'
+  });
+  
   if (!tabManual || !tabYouTube) {
-    console.error('[switchStreamTab] Tab buttons not found:', { tabManual, tabYouTube });
+    console.error('[switchStreamTab] ❌ Tab buttons not found:', { 
+      expectedManualId: tabPrefix + 'Manual',
+      expectedYouTubeId: tabPrefix + 'YouTube',
+      tabManual, 
+      tabYouTube 
+    });
     return;
   }
   
   if (tab === 'manual') {
+    console.log('[switchStreamTab] 📝 Activating Manual RTMP tab');
     // Activate Manual tab
     tabManual.classList.add('bg-primary', 'text-white');
     tabManual.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
@@ -942,8 +967,14 @@ function switchStreamTab(tab) {
     tabYouTube.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
     
     // Show/Hide fields
-    if (youtubeApiFields) youtubeApiFields.classList.add('hidden');
-    if (manualRtmpFields) manualRtmpFields.classList.remove('hidden');
+    if (youtubeApiFields) {
+      youtubeApiFields.classList.add('hidden');
+      console.log('[switchStreamTab] ✅ YouTube API fields hidden');
+    }
+    if (manualRtmpFields) {
+      manualRtmpFields.classList.remove('hidden');
+      console.log('[switchStreamTab] ✅ Manual RTMP fields shown');
+    }
     
     // Make RTMP fields required (only for New Stream Modal)
     if (!isEditModal) {
@@ -954,6 +985,7 @@ function switchStreamTab(tab) {
     }
     
   } else if (tab === 'youtube') {
+    console.log('[switchStreamTab] 🎥 Activating YouTube API tab');
     // Activate YouTube tab
     tabYouTube.classList.add('bg-primary', 'text-white');
     tabYouTube.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
@@ -963,8 +995,14 @@ function switchStreamTab(tab) {
     tabManual.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-dark-700');
     
     // Show/Hide fields
-    if (youtubeApiFields) youtubeApiFields.classList.remove('hidden');
-    if (manualRtmpFields) manualRtmpFields.classList.add('hidden');
+    if (youtubeApiFields) {
+      youtubeApiFields.classList.remove('hidden');
+      console.log('[switchStreamTab] ✅ YouTube API fields shown');
+    }
+    if (manualRtmpFields) {
+      manualRtmpFields.classList.add('hidden');
+      console.log('[switchStreamTab] ✅ Manual RTMP fields hidden');
+    }
     
     // Make RTMP fields not required (only for New Stream Modal)
     if (!isEditModal) {
@@ -977,6 +1015,8 @@ function switchStreamTab(tab) {
     // Don't auto-load stream keys - user will click Load button
     // loadYouTubeStreamKeys();
   }
+  
+  console.log('[switchStreamTab] ========== END ==========');
 }
 
 // Make sure switchStreamTab is available globally
@@ -1986,3 +2026,670 @@ function selectEditYouTubeStreamKey(streamKeyId) {
     showToast('success', 'YouTube stream key loaded successfully');
   }
 }
+
+// ============================================================================
+// EDIT MODAL FUNCTIONS (Mirror of New Stream Modal functions)
+// ============================================================================
+
+// Edit Modal - Toggle YouTube Stream Key Visibility (already exists, just expose)
+// (Function already defined above at line 1840)
+
+// Edit Modal - Toggle YouTube Stream Keys Dropdown
+function toggleEditYouTubeStreamKeysDropdown() {
+  const dropdown = document.getElementById('editYoutubeStreamKeysDropdown');
+  if (!dropdown) return;
+  
+  dropdown.classList.toggle('hidden');
+  
+  // Load stream keys when opening dropdown
+  if (!dropdown.classList.contains('hidden')) {
+    loadEditYouTubeStreamKeys();
+  }
+}
+
+// Edit Modal - Load YouTube Stream Keys
+async function loadEditYouTubeStreamKeys(forceRefresh = false) {
+  try {
+    // Check cache first (unless force refresh)
+    const now = Date.now();
+    if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime) {
+      const cacheAge = now - youtubeStreamKeysCacheTime;
+      if (cacheAge < STREAM_KEYS_CACHE_DURATION) {
+        console.log('[loadEditYouTubeStreamKeys] Using cached stream keys (age:', Math.round(cacheAge / 1000), 'seconds)');
+        youtubeStreamKeys = youtubeStreamKeysCache;
+        displayEditYouTubeStreamKeys(youtubeStreamKeysCache);
+        return;
+      }
+    }
+    
+    const container = document.getElementById('editYoutubeStreamKeysList');
+    const countSpan = document.getElementById('editStreamKeysCount');
+    const cacheInfo = document.getElementById('editStreamKeysCacheInfo');
+    
+    if (!container) return;
+    
+    container.innerHTML = '<div class="text-center py-4 text-gray-400"><i class="ti ti-loader animate-spin text-xl mb-2"></i><p class="text-xs">Loading stream keys...</p></div>';
+    
+    const response = await fetch('/api/youtube/stream-keys');
+    const data = await response.json();
+    
+    if (data.success && data.streamKeys) {
+      youtubeStreamKeys = data.streamKeys;
+      youtubeStreamKeysCache = data.streamKeys;
+      youtubeStreamKeysCacheTime = now;
+      
+      displayEditYouTubeStreamKeys(data.streamKeys);
+      
+      if (countSpan) {
+        countSpan.textContent = `(${data.streamKeys.length})`;
+      }
+      
+      if (cacheInfo) {
+        cacheInfo.textContent = 'Just loaded';
+      }
+    } else {
+      showEditYouTubeStreamKeysError(data.error || 'Failed to load stream keys');
+    }
+  } catch (error) {
+    console.error('[loadEditYouTubeStreamKeys] Error:', error);
+    showEditYouTubeStreamKeysError('Network error. Please try again.');
+  }
+}
+
+// Edit Modal - Display YouTube Stream Keys
+function displayEditYouTubeStreamKeys(streamKeys) {
+  const container = document.getElementById('editYoutubeStreamKeysList');
+  if (!container) return;
+  
+  if (!streamKeys || streamKeys.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-gray-400">
+        <i class="ti ti-inbox text-2xl mb-2"></i>
+        <p class="text-xs">No stream keys found</p>
+        <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = '';
+  
+  streamKeys.forEach(key => {
+    const keyItem = document.createElement('div');
+    keyItem.className = 'p-2 hover:bg-dark-600 rounded cursor-pointer transition-colors';
+    keyItem.onclick = () => selectEditYouTubeStreamKey(key.id);
+    
+    keyItem.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</div>
+          <div class="text-xs text-gray-400 mt-1">
+            <span class="inline-flex items-center gap-1">
+              <i class="ti ti-calendar text-xs"></i>
+              ${key.scheduledStartTime ? new Date(key.scheduledStartTime).toLocaleString() : 'Not scheduled'}
+            </span>
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'rtmp')" 
+              class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              title="Copy RTMP URL">
+              <i class="ti ti-link text-xs"></i>
+              RTMP
+            </button>
+            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'key')" 
+              class="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+              title="Copy Stream Key">
+              <i class="ti ti-key text-xs"></i>
+              Key
+            </button>
+            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'all')" 
+              class="text-xs text-green-400 hover:text-green-300 flex items-center gap-1"
+              title="Copy Both">
+              <i class="ti ti-copy text-xs"></i>
+              Both
+            </button>
+          </div>
+        </div>
+        <div class="flex-shrink-0">
+          <span class="inline-flex items-center px-2 py-1 rounded text-xs ${
+            key.status === 'active' ? 'bg-green-500/20 text-green-400' :
+            key.status === 'ready' ? 'bg-blue-500/20 text-blue-400' :
+            'bg-gray-500/20 text-gray-400'
+          }">
+            ${key.status || 'unknown'}
+          </span>
+        </div>
+      </div>
+    `;
+    
+    container.appendChild(keyItem);
+  });
+}
+
+// Edit Modal - Show Error
+function showEditYouTubeStreamKeysError(message) {
+  const container = document.getElementById('editYoutubeStreamKeysList');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="text-center py-4 text-red-400">
+      <i class="ti ti-alert-circle text-2xl mb-2"></i>
+      <p class="text-xs">${message}</p>
+    </div>
+  `;
+}
+
+// Edit Modal - Copy Stream Key to Clipboard
+function copyEditStreamKeyToClipboard(keyId, type) {
+  const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+  if (!selectedKey) return;
+  
+  let textToCopy = '';
+  let successMessage = '';
+  
+  switch(type) {
+    case 'rtmp':
+      textToCopy = selectedKey.rtmpUrl;
+      successMessage = 'RTMP URL copied!';
+      break;
+    case 'key':
+      textToCopy = selectedKey.streamKey;
+      successMessage = 'Stream key copied!';
+      break;
+    case 'all':
+      textToCopy = `RTMP URL: ${selectedKey.rtmpUrl}\nStream Key: ${selectedKey.streamKey}`;
+      successMessage = 'RTMP URL and Stream Key copied!';
+      break;
+  }
+  
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    if (typeof showToast === 'function') {
+      showToast('success', successMessage);
+    } else {
+      console.log(successMessage);
+    }
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    if (typeof showToast === 'function') {
+      showToast('error', 'Failed to copy to clipboard');
+    }
+  });
+}
+
+// Edit Modal - Select YouTube Stream Key
+function selectEditYouTubeStreamKey(keyId) {
+  const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
+  if (!selectedKey) return;
+  
+  // Fill in the form fields
+  const rtmpUrlInput = document.getElementById('youtubeRtmpUrl');
+  const streamKeyInput = document.getElementById('youtubeStreamKey');
+  const streamIdInput = document.getElementById('youtubeStreamId');
+  
+  if (rtmpUrlInput) rtmpUrlInput.value = selectedKey.rtmpUrl;
+  if (streamKeyInput) streamKeyInput.value = selectedKey.streamKey;
+  if (streamIdInput) streamIdInput.value = selectedKey.id;
+  
+  // Close dropdown
+  const dropdown = document.getElementById('editYoutubeStreamKeysDropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+  
+  // Show success message
+  if (typeof showToast === 'function') {
+    showToast('success', `Stream key loaded: ${selectedKey.title || 'Untitled'}`);
+  }
+  
+  console.log('[selectEditYouTubeStreamKey] Selected stream:', selectedKey.title, selectedKey.id);
+}
+
+// Edit Modal - Refresh Stream Keys
+function refreshEditYouTubeStreamKeys() {
+  console.log('[refreshEditYouTubeStreamKeys] Force refreshing stream keys...');
+  loadEditYouTubeStreamKeys(true); // Force refresh
+}
+
+// Edit Modal - Tags System
+let editTags = [];
+
+function handleEditTagInput(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    addEditTag();
+  }
+}
+
+function addEditTag() {
+  const input = document.getElementById('editTagInput');
+  if (!input) return;
+  
+  const tag = input.value.trim();
+  if (!tag) return;
+  
+  // Check if tag already exists
+  if (editTags.includes(tag)) {
+    if (typeof showToast === 'function') {
+      showToast('warning', 'Tag already added');
+    }
+    return;
+  }
+  
+  // Check tag limit
+  if (editTags.length >= 20) {
+    if (typeof showToast === 'function') {
+      showToast('warning', 'Maximum 20 tags allowed');
+    }
+    return;
+  }
+  
+  // Check total character limit
+  const totalChars = editTags.join(',').length + tag.length + (editTags.length > 0 ? 1 : 0);
+  if (totalChars > 500) {
+    if (typeof showToast === 'function') {
+      showToast('warning', 'Total tags length cannot exceed 500 characters');
+    }
+    return;
+  }
+  
+  editTags.push(tag);
+  input.value = '';
+  updateEditTagsDisplay();
+}
+
+function removeEditTag(tag) {
+  editTags = editTags.filter(t => t !== tag);
+  updateEditTagsDisplay();
+}
+
+function updateEditTagsDisplay() {
+  const container = document.getElementById('editTagsContainer');
+  const countSpan = document.getElementById('editTagCount');
+  const lengthSpan = document.getElementById('editTagLength');
+  const hiddenInput = document.getElementById('youtubeTags');
+  
+  if (!container) return;
+  
+  if (editTags.length === 0) {
+    container.innerHTML = '<span class="text-gray-500 text-sm">No tags added yet. Click "Generate with AI" or add manually.</span>';
+  } else {
+    container.innerHTML = '';
+    editTags.forEach(tag => {
+      const tagElement = document.createElement('span');
+      tagElement.className = 'inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded text-sm';
+      tagElement.innerHTML = `
+        ${tag}
+        <button type="button" onclick="removeEditTag('${tag.replace(/'/g, "\\'")}')" class="hover:text-emerald-400 transition-colors">
+          <i class="ti ti-x text-xs"></i>
+        </button>
+      `;
+      container.appendChild(tagElement);
+    });
+  }
+  
+  // Update stats
+  if (countSpan) {
+    const isOverLimit = editTags.length > 20;
+    countSpan.textContent = `${editTags.length} / 20 tags`;
+    countSpan.className = isOverLimit ? 'text-orange-400' : 'text-gray-400';
+  }
+  
+  const totalLength = editTags.join(',').length;
+  if (lengthSpan) {
+    lengthSpan.textContent = `${totalLength} / 500 characters`;
+    lengthSpan.className = totalLength > 500 ? 'text-orange-400' : 'text-gray-400';
+  }
+  
+  // Update hidden input
+  if (hiddenInput) {
+    hiddenInput.value = JSON.stringify(editTags);
+  }
+}
+
+// Edit Modal - AI Generate Description
+async function generateEditDescriptionWithGemini() {
+  console.log('[Edit Modal] generateEditDescriptionWithGemini called');
+  
+  const titleInput = document.getElementById('editStreamTitle');
+  const descriptionTextarea = document.getElementById('editYoutubeDescription');
+  
+  if (!titleInput || !descriptionTextarea) {
+    console.error('[Edit Modal] Elements not found:', {
+      titleInput: !!titleInput,
+      descriptionTextarea: !!descriptionTextarea
+    });
+    return;
+  }
+  
+  const title = titleInput.value.trim();
+  if (!title || title.length < 5) {
+    if (typeof showNotification === 'function') {
+      showNotification('Info', 'Please enter a stream title first', 'info');
+    }
+    titleInput.focus();
+    return;
+  }
+  
+  console.log('[Edit Modal] Generating description for:', title);
+  
+  // Show loading state
+  const originalValue = descriptionTextarea.value;
+  descriptionTextarea.value = 'Generating description with AI...';
+  descriptionTextarea.disabled = true;
+  
+  try {
+    const response = await fetch('/api/gemini/generate-description', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        title,
+        keywords: '' // Optional: could add keywords field later
+      })
+    });
+    
+    const data = await response.json();
+    
+    console.log('[Edit Modal] Response:', data);
+    
+    if (data.success && data.description) {
+      descriptionTextarea.value = data.description;
+      
+      console.log('[Edit Modal] ✅ Description set successfully');
+      console.log('[Edit Modal] Length:', data.description.length, 'characters');
+      
+      if (typeof showNotification === 'function') {
+        showNotification('Success', 'Description generated successfully!', 'success');
+      }
+    } else {
+      throw new Error(data.error || 'Failed to generate description');
+    }
+  } catch (error) {
+    console.error('[Edit Modal] Error generating description:', error);
+    descriptionTextarea.value = originalValue; // Restore original value on error
+    
+    if (typeof showNotification === 'function') {
+      if (error.message.includes('API key')) {
+        showNotification('Error', 'Gemini API key not configured. Please add it in Settings.', 'error');
+      } else {
+        showNotification('Error', error.message || 'Failed to generate description', 'error');
+      }
+    }
+  } finally {
+    descriptionTextarea.disabled = false;
+  }
+}
+
+// Edit Modal - AI Generate Tags
+async function generateEditTagsWithGemini() {
+  const titleInput = document.getElementById('editStreamTitle');
+  const descriptionTextarea = document.getElementById('youtubeDescription');
+  
+  if (!titleInput) return;
+  
+  const title = titleInput.value.trim();
+  const description = descriptionTextarea ? descriptionTextarea.value.trim() : '';
+  
+  if (!title) {
+    if (typeof showToast === 'function') {
+      showToast('warning', 'Please enter a stream title first');
+    }
+    return;
+  }
+  
+  console.log('[generateEditTagsWithGemini] Generating tags for:', { title, description: description.substring(0, 50) });
+  
+  // Show loading state
+  const container = document.getElementById('editTagsContainer');
+  if (container) {
+    container.innerHTML = '<span class="text-gray-400 text-sm"><i class="ti ti-loader animate-spin mr-1"></i>Generating tags with AI...</span>';
+  }
+  
+  try {
+    const response = await fetch('/api/gemini/generate-tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description })
+    });
+    
+    const data = await response.json();
+    
+    console.log('[generateEditTagsWithGemini] Response:', data);
+    
+    if (data.success && data.tags && Array.isArray(data.tags)) {
+      editTags = data.tags.slice(0, 20); // Limit to 20 tags
+      updateEditTagsDisplay();
+      if (typeof showToast === 'function') {
+        showToast('success', `Generated ${editTags.length} tags!`);
+      }
+    } else {
+      throw new Error(data.error || 'Failed to generate tags');
+    }
+  } catch (error) {
+    console.error('[generateEditTagsWithGemini] Error:', error);
+    if (typeof showToast === 'function') {
+      showToast('error', 'Failed to generate tags: ' + error.message);
+    }
+    updateEditTagsDisplay(); // Reset to previous state
+  }
+}
+
+// Expose Edit Modal functions globally
+window.toggleEditYouTubeStreamKeysDropdown = toggleEditYouTubeStreamKeysDropdown;
+window.loadEditYouTubeStreamKeys = loadEditYouTubeStreamKeys;
+window.refreshEditYouTubeStreamKeys = refreshEditYouTubeStreamKeys;
+window.selectEditYouTubeStreamKey = selectEditYouTubeStreamKey;
+window.copyEditStreamKeyToClipboard = copyEditStreamKeyToClipboard;
+window.handleEditTagInput = handleEditTagInput;
+window.addEditTag = addEditTag;
+window.removeEditTag = removeEditTag;
+window.generateEditDescriptionWithGemini = generateEditDescriptionWithGemini;
+window.generateEditTagsWithGemini = generateEditTagsWithGemini;
+
+console.log('[stream-modal.js] Edit modal functions loaded and exposed globally');
+
+// ============================================================================
+// EDIT MODAL - POPULATE YOUTUBE API FIELDS
+// ============================================================================
+
+/**
+ * Populate Edit Modal YouTube API fields with existing stream data
+ * This function should be called AFTER modal is opened and tab is switched
+ * @param {Object} stream - Stream object from database
+ */
+function populateEditYouTubeAPIFields(stream) {
+  console.log('[populateEditYouTubeAPIFields] Populating fields with:', stream);
+  
+  try {
+    // Helper function to safely set element value
+    const safeSetValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.value = value || '';
+        return true;
+      }
+      console.warn(`[populateEditYouTubeAPIFields] Element not found: ${id}`);
+      return false;
+    };
+    
+    // Helper function to safely set element value ONLY if empty (don't overwrite user input)
+    const safeSetValueIfEmpty = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) {
+        // Only set if field is empty (don't overwrite AI-generated content)
+        if (!el.value || el.value.trim() === '') {
+          el.value = value || '';
+        }
+        return true;
+      }
+      console.warn(`[populateEditYouTubeAPIFields] Element not found: ${id}`);
+      return false;
+    };
+    
+    const safeSetChecked = (id, checked) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.checked = !!checked;
+        return true;
+      }
+      console.warn(`[populateEditYouTubeAPIFields] Element not found: ${id}`);
+      return false;
+    };
+    
+    // Populate basic fields with EDIT prefix
+    // Use safeSetValueIfEmpty for description to not overwrite AI-generated content
+    safeSetValueIfEmpty('editYoutubeDescription', stream.youtube_description);
+    safeSetValue('editYoutubeRtmpUrl', stream.rtmp_url);
+    safeSetValue('editYoutubeStreamKey', stream.stream_key);
+    safeSetValue('editYoutubeStreamId', stream.youtube_stream_id);
+    
+    // Populate Additional Settings with EDIT prefix
+    safeSetValue('editYoutubePrivacy', stream.youtube_privacy || 'unlisted');
+    
+    // Parse and populate tags
+    if (stream.youtube_tags) {
+      try {
+        let parsedTags = [];
+        if (typeof stream.youtube_tags === 'string') {
+          // Try to parse as JSON first
+          try {
+            parsedTags = JSON.parse(stream.youtube_tags);
+          } catch (e) {
+            // If not JSON, split by comma
+            parsedTags = stream.youtube_tags.split(',').map(t => t.trim()).filter(t => t);
+          }
+        } else if (Array.isArray(stream.youtube_tags)) {
+          parsedTags = stream.youtube_tags;
+        }
+        
+        // Set editTags array and update display
+        editTags = parsedTags.slice(0, 30); // Limit to 30 tags
+        updateEditTagsDisplay();
+        console.log(`[populateEditYouTubeAPIFields] Populated ${editTags.length} tags`);
+      } catch (error) {
+        console.error('[populateEditYouTubeAPIFields] Error parsing tags:', error);
+        editTags = [];
+        updateEditTagsDisplay();
+      }
+    } else {
+      editTags = [];
+      updateEditTagsDisplay();
+    }
+    
+    // Made for Kids radio buttons with EDIT prefix
+    const madeForKidsYes = document.querySelector('input[name="editYoutubeMadeForKids"][value="yes"]');
+    const madeForKidsNo = document.querySelector('input[name="editYoutubeMadeForKids"][value="no"]');
+    if (stream.youtube_made_for_kids === 1 || stream.youtube_made_for_kids === true) {
+      if (madeForKidsYes) madeForKidsYes.checked = true;
+    } else {
+      if (madeForKidsNo) madeForKidsNo.checked = true;
+    }
+    
+    // Checkboxes with EDIT prefix
+    safeSetChecked('editYoutubeAgeRestricted', stream.youtube_age_restricted === 1 || stream.youtube_age_restricted === true);
+    safeSetChecked('editYoutubeSyntheticContent', stream.youtube_synthetic_content === 1 || stream.youtube_synthetic_content === true);
+    safeSetChecked('editYoutubeAutoStart', stream.youtube_auto_start === 1 || stream.youtube_auto_start === true);
+    safeSetChecked('editYoutubeAutoEnd', stream.youtube_auto_end === 1 || stream.youtube_auto_end === true);
+    
+    // Load existing thumbnail if exists
+    if (stream.youtube_thumbnail_path) {
+      const thumbnailPreview = document.getElementById('editYoutubeThumbnailPreview');
+      const thumbnailImg = document.getElementById('editYoutubeThumbnailImg');
+      const thumbnailInfo = document.getElementById('editYoutubeThumbnailInfo');
+      
+      if (thumbnailPreview && thumbnailImg) {
+        thumbnailImg.src = stream.youtube_thumbnail_path;
+        thumbnailPreview.classList.remove('hidden');
+        if (thumbnailInfo) {
+          thumbnailInfo.innerHTML = '<span class="text-green-400">Current thumbnail loaded</span>';
+        }
+        console.log('[populateEditYouTubeAPIFields] Loaded existing thumbnail');
+      }
+    }
+    
+    console.log('[populateEditYouTubeAPIFields] ✅ All fields populated successfully');
+  } catch (error) {
+    console.error('[populateEditYouTubeAPIFields] Error:', error);
+  }
+}
+
+// Expose function globally
+window.populateEditYouTubeAPIFields = populateEditYouTubeAPIFields;
+
+console.log('[stream-modal.js] Edit modal populate function loaded');
+
+// ============================================================================
+// EDIT MODAL - THUMBNAIL & ADDITIONAL SETTINGS
+// ============================================================================
+
+/**
+ * Preview Edit Modal YouTube Thumbnail
+ */
+function previewEditYoutubeThumbnail(input) {
+  const preview = document.getElementById('editYoutubeThumbnailPreview');
+  const img = document.getElementById('editYoutubeThumbnailImg');
+  const info = document.getElementById('editYoutubeThumbnailInfo');
+  
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      if (info) info.innerHTML = '<span class="text-red-400">Please select an image file</span>';
+      return;
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      if (info) info.innerHTML = '<span class="text-red-400">Image must be less than 2MB</span>';
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      if (img) img.src = e.target.result;
+      if (preview) preview.classList.remove('hidden');
+      if (info) info.innerHTML = `<span class="text-green-400">${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>`;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+/**
+ * Clear Edit Modal YouTube Thumbnail
+ */
+function clearEditYoutubeThumbnail() {
+  const input = document.getElementById('editYoutubeThumbnail');
+  const preview = document.getElementById('editYoutubeThumbnailPreview');
+  const img = document.getElementById('editYoutubeThumbnailImg');
+  const info = document.getElementById('editYoutubeThumbnailInfo');
+  
+  if (input) input.value = '';
+  if (img) img.src = '';
+  if (preview) preview.classList.add('hidden');
+  if (info) info.innerHTML = '';
+}
+
+/**
+ * Toggle Edit Modal YouTube Additional Settings
+ */
+function toggleEditYouTubeAdditionalSettings() {
+  const content = document.getElementById('editYoutubeAdditionalSettings');
+  const icon = document.getElementById('editYoutubeAdditionalSettingsIcon');
+  
+  if (content && icon) {
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+      content.classList.remove('hidden');
+      icon.classList.add('rotate-180');
+    } else {
+      content.classList.add('hidden');
+      icon.classList.remove('rotate-180');
+    }
+  }
+}
+
+// Expose functions globally
+window.previewEditYoutubeThumbnail = previewEditYoutubeThumbnail;
+window.clearEditYoutubeThumbnail = clearEditYoutubeThumbnail;
+window.toggleEditYouTubeAdditionalSettings = toggleEditYouTubeAdditionalSettings;
+
+console.log('[stream-modal.js] Edit modal thumbnail and settings functions loaded');

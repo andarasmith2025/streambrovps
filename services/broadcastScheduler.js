@@ -60,11 +60,20 @@ class BroadcastScheduler {
    */
   async checkUpcomingSchedules() {
     try {
-      // Get schedules in next 10-15 minutes that don't have broadcasts yet
       const now = new Date();
-      const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
-      const fifteenMinutesLater = new Date(now.getTime() + 15 * 60 * 1000);
+      const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTimeMinutes = currentHour * 60 + currentMinute;
+      
+      // For recurring schedules, we need to check if they will execute in next 10-15 minutes TODAY
+      const tenMinutesLater = currentTimeMinutes + 10;
+      const fifteenMinutesLater = currentTimeMinutes + 15;
 
+      console.log(`[BroadcastScheduler] Checking schedules at ${currentHour}:${String(currentMinute).padStart(2, '0')}`);
+      console.log(`[BroadcastScheduler] Looking for schedules between ${Math.floor(tenMinutesLater/60)}:${String(tenMinutesLater%60).padStart(2, '0')} and ${Math.floor(fifteenMinutesLater/60)}:${String(fifteenMinutesLater%60).padStart(2, '0')}`);
+
+      // Get all pending schedules (both one-time and recurring)
       const query = `
         SELECT 
           ss.*,
@@ -83,23 +92,67 @@ class BroadcastScheduler {
           s.user_id
         FROM stream_schedules ss
         JOIN streams s ON ss.stream_id = s.id
-        WHERE ss.schedule_time BETWEEN ? AND ?
-          AND ss.status = 'pending'
-          AND (ss.broadcast_status IS NULL OR ss.broadcast_status = 'pending')
+        WHERE ss.status = 'pending'
+          AND (ss.broadcast_status IS NULL OR ss.broadcast_status = 'pending' OR ss.broadcast_status = 'failed')
           AND s.use_youtube_api = 1
         ORDER BY ss.schedule_time ASC
       `;
 
-      db.all(query, [tenMinutesLater.toISOString(), fifteenMinutesLater.toISOString()], async (err, schedules) => {
+      db.all(query, [], async (err, schedules) => {
         if (err) {
           console.error('[BroadcastScheduler] Error fetching schedules:', err);
           return;
         }
 
-        if (schedules && schedules.length > 0) {
-          console.log(`[BroadcastScheduler] Found ${schedules.length} schedule(s) needing broadcast creation`);
+        if (!schedules || schedules.length === 0) {
+          return;
+        }
+
+        let matchedSchedules = [];
+
+        for (const schedule of schedules) {
+          let shouldCreateBroadcast = false;
+
+          if (schedule.is_recurring) {
+            // Recurring schedule - check if today is allowed day and time is in window
+            if (schedule.recurring_days) {
+              const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
+              
+              if (allowedDays.includes(currentDay)) {
+                // Extract time from schedule_time
+                const scheduleDate = new Date(schedule.schedule_time);
+                const scheduleHour = scheduleDate.getHours();
+                const scheduleMinute = scheduleDate.getMinutes();
+                const scheduleTimeMinutes = scheduleHour * 60 + scheduleMinute;
+                
+                // Check if schedule time is in the 10-15 minute window
+                if (scheduleTimeMinutes >= tenMinutesLater && scheduleTimeMinutes <= fifteenMinutesLater) {
+                  shouldCreateBroadcast = true;
+                  console.log(`[BroadcastScheduler] ✓ Recurring schedule matched: ${schedule.title} at ${scheduleHour}:${String(scheduleMinute).padStart(2, '0')}`);
+                }
+              }
+            }
+          } else {
+            // One-time schedule - check if schedule_time is in window
+            const scheduleTime = new Date(schedule.schedule_time);
+            const tenMinutesLaterDate = new Date(now.getTime() + 10 * 60 * 1000);
+            const fifteenMinutesLaterDate = new Date(now.getTime() + 15 * 60 * 1000);
+            
+            if (scheduleTime >= tenMinutesLaterDate && scheduleTime <= fifteenMinutesLaterDate) {
+              shouldCreateBroadcast = true;
+              console.log(`[BroadcastScheduler] ✓ One-time schedule matched: ${schedule.title} at ${scheduleTime.toISOString()}`);
+            }
+          }
+
+          if (shouldCreateBroadcast) {
+            matchedSchedules.push(schedule);
+          }
+        }
+
+        if (matchedSchedules.length > 0) {
+          console.log(`[BroadcastScheduler] Found ${matchedSchedules.length} schedule(s) needing broadcast creation`);
           
-          for (const schedule of schedules) {
+          for (const schedule of matchedSchedules) {
             await this.createBroadcastForSchedule(schedule);
           }
         }
@@ -118,6 +171,7 @@ class BroadcastScheduler {
       console.log(`[BroadcastScheduler] Creating broadcast for schedule ${schedule.id}`);
       console.log(`[BroadcastScheduler] - Stream: ${schedule.title}`);
       console.log(`[BroadcastScheduler] - Scheduled: ${schedule.schedule_time}`);
+      console.log(`[BroadcastScheduler] - Recurring: ${schedule.is_recurring ? 'Yes' : 'No'}`);
 
       // Mark as creating to prevent duplicate attempts
       await this.updateScheduleBroadcastStatus(schedule.id, 'creating');
@@ -126,6 +180,28 @@ class BroadcastScheduler {
       const tokens = await getTokensForUser(schedule.user_id);
       if (!tokens || !tokens.access_token) {
         throw new Error('YouTube tokens not found for user');
+      }
+
+      // Calculate scheduled start time
+      let scheduledStartTime;
+      if (schedule.is_recurring) {
+        // For recurring: use today's date with schedule time
+        const scheduleDate = new Date(schedule.schedule_time);
+        const now = new Date();
+        scheduledStartTime = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          scheduleDate.getHours(),
+          scheduleDate.getMinutes(),
+          0,
+          0
+        );
+        console.log(`[BroadcastScheduler] - Recurring schedule time: ${scheduledStartTime.toISOString()}`);
+      } else {
+        // For one-time: use exact schedule_time
+        scheduledStartTime = new Date(schedule.schedule_time);
+        console.log(`[BroadcastScheduler] - One-time schedule time: ${scheduledStartTime.toISOString()}`);
       }
 
       // Parse tags if exists
@@ -138,19 +214,59 @@ class BroadcastScheduler {
         }
       }
 
+      // Get thumbnail path - use saved thumbnail or get from video
+      let thumbnailPath = schedule.video_thumbnail;
+      
+      // If no thumbnail saved, try to get from video
+      if (!thumbnailPath || !require('fs').existsSync(thumbnailPath)) {
+        console.log(`[BroadcastScheduler] No saved thumbnail, checking video...`);
+        
+        // Get video info from database
+        const video = await new Promise((resolve, reject) => {
+          db.get(
+            'SELECT thumbnail_path FROM videos WHERE id = (SELECT video_id FROM streams WHERE id = ?)',
+            [schedule.stream_id],
+            (err, row) => {
+              if (err) reject(err);
+              else resolve(row);
+            }
+          );
+        });
+        
+        if (video && video.thumbnail_path) {
+          // Video thumbnail is relative path like '/uploads/thumbnails/xxx.jpg'
+          const path = require('path');
+          thumbnailPath = path.join(__dirname, '..', 'public', video.thumbnail_path);
+          
+          // Check if file exists
+          const fs = require('fs');
+          if (fs.existsSync(thumbnailPath)) {
+            console.log(`[BroadcastScheduler] Using video thumbnail: ${thumbnailPath}`);
+          } else {
+            console.warn(`[BroadcastScheduler] Thumbnail file not found: ${thumbnailPath}`);
+            thumbnailPath = null;
+          }
+        } else {
+          console.warn(`[BroadcastScheduler] No thumbnail available for this stream`);
+          thumbnailPath = null;
+        }
+      } else {
+        console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
+      }
+
       // Create broadcast via YouTube API
       const broadcastResult = await youtubeService.scheduleLive(tokens, {
         title: schedule.title,
         description: schedule.youtube_description || '',
         privacyStatus: schedule.youtube_privacy || 'unlisted',
-        scheduledStartTime: new Date(schedule.schedule_time).toISOString(),
+        scheduledStartTime: scheduledStartTime.toISOString(),
         streamId: schedule.youtube_stream_id, // Use existing stream key!
         enableAutoStart: schedule.youtube_auto_start || false,
         enableAutoStop: schedule.youtube_auto_end || false,
         tags: tags,
         category: schedule.youtube_category_id || null,
         language: schedule.youtube_language || null,
-        thumbnailPath: schedule.video_thumbnail || null // Use saved thumbnail
+        thumbnailPath: thumbnailPath // Use thumbnail from video or saved path
       });
 
       if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
@@ -162,6 +278,8 @@ class BroadcastScheduler {
         console.log(`[BroadcastScheduler] ✅ Broadcast created: ${broadcastId}`);
         console.log(`[BroadcastScheduler] - Schedule: ${schedule.id}`);
         console.log(`[BroadcastScheduler] - Stream Key: ${schedule.youtube_stream_id}`);
+        console.log(`[BroadcastScheduler] - Start Time: ${scheduledStartTime.toISOString()}`);
+        console.log(`[BroadcastScheduler] - Thumbnail: ${thumbnailPath ? 'Uploaded' : 'Not provided'}`);
 
         // Set audience settings if needed
         if (typeof schedule.youtube_made_for_kids === 'number' || schedule.youtube_age_restricted) {
@@ -171,7 +289,7 @@ class BroadcastScheduler {
               selfDeclaredMadeForKids: schedule.youtube_made_for_kids === 1,
               ageRestricted: schedule.youtube_age_restricted === 1
             });
-            console.log(`[BroadcastScheduler] ✅ Audience settings applied`);
+            console.log(`[BroadcastScheduler] ✅ Audience settings applied (Made for Kids: ${schedule.youtube_made_for_kids === 1}, Age Restricted: ${schedule.youtube_age_restricted === 1})`);
           } catch (audienceError) {
             console.error('[BroadcastScheduler] Error setting audience:', audienceError);
           }

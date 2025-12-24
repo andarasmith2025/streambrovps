@@ -22,8 +22,8 @@ function addTag(tagText = null) {
   }
   
   // Check max tags
-  if (currentTags.length >= 30) {
-    showNotification('Error', 'Maximum 30 tags allowed', 'error');
+  if (currentTags.length >= 20) {
+    showNotification('Error', 'Maximum 20 tags allowed', 'error');
     return;
   }
   
@@ -86,12 +86,12 @@ function renderTags() {
     container.innerHTML = '<span class="text-gray-500 text-sm">No tags added yet. Click "Generate with AI" or add manually.</span>';
   } else {
     container.innerHTML = currentTags.map((tag, index) => `
-      <div class="flex items-center gap-1 px-3 py-1.5 bg-primary/20 border border-primary/30 rounded-full text-sm">
-        <span class="text-white">${escapeHtml(tag)}</span>
+      <div class="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-sm">
+        <span class="text-emerald-300">${escapeHtml(tag)}</span>
         <button
           type="button"
           onclick="removeTag(${index})"
-          class="text-gray-400 hover:text-white transition-colors ml-1"
+          class="text-gray-400 hover:text-emerald-300 transition-colors ml-1"
           title="Remove tag"
         >
           <i class="ti ti-x text-xs"></i>
@@ -117,13 +117,14 @@ function updateTagStats() {
   const lengthEl = document.getElementById('tagLength');
   
   if (countEl) {
-    countEl.textContent = `${currentTags.length} / 30 tags`;
-    countEl.className = currentTags.length >= 30 ? 'text-red-400' : 'text-gray-500';
+    const isOverLimit = currentTags.length > 20;
+    countEl.textContent = `${currentTags.length} / 20 tags`;
+    countEl.className = isOverLimit ? 'text-orange-400' : 'text-gray-400';
   }
   
   if (lengthEl) {
     lengthEl.textContent = `${totalLength} / 500 characters`;
-    lengthEl.className = totalLength >= 500 ? 'text-red-400' : 'text-gray-500';
+    lengthEl.className = totalLength > 500 ? 'text-orange-400' : 'text-gray-400';
   }
 }
 

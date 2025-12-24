@@ -914,11 +914,8 @@ async function stopStream(streamId, options = {}) {
     }
     
     if (stream) {
-      // Clear active_schedule_id when stopping
-      await Stream.update(streamId, { active_schedule_id: null });
-      await Stream.updateStatus(streamId, 'offline', stream.user_id);
-      
-      // Transition YouTube broadcast to complete if using YouTube API
+      // ⭐ IMPORTANT: Transition YouTube broadcast BEFORE clearing active_schedule_id
+      // This ensures we can check if schedule is recurring
       if (stream.use_youtube_api && stream.youtube_broadcast_id) {
         try {
           const { getTokensForUser } = require('../routes/youtube');
@@ -927,17 +924,147 @@ async function stopStream(streamId, options = {}) {
           const tokens = await getTokensForUser(stream.user_id);
           if (tokens && tokens.access_token) {
             console.log(`[StreamingService] Transitioning YouTube broadcast ${stream.youtube_broadcast_id} to complete`);
+            
+            // Transition broadcast to complete
             await youtubeService.transition(tokens, {
               broadcastId: stream.youtube_broadcast_id,
               status: 'complete'
             });
-            console.log(`[StreamingService] Γ£ô YouTube broadcast transitioned to complete`);
+            console.log(`[StreamingService] ✅ YouTube broadcast ${stream.youtube_broadcast_id} transitioned to complete`);
+            
+            // Clear broadcast_id from recurring schedules so new broadcast can be created next time
+            if (stream.active_schedule_id) {
+              try {
+                const schedule = await new Promise((resolve, reject) => {
+                  db.get(
+                    'SELECT is_recurring FROM stream_schedules WHERE id = ?',
+                    [stream.active_schedule_id],
+                    (err, row) => {
+                      if (err) reject(err);
+                      else resolve(row);
+                    }
+                  );
+                });
+                
+                if (schedule && schedule.is_recurring) {
+                  await new Promise((resolve, reject) => {
+                    db.run(
+                      'UPDATE stream_schedules SET youtube_broadcast_id = NULL, broadcast_status = ? WHERE id = ?',
+                      ['pending', stream.active_schedule_id],
+                      (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                      }
+                    );
+                  });
+                  console.log(`[StreamingService] ✅ Cleared broadcast_id from recurring schedule ${stream.active_schedule_id}`);
+                }
+              } catch (clearError) {
+                console.error('[StreamingService] Error clearing broadcast_id from schedule:', clearError);
+              }
+            }
+            
+            // Clear broadcast_id from stream
+            await Stream.update(streamId, { 
+              youtube_broadcast_id: null,
+              youtube_stream_id: null 
+            });
+            console.log(`[StreamingService] ✅ Cleared broadcast_id from stream ${streamId}`);
+            
+          } else {
+            console.error(`[StreamingService] ❌ Cannot transition broadcast - no valid tokens for user ${stream.user_id}`);
           }
         } catch (ytError) {
-          console.error('[StreamingService] Error transitioning YouTube broadcast to complete:', ytError);
-          // Don't fail the stream stop, just log the error
+          console.error('[StreamingService] ❌ Error transitioning YouTube broadcast to complete:', ytError);
+          console.error('[StreamingService] Error details:', ytError.stack);
+          // Don't fail the stream stop, but log prominently
+          console.error('[StreamingService] ⚠️ WARNING: YouTube broadcast may still be live in YouTube Studio!');
         }
       }
+      
+      // Clear active_schedule_id when stopping (AFTER YouTube transition)
+      await Stream.update(streamId, { active_schedule_id: null });
+      console.log(`[StreamingService] ✓ Cleared active_schedule_id for stream ${streamId}`);
+      
+      // ⭐ Check if there are more schedules today - if yes, set status to 'scheduled' instead of 'offline'
+      let hasUpcomingScheduleToday = false;
+      try {
+        const now = new Date();
+        const currentDay = now.getDay();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        // Check for upcoming schedules
+        const upcomingSchedules = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT * FROM stream_schedules 
+             WHERE stream_id = ? 
+             AND status = 'pending'
+             ORDER BY schedule_time ASC`,
+            [streamId],
+            (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows || []);
+            }
+          );
+        });
+        
+        console.log(`[StreamingService] Checking ${upcomingSchedules.length} schedule(s) for stream ${streamId}`);
+        
+        for (const schedule of upcomingSchedules) {
+          if (schedule.is_recurring) {
+            // Check if today is in recurring days
+            if (schedule.recurring_days) {
+              const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
+              if (allowedDays.includes(currentDay)) {
+                // Parse schedule time
+                let scheduleHour, scheduleMinute;
+                
+                if (schedule.schedule_time.includes(':') && !schedule.schedule_time.includes('T')) {
+                  const timeParts = schedule.schedule_time.split(':');
+                  scheduleHour = parseInt(timeParts[0]);
+                  scheduleMinute = parseInt(timeParts[1]);
+                } else if (schedule.schedule_time.includes('T')) {
+                  if (schedule.schedule_time.endsWith('Z')) {
+                    const utcDate = new Date(schedule.schedule_time);
+                    scheduleHour = utcDate.getHours();
+                    scheduleMinute = utcDate.getMinutes();
+                  } else {
+                    const timePart = schedule.schedule_time.split('T')[1].split('.')[0];
+                    const timeParts = timePart.split(':');
+                    scheduleHour = parseInt(timeParts[0]);
+                    scheduleMinute = parseInt(timeParts[1]);
+                  }
+                }
+                
+                const scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+                const nowTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+                
+                // If schedule time is later today
+                if (scheduleTimeInMinutes > nowTimeInMinutes) {
+                  hasUpcomingScheduleToday = true;
+                  console.log(`[StreamingService] ✓ Found upcoming schedule today at ${scheduleHour}:${scheduleMinute}`);
+                  break;
+                }
+              }
+            }
+          } else {
+            // One-time schedule
+            const scheduleTime = new Date(schedule.schedule_time);
+            if (scheduleTime > now && scheduleTime.toDateString() === now.toDateString()) {
+              hasUpcomingScheduleToday = true;
+              console.log(`[StreamingService] ✓ Found upcoming one-time schedule today at ${scheduleTime.toLocaleTimeString()}`);
+              break;
+            }
+          }
+        }
+      } catch (scheduleCheckError) {
+        console.error('[StreamingService] Error checking upcoming schedules:', scheduleCheckError);
+      }
+      
+      // Set status based on whether there are upcoming schedules
+      const newStatus = hasUpcomingScheduleToday ? 'scheduled' : 'offline';
+      await Stream.updateStatus(streamId, newStatus, stream.user_id);
+      console.log(`[StreamingService] ✓ Stream ${streamId} status set to '${newStatus}' (upcoming schedules today: ${hasUpcomingScheduleToday})`);
       
       const updatedStream = await Stream.findById(streamId);
       await saveStreamHistory(updatedStream);

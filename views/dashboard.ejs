@@ -579,11 +579,12 @@
         document.getElementById('newStreamForm').addEventListener('submit', function (e) {
           e.preventDefault();
           
-          // Check which tab is active - detect by checking which fields are visible/filled
-          // If youtubeRtmpUrl exists and has value, it's YouTube API mode
-          const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl');
-          const isYouTubeMode = youtubeRtmpUrl && youtubeRtmpUrl.value && youtubeRtmpUrl.value.trim() !== '';
-          console.log('[Form Submit] Detected mode - isYouTubeMode:', isYouTubeMode, 'youtubeRtmpUrl:', youtubeRtmpUrl?.value);
+          // ⭐ DETECT ACTIVE TAB - YouTube API or Manual RTMP
+          const currentTab = (window.currentStreamTab || 'manual').toLowerCase();
+          const isYouTubeMode = currentTab === 'youtube';
+          
+          console.log('[Form Submit] Active tab:', currentTab);
+          console.log('[Form Submit] Using YouTube API:', isYouTubeMode);
           
           // Validate stream title
           const streamTitle = document.getElementById('streamTitle').value.trim();
@@ -1167,8 +1168,8 @@
           <div class="flex items-center justify-between mb-2 gap-2">
             <div class="font-medium overflow-hidden flex-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; max-width: 200px;">${stream.title}</div>
             <div class="flex items-center text-sm flex-shrink-0 whitespace-nowrap">
-              <i class="ti ti-brand-${getPlatformIcon(stream.platform)} text-${getPlatformColor(stream.platform)} mr-1"></i>
-              <span>${stream.platform || 'Custom'}</span>
+              <i class="ti ti-brand-${getPlatformIcon(stream.use_youtube_api ? 'YouTube' : stream.platform)} text-${getPlatformColor(stream.use_youtube_api ? 'YouTube' : stream.platform)} mr-1"></i>
+              <span>${stream.use_youtube_api ? 'YouTube API' : (stream.platform || 'Custom')}</span>
             </div>
           </div>
           <div class="text-xs text-gray-400 mb-2">
@@ -1351,8 +1352,8 @@
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
-            <i class="ti ti-brand-${getPlatformIcon(stream.platform)} text-${getPlatformColor(stream.platform)} mr-1.5"></i>
-            <span class="text-sm">${stream.platform || 'Custom'}</span>
+            <i class="ti ti-brand-${getPlatformIcon(stream.use_youtube_api ? 'YouTube' : stream.platform)} text-${getPlatformColor(stream.use_youtube_api ? 'YouTube' : stream.platform)} mr-1.5"></i>
+            <span class="text-sm">${stream.use_youtube_api ? 'YouTube API' : (stream.platform || 'Custom')}</span>
           </div>
         </td>
         <td class="px-6 py-4">
@@ -1389,11 +1390,10 @@
                         dayLabel = days.join(', ');
                       }
                       
-                      // Show checklist for active schedule indicator
+                      // Removed checklist from Every Day column to reduce clutter
                       recurringInfo = `<div class="flex items-center gap-2 w-full">
                         <i class="ti ti-repeat text-blue-400 text-xs flex-shrink-0"></i>
                         <span class="text-xs text-blue-400 flex-1 min-w-0">${dayLabel}</span>
-                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-sm flex-shrink-0" title="Currently Active"></i>' : ''}
                         ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex-shrink-0" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                           <i class="ti ti-x text-red-400 text-sm font-bold"></i>
                         </button>` : ''}
@@ -1402,7 +1402,6 @@
                       const schDate = new Date(sch.schedule_time);
                       recurringInfo = `<div class="flex items-center gap-2 w-full text-xs text-gray-500">
                         <span class="flex-1 min-w-0">${formatDate(schDate)}</span>
-                        ${isActive ? '<i class="ti ti-circle-check text-green-400 text-xs flex-shrink-0"></i>' : ''}
                         ${(stream.status === 'scheduled' || stream.status === 'live') ? `<button onclick="event.stopPropagation(); stopSchedule('${stream.id}', '${sch.id}')" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex-shrink-0" title="${stream.status === 'live' ? 'Stop Stream' : 'Cancel Schedule'}">
                           <i class="ti ti-x text-red-400 text-sm font-bold"></i>
                         </button>` : ''}
@@ -1886,14 +1885,28 @@
 
         // Stop/Cancel a specific schedule
         function stopSchedule(streamId, scheduleId) {
-          if (!streamId || !scheduleId) return;
+          console.log('[stopSchedule] Called with:', { streamId, scheduleId });
+          
+          if (!streamId || !scheduleId) {
+            console.error('[stopSchedule] Missing streamId or scheduleId');
+            return;
+          }
 
+          console.log('[stopSchedule] Fetching stream info...');
+          
           // Get stream info to check status
           fetch(`/api/streams/${streamId}`)
-            .then(response => response.json())
+            .then(response => {
+              console.log('[stopSchedule] Stream fetch response:', response.status);
+              return response.json();
+            })
             .then(streamData => {
+              console.log('[stopSchedule] Stream data:', streamData);
+              
               const stream = streamData.stream;
               const isLive = stream.status === 'live';
+              
+              console.log('[stopSchedule] Stream status:', stream.status, 'isLive:', isLive);
               
               const title = isLive ? 'Stop Stream' : 'Cancel Schedule';
               const message = isLive 
@@ -1901,12 +1914,16 @@
                 : 'Are you sure you want to cancel this schedule? The stream will not start at the scheduled time.';
               const confirmText = isLive ? 'Stop Stream' : 'Cancel Schedule';
               
+              console.log('[stopSchedule] Showing confirm dialog...');
+              
               showConfirmDialog(
                 title,
                 message,
                 confirmText,
                 'Keep Running',
                 () => {
+                  console.log('[stopSchedule] User confirmed, proceeding...');
+                  
                   // If live, stop the stream first
                   const stopPromise = isLive 
                     ? fetch(`/api/streams/${streamId}/stop`, {
@@ -1917,14 +1934,20 @@
                   
                   stopPromise
                     .then(() => {
+                      console.log('[stopSchedule] Deleting schedule...');
                       // Then delete the schedule
                       return fetch(`/api/streams/${streamId}/schedules/${scheduleId}`, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' }
                       });
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                      console.log('[stopSchedule] Delete response:', response.status);
+                      return response.json();
+                    })
                     .then(data => {
+                      console.log('[stopSchedule] Delete result:', data);
+                      
                       if (data.success) {
                         const successMsg = isLive ? 'Stream stopped and schedule cancelled' : 'Schedule cancelled successfully';
                         showNotification('Success', successMsg, 'success');
@@ -1934,14 +1957,14 @@
                       }
                     })
                     .catch(error => {
-                      console.error('Error stopping schedule:', error);
+                      console.error('[stopSchedule] Error:', error);
                       showNotification('Error', 'An error occurred while stopping the schedule', 'error');
                     });
                 }
               );
             })
             .catch(error => {
-              console.error('Error fetching stream info:', error);
+              console.error('[stopSchedule] Error fetching stream info:', error);
               showNotification('Error', 'Failed to fetch stream information', 'error');
             });
         }
@@ -2143,8 +2166,6 @@
             safeSetValue('editStreamTitle', stream.title);
             safeSetValue('editRtmpUrl', stream.rtmp_url || '');
             safeSetValue('editStreamKey', stream.stream_key || '');
-            safeSetValue('editStreamPlatform', stream.platform || 'youtube');
-            safeSetValue('editUseYoutubeApi', stream.use_youtube_api ? '1' : '0');
 
             // Check if using YouTube API
             const isYouTubeAPI = stream.use_youtube_api === 1 || stream.use_youtube_api === true;
@@ -2211,26 +2232,7 @@
               const badge = document.querySelector('.youtube-api-badge');
               if (badge) badge.remove();
             }
-
-            // Show/hide YouTube Additional Settings based on mode
-            const youtubeAdditionalSettings = document.getElementById('editYouTubeAdditionalSettings');
-            if (youtubeAdditionalSettings) {
-              if (isYouTubeAPI) {
-                youtubeAdditionalSettings.classList.remove('hidden');
-                
-                // Populate YouTube Additional Settings
-                safeSetValue('editYoutubeDescription', stream.youtube_description || '');
-                safeSetValue('editYoutubePrivacy', stream.youtube_privacy || 'unlisted');
-                safeSetChecked('editYoutubeMadeForKids', stream.youtube_made_for_kids === 1 || stream.youtube_made_for_kids === true);
-                safeSetChecked('editYoutubeAgeRestricted', stream.youtube_age_restricted === 1 || stream.youtube_age_restricted === true);
-                safeSetChecked('editYoutubeSyntheticContent', stream.youtube_synthetic_content === 1 || stream.youtube_synthetic_content === true);
-                safeSetChecked('editYoutubeAutoStart', stream.youtube_auto_start === 1 || stream.youtube_auto_start === true);
-                safeSetChecked('editYoutubeAutoEnd', stream.youtube_auto_end === 1 || stream.youtube_auto_end === true);
-              } else {
-                youtubeAdditionalSettings.classList.add('hidden');
-              }
-            }
-
+            
             if (stream.video_id) {
               safeSetValue('editSelectedVideoId', stream.video_id);
               const displayName = stream.video_type === 'playlist' ? (stream.playlist_name || stream.video_title) : stream.video_title;
@@ -2247,24 +2249,8 @@
             }
 
             safeSetChecked('editLoopVideo', stream.loop_video);
-
-            // Note: Advanced settings (bitrate, resolution, fps) have been removed
-            // Video settings are now auto-detected from the video file itself
             
-            // ⭐ Switch to correct tab based on stream mode
-            if (isYouTubeAPI) {
-              console.log('[Edit Modal] Switching to YouTube API tab, use_youtube_api:', stream.use_youtube_api);
-              window.currentEditStreamTab = 'youtube'; // Set before calling switchStreamTab
-              switchStreamTab('youtube');
-            } else {
-              console.log('[Edit Modal] Switching to Manual RTMP tab, use_youtube_api:', stream.use_youtube_api);
-              window.currentEditStreamTab = 'manual'; // Set before calling switchStreamTab
-              switchStreamTab('manual');
-            }
-            
-            // Load schedules for this stream
-            loadStreamSchedules(stream.id);
-
+            // ⭐ Open modal FIRST, then populate YouTube fields
             const modal = document.getElementById('editStreamModal');
             if (!modal) {
               console.error('Edit modal element not found in DOM');
@@ -2278,6 +2264,46 @@
                 modal.classList.add('active');
               }
             });
+            
+            // Load schedules for this stream
+            loadStreamSchedules(stream.id);
+            
+            // ⭐ Switch to correct tab based on stream mode
+            console.log('[Edit Modal] Stream data:', {
+              id: stream.id,
+              title: stream.title,
+              use_youtube_api: stream.use_youtube_api,
+              isYouTubeAPI: isYouTubeAPI
+            });
+            
+            if (isYouTubeAPI) {
+              console.log('[Edit Modal] ✅ Switching to YouTube API tab');
+              window.currentEditStreamTab = 'youtube'; // Set before calling switchStreamTab
+              
+              // Use setTimeout to ensure modal is fully rendered before switching tabs
+              setTimeout(() => {
+                console.log('[Edit Modal] Calling switchStreamTab("youtube")');
+                switchStreamTab('youtube');
+                
+                // NOW populate YouTube API fields using the new function from stream-modal.js
+                setTimeout(() => {
+                  console.log('[Edit Modal] Calling populateEditYouTubeAPIFields()');
+                  if (typeof populateEditYouTubeAPIFields === 'function') {
+                    populateEditYouTubeAPIFields(stream);
+                  } else {
+                    console.error('[Edit Modal] populateEditYouTubeAPIFields function not found!');
+                  }
+                }, 100);
+              }, 50);
+            } else {
+              console.log('[Edit Modal] ✅ Switching to Manual RTMP tab');
+              window.currentEditStreamTab = 'manual'; // Set before calling switchStreamTab
+              
+              setTimeout(() => {
+                console.log('[Edit Modal] Calling switchStreamTab("manual")');
+                switchStreamTab('manual');
+              }, 50);
+            }
           } catch (error) {
             console.error('Error opening edit modal:', error);
             showNotification('Error', `Failed to open edit modal: ${error.message}`, 'error');
@@ -2499,17 +2525,24 @@
         }
 
         function toggleEditYouTubeAdditionalSettings() {
-          const content = document.getElementById('editYouTubeAdditionalSettingsContent');
-          const icon = document.getElementById('editYouTubeAdditionalSettingsIcon');
+          const content = document.getElementById('editYoutubeAdditionalSettings');
+          const icon = document.getElementById('editYoutubeAdditionalSettingsIcon');
+          
+          console.log('[toggleEditYouTubeAdditionalSettings] Content element:', content ? 'FOUND' : 'NOT FOUND');
+          console.log('[toggleEditYouTubeAdditionalSettings] Icon element:', icon ? 'FOUND' : 'NOT FOUND');
           
           if (content && icon) {
             if (content.classList.contains('hidden')) {
               content.classList.remove('hidden');
               icon.style.transform = 'rotate(180deg)';
+              console.log('[toggleEditYouTubeAdditionalSettings] ✅ Additional Settings OPENED');
             } else {
               content.classList.add('hidden');
               icon.style.transform = 'rotate(0deg)';
+              console.log('[toggleEditYouTubeAdditionalSettings] ✅ Additional Settings CLOSED');
             }
+          } else {
+            console.error('[toggleEditYouTubeAdditionalSettings] ❌ Elements not found!');
           }
         }
         document.addEventListener('DOMContentLoaded', function () {
@@ -2531,26 +2564,92 @@
                 showNotification('Warning', 'Please select a video before updating the stream.', 'warning');
                 return;
               }
+              
+              // ⭐ DETECT ACTIVE TAB - YouTube API or Manual RTMP
+              const currentTab = (window.currentEditStreamTab || 'manual').toLowerCase();
+              const isYouTubeAPITab = currentTab === 'youtube';
+              
+              console.log('[Edit Stream] Active tab:', currentTab);
+              console.log('[Edit Stream] Using YouTube API:', isYouTubeAPITab);
+              
+              // Build form data based on active tab
               const formData = {
                 streamTitle: document.getElementById('editStreamTitle').value,
                 videoId: videoId,
-                rtmpUrl: document.getElementById('editRtmpUrl').value,
-                streamKey: document.getElementById('editStreamKey').value,
                 loopVideo: document.getElementById('editLoopVideo').checked
               };
-
-              // Add YouTube Additional Settings if stream uses YouTube API
-              const stream = window.currentEditStream;
-              const isYouTubeAPI = stream && (stream.use_youtube_api === 1 || stream.use_youtube_api === true);
-              if (isYouTubeAPI) {
+              
+              if (isYouTubeAPITab) {
+                // ⭐ YOUTUBE API TAB - Use YouTube API fields
+                console.log('[Edit Stream] Using YouTube API fields');
                 formData.useYouTubeAPI = true;
-                formData.youtubeDescription = document.getElementById('editYoutubeDescription')?.value || '';
-                formData.youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value || 'unlisted';
-                formData.youtubeMadeForKids = document.getElementById('editYoutubeMadeForKids')?.checked || false;
-                formData.youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked || false;
-                formData.youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked || false;
-                formData.youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked || false;
-                formData.youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked || false;
+                formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
+                formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
+                formData.youtubeStreamId = document.getElementById('youtubeStreamId')?.value || '';
+                formData.youtubeDescription = document.getElementById('youtubeDescription')?.value || '';
+                
+                // YouTube Additional Settings
+                formData.youtubePrivacy = document.getElementById('youtubePrivacy')?.value || 'unlisted';
+                formData.youtubeTags = document.getElementById('youtubeTags')?.value || '';
+                formData.youtubeMadeForKids = document.querySelector('input[name="editYoutubeMadeForKids"]:checked')?.value === 'yes';
+                formData.youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked || false;
+                formData.youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked || false;
+                formData.youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked || false;
+                formData.youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked || false;
+                
+                // Check if thumbnail file is uploaded
+                const thumbnailInput = document.getElementById('editYoutubeThumbnail');
+                const hasThumbnail = thumbnailInput && thumbnailInput.files && thumbnailInput.files.length > 0;
+                
+                if (hasThumbnail) {
+                  // Need to use FormData for file upload
+                  const formDataObj = new FormData();
+                  
+                  // Add all form data
+                  for (const key in formData) {
+                    if (key === 'schedules') {
+                      formDataObj.append(key, JSON.stringify(formData[key]));
+                    } else {
+                      formDataObj.append(key, formData[key]);
+                    }
+                  }
+                  
+                  // Add thumbnail file
+                  formDataObj.append('youtubeThumbnail', thumbnailInput.files[0]);
+                  
+                  // Update fetch to use FormData
+                  const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+                  fetch(`/api/streams/${streamId}`, {
+                    method: 'PUT',
+                    headers: {
+                      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+                    },
+                    body: formDataObj
+                  })
+                    .then(response => response.json())
+                    .then(data => {
+                      if (data.success) {
+                        showNotification('Success!', 'Stream updated successfully!', 'success');
+                        closeEditStreamModal();
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 500);
+                      } else {
+                        showNotification('Error', data.error || 'Failed to update stream', 'error');
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error:', error);
+                      showNotification('Error', 'An error occurred while updating the stream', 'error');
+                    });
+                  return; // Exit early since we handled the request
+                }
+              } else {
+                // ⭐ MANUAL RTMP TAB - Use Manual RTMP fields
+                console.log('[Edit Stream] Using Manual RTMP fields');
+                formData.useYouTubeAPI = false;
+                formData.rtmpUrl = document.getElementById('editRtmpUrl')?.value || '';
+                formData.streamKey = document.getElementById('editStreamKey')?.value || '';
               }
 
               // Collect multiple schedules
@@ -3304,6 +3403,69 @@
           info.innerHTML = '';
         }
         
+        // Edit Modal Thumbnail Functions
+        function previewEditYoutubeThumbnail(input) {
+          const file = input.files[0];
+          if (!file) return;
+          
+          const preview = document.getElementById('editYoutubeThumbnailPreview');
+          const img = document.getElementById('editYoutubeThumbnailImg');
+          const info = document.getElementById('editYoutubeThumbnailInfo');
+          
+          // Check file size (max 2MB for YouTube)
+          if (file.size > 2 * 1024 * 1024) {
+            showNotification('Error', 'Thumbnail file size must be less than 2MB. Please choose a smaller image.', 'error');
+            input.value = '';
+            preview.classList.add('hidden');
+            info.innerHTML = '<i class="ti ti-alert-circle text-red-500"></i> File too large (max 2MB)';
+            info.className = 'text-xs text-red-400 mt-1';
+            return;
+          }
+          
+          // Check file type
+          const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+          if (!validTypes.includes(file.type)) {
+            showNotification('Error', 'Invalid file type. Please use JPG or PNG format.', 'error');
+            input.value = '';
+            preview.classList.add('hidden');
+            info.innerHTML = '<i class="ti ti-alert-circle text-red-500"></i> Invalid format (use JPG/PNG)';
+            info.className = 'text-xs text-red-400 mt-1';
+            return;
+          }
+          
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            img.src = e.target.result;
+            preview.classList.remove('hidden');
+            
+            // Check aspect ratio
+            img.onload = function() {
+              const ratio = this.width / this.height;
+              const is16by9 = Math.abs(ratio - (16/9)) < 0.01;
+              
+              const fileSizeKB = (file.size / 1024).toFixed(1);
+              
+              if (is16by9) {
+                info.innerHTML = `<i class="ti ti-check text-green-500"></i> ${this.width}x${this.height} (16:9 ratio ✓) - ${fileSizeKB} KB`;
+                info.className = 'text-xs text-green-400 mt-1';
+              } else {
+                info.innerHTML = `<i class="ti ti-alert-triangle text-yellow-500"></i> ${this.width}x${this.height} (Recommended: 16:9 ratio, e.g. 1280x720) - ${fileSizeKB} KB`;
+                info.className = 'text-xs text-yellow-400 mt-1';
+              }
+            };
+          };
+          reader.readAsDataURL(file);
+        }
+        
+        function clearEditYoutubeThumbnail() {
+          const input = document.getElementById('editYoutubeThumbnail');
+          const preview = document.getElementById('editYoutubeThumbnailPreview');
+          const info = document.getElementById('editYoutubeThumbnailInfo');
+          input.value = '';
+          preview.classList.add('hidden');
+          info.innerHTML = '';
+        }
+        
         // Platform Selectors - Use event delegation to work with dynamically loaded modals
         document.addEventListener('click', function(e) {
           // Manual RTMP Platform Selector
@@ -3496,7 +3658,21 @@
         </div>
       </div>
       <script src="/js/dashboard-stats.js"></script>
+      <script src="/js/youtube-title-autocomplete.js?v=1.0.0"></script>
       <!-- Note: stream-modal.js already loaded in layout.ejs -->
+      
+      <!-- Initialize Title Autocomplete -->
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          // Initialize for new stream modal
+          initTitleAutocomplete('streamTitle', 'streamTitleSuggestionsDropdown');
+          
+          // Initialize for edit stream modal
+          initTitleAutocomplete('editStreamTitle', 'editTitleSuggestionsDropdown');
+          
+          console.log('[Dashboard] Title autocomplete initialized');
+        });
+      </script>
 
       <!-- Stream Templates UI -->
       <%- include('partials/stream-templates-ui') %>

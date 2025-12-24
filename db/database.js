@@ -518,6 +518,15 @@ function createTables() {
     }
   });
 
+  // Add youtube_thumbnail_path column for custom thumbnails
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_thumbnail_path TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_thumbnail_path column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_thumbnail_path column to streams table');
+    }
+  });
+
   db.run(`ALTER TABLE streams ADD COLUMN youtube_enable_dvr BOOLEAN DEFAULT 1`, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding youtube_enable_dvr column:', err.message);

@@ -371,6 +371,10 @@ app.use('/api/templates', templatesRoutes);
 const geminiRoutes = require('./routes/gemini');
 app.use('/api/gemini', geminiRoutes);
 
+// YouTube Suggestions proxy (for title autocomplete)
+const youtubeSuggestionsRoutes = require('./routes/youtube-suggestions');
+app.use('/api/youtube-suggestions', youtubeSuggestionsRoutes);
+
 // Expose session-based flags to views (after session is set up and body parsers)
 // Ensure youtubeChannel is populated if tokens exist
 app.use(async (req, res, next) => {
@@ -1681,16 +1685,30 @@ app.post('/settings/gemini', isAuthenticated, async (req, res) => {
   try {
     const { gemini_api_key } = req.body;
     
-    // Update Gemini API key in database
-    await User.updateGeminiApiKey(req.session.userId, gemini_api_key || null);
-    
-    return res.render('settings', {
-      title: 'Settings',
-      active: 'settings',
-      user: await User.findById(req.session.userId),
-      success: gemini_api_key ? 'Gemini API key saved successfully!' : 'Gemini API key removed',
-      activeTab: 'profile'
-    });
+    // If empty string submitted, keep existing key (don't update)
+    // Only update if user provides a new key or explicitly wants to remove it
+    if (gemini_api_key && gemini_api_key.trim() !== '') {
+      // Update with new key
+      await User.updateGeminiApiKey(req.session.userId, gemini_api_key.trim());
+      
+      return res.render('settings', {
+        title: 'Settings',
+        active: 'settings',
+        user: await User.findById(req.session.userId),
+        success: 'Gemini API key updated successfully!',
+        activeTab: 'profile'
+      });
+    } else {
+      // Empty submission - keep existing key
+      const user = await User.findById(req.session.userId);
+      return res.render('settings', {
+        title: 'Settings',
+        active: 'settings',
+        user: user,
+        success: user.gemini_api_key ? 'Settings saved (API key unchanged)' : 'Settings saved',
+        activeTab: 'profile'
+      });
+    }
   } catch (error) {
     console.error('Error saving Gemini API key:', error);
     res.render('settings', {
@@ -2714,7 +2732,7 @@ app.delete('/api/streams/:id/schedules/:scheduleId', isAuthenticated, async (req
   }
 });
 
-app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
+app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThumbnail'), async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
     if (!stream) {
@@ -2752,6 +2770,24 @@ app.put('/api/streams/:id', isAuthenticated, async (req, res) => {
       if (req.body.youtubeSyntheticContent !== undefined) updateData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
       if (req.body.youtubeAutoStart !== undefined) updateData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
       if (req.body.youtubeAutoEnd !== undefined) updateData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+      
+      // Handle tags (convert array to JSON string for storage)
+      if (req.body.youtubeTags !== undefined) {
+        try {
+          // Parse if it's a string, otherwise use as-is
+          const tags = typeof req.body.youtubeTags === 'string' ? JSON.parse(req.body.youtubeTags) : req.body.youtubeTags;
+          updateData.youtube_tags = JSON.stringify(tags);
+          console.log(`[UPDATE STREAM] Tags updated: ${tags.length} tags`);
+        } catch (e) {
+          console.error('[UPDATE STREAM] Error parsing tags:', e);
+        }
+      }
+      
+      // Handle thumbnail upload
+      if (req.file) {
+        updateData.youtube_thumbnail_path = `/uploads/thumbnails/${req.file.filename}`;
+        console.log(`[UPDATE STREAM] Thumbnail uploaded: ${updateData.youtube_thumbnail_path}`);
+      }
       
       console.log(`[UPDATE STREAM] Updating YouTube Additional Settings for stream ${req.params.id}`);
     }

@@ -32,21 +32,106 @@
             listContainerId: 'editVideoListContainer'
           }) %>
           
-          <!-- Stream Title -->
-          <%- include('stream-modal-title', {
-            titleFieldId: 'editStreamTitle',
-            titleFieldName: 'streamTitle'
-          }) %>
+          <!-- Stream Title with Autocomplete and AI Generate -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-sm font-medium text-white">Stream Title</label>
+              <button
+                type="button"
+                onclick="generateTitleWithGemini('editStreamTitle')"
+                class="flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors"
+                title="Generate SEO-optimized title from keywords"
+              >
+                <i class="ti ti-sparkles text-sm"></i>
+                <span>Generate Title</span>
+              </button>
+            </div>
+            <div class="relative">
+              <input type="text" id="editStreamTitle" name="streamTitle" required
+                class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="Enter stream title (suggestions will appear as you type)">
+              
+              <!-- Autocomplete Dropdown -->
+              <div id="editTitleSuggestionsDropdown" class="hidden absolute z-20 w-full mt-1 bg-dark-700 border border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                <!-- Suggestions will be populated here -->
+              </div>
+            </div>
+          </div>
           
-          <!-- YouTube API Fields (Edit version - needs separate component with edit IDs) -->
-          <div id="youtubeApiFields" class="hidden space-y-3">
+          <!-- YouTube API Fields (Edit version with unique IDs) -->
+          <div id="editYoutubeApiFields" class="hidden space-y-3">
+            
+            <!-- Description with AI Generate Button -->
             <div>
-              <label class="text-sm font-medium text-white block mb-2">Description</label>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-medium text-white">Description</label>
+                <button
+                  type="button"
+                  onclick="generateEditDescriptionWithGemini()"
+                  class="flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors"
+                  title="Generate SEO-optimized description from title"
+                >
+                  <i class="ti ti-sparkles text-sm"></i>
+                  <span>Generate Description</span>
+                </button>
+              </div>
               <textarea name="youtubeDescription" id="editYoutubeDescription" rows="3"
                 class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-                placeholder="Stream description (optional)"></textarea>
+                placeholder="Stream description (optional - or generate with AI)"></textarea>
             </div>
             
+            <!-- Tags Input with Gemini AI -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-medium text-white">
+                  Tags
+                  <span class="text-gray-500 text-xs ml-2">(Optional - improves discoverability)</span>
+                </label>
+                <button
+                  type="button"
+                  onclick="generateEditTagsWithGemini()"
+                  class="flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors"
+                >
+                  <i class="ti ti-sparkles text-sm"></i>
+                  <span>Generate with AI</span>
+                </button>
+              </div>
+              
+              <!-- Tags Container -->
+              <div id="editTagsContainer" class="flex flex-wrap gap-2 p-3 bg-dark-700 border border-gray-600 rounded-lg min-h-[60px]">
+                <span class="text-gray-500 text-sm">No tags added yet. Click "Generate with AI" or add manually.</span>
+              </div>
+              
+              <!-- Tag Input -->
+              <div class="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  id="editTagInput"
+                  placeholder="Type a tag and press Enter"
+                  class="flex-1 px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+                  onkeypress="handleEditTagInput(event)"
+                  maxlength="30"
+                />
+                <button
+                  type="button"
+                  onclick="addEditTag()"
+                  class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  Add
+                </button>
+              </div>
+              
+              <!-- Tag Stats -->
+              <div class="mt-2 flex items-center justify-between text-xs">
+                <span id="editTagCount" class="text-gray-500">0 / 30 tags</span>
+                <span id="editTagLength" class="text-gray-500">0 / 500 characters</span>
+              </div>
+              
+              <!-- Hidden input for form submission -->
+              <input type="hidden" id="editYoutubeTags" name="youtubeTags" value="[]" />
+            </div>
+            
+            <!-- Stream Configuration -->
             <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
             <div class="space-y-2">
               <div class="relative">
@@ -83,18 +168,168 @@
               </div>
             </div>
             
+            <!-- Stream Key with Load Button -->
             <div>
               <label class="text-sm font-medium text-white block mb-2">Stream Key</label>
-              <div class="relative">
-                <input type="password" id="editYoutubeStreamKey"
-                  class="w-full px-4 py-2.5 pl-10 pr-12 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
-                  placeholder="Stream key">
-                <input type="hidden" id="editYoutubeStreamId" value="">
-                <i class="ti ti-key text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
-                <button type="button" onclick="toggleEditYouTubeStreamKeyVisibility()"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
-                  <i class="ti ti-eye" id="editYoutubeStreamKeyToggle"></i>
+              <div class="flex gap-2">
+                <div class="relative flex-1">
+                  <input type="password" id="editYoutubeStreamKey"
+                    class="w-full px-4 py-2.5 pl-10 pr-12 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
+                    placeholder="Enter stream key or load from channel">
+                  <input type="hidden" id="editYoutubeStreamId" value="">
+                  <i class="ti ti-key text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <button type="button" onclick="toggleEditYouTubeStreamKeyVisibility()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                    <i class="ti ti-eye" id="editYoutubeStreamKeyToggle"></i>
+                  </button>
+                </div>
+                <button type="button" onclick="toggleEditYouTubeStreamKeysDropdown()"
+                  class="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors whitespace-nowrap">
+                  <i class="ti ti-download text-sm"></i>
+                  <span>Load</span>
                 </button>
+              </div>
+              
+              <!-- Dropdown for Stream Keys -->
+              <div id="editYoutubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg">
+                <div class="p-2">
+                  <div class="flex items-center justify-between mb-2 px-2 pb-2 border-b border-gray-600">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-medium text-gray-300">Stream Keys</span>
+                      <span id="editStreamKeysCount" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span id="editStreamKeysCacheInfo" class="text-xs text-gray-500"></span>
+                      <button type="button" onclick="refreshEditYouTubeStreamKeys()"
+                        class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600" 
+                        title="Refresh stream keys">
+                        <i class="ti ti-refresh text-sm"></i>
+                      </button>
+                      <button type="button" onclick="toggleEditYouTubeStreamKeysDropdown()"
+                        class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600"
+                        title="Close">
+                        <i class="ti ti-x text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="max-h-64 overflow-y-auto">
+                    <div id="editYoutubeStreamKeysList" class="space-y-1">
+                      <div class="text-center py-4 text-gray-400">
+                        <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+                        <p class="text-xs">Loading stream keys...</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-2 pt-2 border-t border-gray-600 px-2">
+                    <div class="flex items-center gap-3 text-xs text-gray-500">
+                      <span class="flex items-center gap-1"><i class="ti ti-link text-blue-400"></i> RTMP</span>
+                      <span class="flex items-center gap-1"><i class="ti ti-key text-yellow-400"></i> Key</span>
+                      <span class="flex items-center gap-1"><i class="ti ti-copy text-green-400"></i> Copy All</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional Settings (Collapsible) -->
+            <div class="border-t border-gray-700 pt-3">
+              <button type="button" onclick="toggleEditYouTubeAdditionalSettings()"
+                class="flex items-center justify-between w-full px-2 py-2 hover:bg-dark-700/30 rounded transition-colors">
+                <span class="text-sm font-medium text-white">
+                  <i class="ti ti-settings mr-1.5"></i>Additional Settings (Optional)
+                </span>
+                <i class="ti ti-chevron-down text-gray-400 transition-transform duration-200" id="editYoutubeAdditionalSettingsIcon"></i>
+              </button>
+              
+              <div id="editYoutubeAdditionalSettings" class="hidden mt-3 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <!-- Privacy -->
+                  <div>
+                    <label class="text-sm font-medium text-white block mb-2">Privacy</label>
+                    <select name="youtubePrivacy" id="editYoutubePrivacy"
+                      class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
+                      <option value="public">Public</option>
+                      <option value="unlisted" selected>Unlisted</option>
+                      <option value="private">Private</option>
+                    </select>
+                  </div>
+                  
+                  <!-- Thumbnail -->
+                  <div>
+                    <label class="text-sm font-medium text-white block mb-2">Thumbnail (16:9 ratio recommended)</label>
+                    <div class="flex gap-3 items-start">
+                      <div class="flex-1">
+                        <input type="file" name="youtubeThumbnail" id="editYoutubeThumbnail" accept="image/*" onchange="previewEditYoutubeThumbnail(this)"
+                          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded text-sm cursor-pointer hover:border-primary transition-colors">
+                        <p id="editYoutubeThumbnailInfo" class="text-xs text-gray-400 mt-1"></p>
+                      </div>
+                      <div id="editYoutubeThumbnailPreview" class="hidden">
+                        <div class="relative">
+                          <img id="editYoutubeThumbnailImg" src="" alt="Thumbnail preview" class="w-32 h-18 object-cover rounded border border-gray-600">
+                          <button type="button" onclick="clearEditYoutubeThumbnail()" class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs shadow-lg">
+                            <i class="ti ti-x text-xs"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <!-- Made for Kids -->
+                  <div>
+                    <label class="text-sm font-medium text-white block mb-2">Made for Kids</label>
+                    <div class="flex items-center gap-4 pt-2">
+                      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                        <input type="radio" name="editYoutubeMadeForKids" value="yes" class="w-4 h-4">
+                        <span>Yes</span>
+                      </label>
+                      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                        <input type="radio" name="editYoutubeMadeForKids" value="no" checked class="w-4 h-4">
+                        <span>No</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <!-- Age Restriction -->
+                  <div>
+                    <label class="text-sm font-medium text-white block mb-2">Age Restriction</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
+                      <input type="checkbox" name="youtubeAgeRestricted" id="editYoutubeAgeRestricted" class="w-4 h-4 rounded">
+                      <span>Age-restricted (18+)</span>
+                    </label>
+                  </div>
+                  
+                  <!-- Konten Sintetis -->
+                  <div>
+                    <label class="text-sm font-medium text-white block mb-2">Konten Sintetis</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
+                      <input type="checkbox" name="youtubeSyntheticContent" id="editYoutubeSyntheticContent" class="w-4 h-4 rounded">
+                      <span>Konten dibuat atau dimodifikasi dengan AI</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Centang jika video ini menggunakan teknologi AI untuk pembuatan atau modifikasi konten</p>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <!-- Auto Start -->
+                  <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" name="youtubeAutoStart" id="editYoutubeAutoStart" class="w-4 h-4 rounded">
+                      <span>Auto Start Broadcast (via API)</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">Automatically transition broadcast to "live" when stream starts</p>
+                  </div>
+                  
+                  <!-- Auto End -->
+                  <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" name="youtubeAutoEnd" id="editYoutubeAutoEnd" class="w-4 h-4 rounded">
+                      <span>Auto End Broadcast (via API)</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">Automatically complete broadcast when stream ends</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
