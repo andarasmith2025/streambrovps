@@ -163,6 +163,10 @@ async function loadTemplate(templateId) {
           const ageRestricted = document.getElementById('youtubeAgeRestricted');
           if (ageRestricted) ageRestricted.checked = template.youtube_age_restricted;
         }
+        if (template.youtube_synthetic_content !== undefined) {
+          const syntheticContent = document.getElementById('youtubeSyntheticContent');
+          if (syntheticContent) syntheticContent.checked = template.youtube_synthetic_content;
+        }
         if (template.youtube_auto_start !== undefined) {
           const autoStart = document.getElementById('youtubeAutoStart');
           if (autoStart) autoStart.checked = template.youtube_auto_start;
@@ -170,6 +174,27 @@ async function loadTemplate(templateId) {
         if (template.youtube_auto_end !== undefined) {
           const autoEnd = document.getElementById('youtubeAutoEnd');
           if (autoEnd) autoEnd.checked = template.youtube_auto_end;
+        }
+        
+        // Load tags
+        if (template.youtube_tags) {
+          try {
+            const tags = typeof template.youtube_tags === 'string' ? JSON.parse(template.youtube_tags) : template.youtube_tags;
+            if (Array.isArray(tags) && tags.length > 0) {
+              // Clear existing tags and set new ones
+              window.tags = tags.slice(0, 30); // Limit to 30 tags
+              updateTagsDisplay();
+              console.log(`[loadTemplate] Loaded ${tags.length} tags`);
+            }
+          } catch (e) {
+            console.error('[loadTemplate] Error parsing tags:', e);
+          }
+        }
+        
+        // Note: Thumbnail path is stored but actual file cannot be restored
+        // Templates only store the reference path, not the actual file
+        if (template.youtube_thumbnail_path) {
+          console.log(`[loadTemplate] Template has thumbnail path: ${template.youtube_thumbnail_path} (file not restored)`);
         }
       } else {
         // Manual RTMP mode
