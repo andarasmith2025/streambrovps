@@ -2434,6 +2434,24 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
       streamData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
       streamData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
       streamData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+      
+      // Handle tags (convert array to JSON string for storage)
+      if (req.body.youtubeTags !== undefined) {
+        try {
+          // Parse if it's a string, otherwise use as-is
+          const tags = typeof req.body.youtubeTags === 'string' ? JSON.parse(req.body.youtubeTags) : req.body.youtubeTags;
+          streamData.youtube_tags = JSON.stringify(tags);
+          console.log(`[CREATE STREAM] Tags saved: ${tags.length} tags`);
+        } catch (e) {
+          console.error('[CREATE STREAM] Error parsing tags:', e);
+        }
+      }
+      
+      // Handle thumbnail upload
+      if (req.file) {
+        streamData.youtube_thumbnail_path = `/uploads/thumbnails/${req.file.filename}`;
+        console.log(`[CREATE STREAM] Thumbnail saved: ${streamData.youtube_thumbnail_path}`);
+      }
     }
     // Handle Stream Now vs Schedule mode
     const streamNow = req.body.streamNow === true || req.body.streamNow === 'true';
