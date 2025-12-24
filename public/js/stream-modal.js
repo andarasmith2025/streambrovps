@@ -2304,7 +2304,7 @@ function updateEditTagsDisplay() {
   const container = document.getElementById('editTagsContainer');
   const countSpan = document.getElementById('editTagCount');
   const lengthSpan = document.getElementById('editTagLength');
-  const hiddenInput = document.getElementById('youtubeTags');
+  const hiddenInput = document.getElementById('editYoutubeTags'); // ✅ FIXED: Use edit modal hidden input
   
   if (!container) return;
   
