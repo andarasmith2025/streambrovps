@@ -223,15 +223,19 @@ function initializeTags() {
   updateTagStats();
 }
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+// Initialize when DOM is ready - only if tags container exists
+function initializeTags() {
+  const container = document.getElementById('tagsContainer');
+  if (container) {
     renderTags();
     updateTagStats();
-  });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeTags);
 } else {
-  renderTags();
-  updateTagStats();
+  initializeTags();
 }
 
 // Expose functions to window for onclick handlers

@@ -264,15 +264,100 @@ router.post('/broadcasts/:id/transition', async (req, res) => {
   try {
     const tokens = await getTokensFromReq(req);
     if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    
     const { status } = req.body || {};
     if (!status || !['testing','live','complete'].includes(String(status))) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    const resp = await youtubeService.transition(tokens, { broadcastId: req.params.id, status });
+    
+    const broadcastId = req.params.id;
+    console.log(`[YouTube] Manual transition request: ${broadcastId} → ${status}`);
+    
+    // Get current broadcast status first
+    try {
+      const currentBroadcast = await youtubeService.getBroadcast(tokens, { broadcastId });
+      if (!currentBroadcast) {
+        return res.status(404).json({ error: 'Broadcast not found' });
+      }
+      
+      const currentStatus = currentBroadcast.status?.lifeCycleStatus;
+      const boundStreamId = currentBroadcast.contentDetails?.boundStreamId;
+      
+      console.log(`[YouTube] Current broadcast status: ${currentStatus}, bound stream: ${boundStreamId}`);
+      
+      // Check if transition is valid
+      if (status === 'live') {
+        if (!boundStreamId) {
+          return res.status(400).json({ 
+            error: 'Cannot go live: No stream bound to broadcast',
+            details: 'This broadcast needs a stream key to go live. Please bind a stream first.'
+          });
+        }
+        
+        if (!['created', 'ready', 'testing'].includes(currentStatus)) {
+          return res.status(400).json({ 
+            error: `Cannot transition to live from ${currentStatus}`,
+            details: `Broadcast must be in 'created', 'ready', or 'testing' status to go live. Current status: ${currentStatus}`
+          });
+        }
+        
+        // For going live, check if stream is active
+        try {
+          const streamActive = await youtubeService.isStreamActive(tokens, { streamId: boundStreamId });
+          if (!streamActive) {
+            return res.status(400).json({ 
+              error: 'Stream not active',
+              details: 'The stream must be actively sending data before going live. Please start your streaming software first.'
+            });
+          }
+        } catch (streamErr) {
+          console.warn(`[YouTube] Could not check stream status: ${streamErr.message}`);
+          // Continue anyway - stream check is not critical
+        }
+      }
+      
+      // Attempt transition
+      const resp = await youtubeService.transition(tokens, { broadcastId, status });
+      console.log(`[YouTube] ✓ Transition successful: ${broadcastId} → ${status}`);
+      
+      return res.json({ success: true, result: resp.data || resp });
+      
+    } catch (broadcastErr) {
+      console.error(`[YouTube] Error getting broadcast info:`, broadcastErr.message);
+      // Continue with basic transition attempt
+    }
+    
+    // Fallback: attempt basic transition
+    const resp = await youtubeService.transition(tokens, { broadcastId, status });
     return res.json({ success: true, result: resp.data || resp });
+    
   } catch (err) {
-    console.error('[YouTube] transition error:', err?.response?.data || err.message);
-    return res.status(500).json({ error: 'Failed to transition broadcast' });
+    const errorDetail = err?.response?.data?.error;
+    const errorMessage = errorDetail?.message || err.message;
+    const errorCode = errorDetail?.code;
+    
+    console.error('[YouTube] transition error:', {
+      broadcastId: req.params.id,
+      targetStatus: req.body?.status,
+      error: errorDetail || err.message,
+      code: errorCode
+    });
+    
+    // Provide user-friendly error messages
+    let userMessage = errorMessage;
+    if (errorMessage.includes('Invalid transition')) {
+      userMessage = 'Cannot transition broadcast - it may not be in the right state or the stream may not be active. Please check that your streaming software is running and connected.';
+    } else if (errorMessage.includes('inactive')) {
+      userMessage = 'Stream is not active. Please start your streaming software and wait for it to connect before going live.';
+    } else if (errorCode === 403) {
+      userMessage = 'Permission denied. The broadcast may be in an invalid state for this transition.';
+    }
+    
+    return res.status(500).json({ 
+      error: 'Failed to transition broadcast',
+      details: userMessage,
+      code: errorCode
+    });
   }
 });
 const upload = multer({ dest: tmpDir });

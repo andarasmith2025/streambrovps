@@ -507,12 +507,44 @@
   }
   // old duplicate prompt removed; use modal instead
   function transitionBroadcast(id, status){
-    fetch(`/youtube/broadcasts/${id}/transition`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status })})
+    // Show loading state
+    const button = event?.target;
+    const originalText = button?.textContent;
+    if (button) {
+      button.disabled = true;
+      button.textContent = status === 'live' ? 'Going Live...' : 'Ending...';
+    }
+    
+    fetch(`/youtube/broadcasts/${id}/transition`, { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json'}, 
+      body: JSON.stringify({ status })
+    })
       .then(r=>r.json()).then(d=>{
-        if (d.error) throw new Error(d.error);
-        toast('Transitioned to '+status, 'success');
+        if (d.error) throw new Error(d.details || d.error);
+        toast(`Transitioned to ${status}`, 'success');
         loadList();
-      }).catch(e=>toast('Transition failed: '+e.message,'error'));
+      }).catch(e=>{
+        console.error('Transition error:', e);
+        const errorMsg = e.message || 'Unknown error';
+        
+        // Show user-friendly error message
+        if (errorMsg.includes('Stream not active')) {
+          toast('Stream not active - Please start your streaming software first', 'error');
+        } else if (errorMsg.includes('No stream bound')) {
+          toast('No stream key bound to this broadcast', 'error');
+        } else if (errorMsg.includes('Invalid transition') || errorMsg.includes('not in the right state')) {
+          toast('Cannot transition - Broadcast not ready or stream inactive', 'error');
+        } else {
+          toast(`Transition failed: ${errorMsg}`, 'error');
+        }
+      }).finally(() => {
+        // Restore button state
+        if (button && originalText) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      });
   }
   function uploadThumbnail(id){
     const input = document.createElement('input');
