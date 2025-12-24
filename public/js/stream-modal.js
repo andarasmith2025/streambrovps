@@ -900,7 +900,183 @@ window.currentStreamTab = currentStreamTab; // Expose globally
 let youtubeStreamKeys = [];
 let youtubeStreamKeysCache = null; // Cache for stream keys
 let youtubeStreamKeysCacheTime = null; // Cache timestamp
+let youtubeChannels = []; // Store user's YouTube channels
+let selectedChannelId = null; // Currently selected channel
 const STREAM_KEYS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+// Load user's YouTube channels
+async function loadYouTubeChannels() {
+  try {
+    console.log('[loadYouTubeChannels] Fetching user YouTube channels...');
+    const response = await fetch('/youtube/api/channels');
+    const data = await response.json();
+    
+    if (data.success && data.channels) {
+      youtubeChannels = data.channels;
+      console.log('[loadYouTubeChannels] Loaded', data.channels.length, 'channels:', data.channels);
+      
+      // Update channel selector
+      updateChannelSelector(data.channels, data.hasMultipleChannels);
+      
+      // Set default channel
+      const defaultChannel = data.channels.find(ch => ch.isDefault) || data.channels[0];
+      if (defaultChannel) {
+        selectedChannelId = defaultChannel.id;
+        console.log('[loadYouTubeChannels] Default channel set:', defaultChannel.title);
+      }
+      
+      return data;
+    } else {
+      console.error('[loadYouTubeChannels] Failed to load channels:', data.error);
+      showChannelSelectorError(data.error || 'Failed to load YouTube channels');
+      return null;
+    }
+  } catch (error) {
+    console.error('[loadYouTubeChannels] Error:', error);
+    showChannelSelectorError('Error connecting to YouTube API');
+    return null;
+  }
+}
+
+// Update channel selector dropdown
+function updateChannelSelector(channels, hasMultipleChannels) {
+  const selector = document.getElementById('youtubeChannelSelect');
+  const container = document.getElementById('youtubeChannelSelector');
+  
+  if (!selector || !container) {
+    console.warn('[updateChannelSelector] Channel selector elements not found');
+    return;
+  }
+  
+  // Show/hide channel selector based on number of channels
+  if (hasMultipleChannels) {
+    container.classList.remove('hidden');
+    console.log('[updateChannelSelector] Showing channel selector (multiple channels)');
+  } else {
+    container.classList.add('hidden');
+    console.log('[updateChannelSelector] Hiding channel selector (single channel)');
+  }
+  
+  // Sort channels: default first, then alphabetically
+  const sortedChannels = [...channels].sort((a, b) => {
+    if (a.isDefault && !b.isDefault) return -1;
+    if (!a.isDefault && b.isDefault) return 1;
+    return a.title.localeCompare(b.title);
+  });
+  
+  // Populate dropdown with clear default indication
+  selector.innerHTML = sortedChannels.map(channel => `
+    <option value="${channel.id}" ${channel.isDefault ? 'selected' : ''} style="background-color: #374151 !important; color: white !important;">
+      ${channel.isDefault ? '⭐ ' : ''}${channel.title}${channel.isDefault ? ' (Default)' : ''} 
+      ${channel.subscriberCount ? `• ${formatSubscriberCount(channel.subscriberCount)} subs` : ''}
+    </option>
+  `).join('');
+  
+  // Add event listener for channel selection
+  selector.removeEventListener('change', handleChannelSelection);
+  selector.addEventListener('change', handleChannelSelection);
+  
+  // Auto-select default channel
+  const defaultChannel = channels.find(ch => ch.isDefault);
+  if (defaultChannel) {
+    selector.value = defaultChannel.id;
+    selectedChannelId = defaultChannel.id;
+    console.log('[updateChannelSelector] Auto-selected default channel:', defaultChannel.title);
+  }
+}
+
+// Handle channel selection change
+function handleChannelSelection(event) {
+  const newChannelId = event.target.value;
+  const oldChannelId = selectedChannelId;
+  
+  console.log('[handleChannelSelection] Channel changed:', oldChannelId, '→', newChannelId);
+  
+  selectedChannelId = newChannelId;
+  
+  // Clear stream keys cache when channel changes
+  if (oldChannelId !== newChannelId) {
+    youtubeStreamKeysCache = null;
+    youtubeStreamKeysCacheTime = null;
+    console.log('[handleChannelSelection] Stream keys cache cleared due to channel change');
+    
+    // Clear current stream key selection
+    const streamKeyInput = document.getElementById('youtubeStreamKey');
+    const streamIdInput = document.getElementById('youtubeStreamId');
+    if (streamKeyInput) streamKeyInput.value = '';
+    if (streamIdInput) streamIdInput.value = '';
+    
+    // Show message about channel change
+    if (typeof showToast === 'function') {
+      const selectedChannel = youtubeChannels.find(ch => ch.id === newChannelId);
+      showToast('info', `Switched to ${selectedChannel?.title || 'selected channel'}. Stream keys cleared.`);
+    }
+  }
+}
+
+// Format subscriber count for display
+function formatSubscriberCount(count) {
+  if (!count || count === 0) return '0';
+  
+  if (count >= 1000000) {
+    return (count / 1000000).toFixed(1) + 'M';
+  } else if (count >= 1000) {
+    return (count / 1000).toFixed(1) + 'K';
+  } else {
+    return count.toString();
+  }
+}
+
+// Show error in channel selector
+function showChannelSelectorError(message) {
+  const selector = document.getElementById('youtubeChannelSelect');
+  const container = document.getElementById('youtubeChannelSelector');
+  
+  if (selector && container) {
+    container.classList.remove('hidden');
+    
+    // Show helpful message based on error type
+    if (message.includes('not connected') || message.includes('Not authenticated')) {
+      selector.innerHTML = `
+        <option value="" disabled selected>
+          ⚠️ No YouTube channels connected
+        </option>
+      `;
+      
+      // Add connect button or link
+      const connectHtml = `
+        <div class="mt-2 p-3 bg-yellow-500/10 border border-yellow-600/30 rounded-lg">
+          <div class="flex items-center gap-2 text-yellow-300 text-sm">
+            <i class="ti ti-alert-triangle"></i>
+            <span>No YouTube channels connected</span>
+          </div>
+          <div class="mt-2">
+            <a href="/oauth2/login" class="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors">
+              <i class="ti ti-brand-youtube"></i>
+              Connect YouTube Channel
+            </a>
+          </div>
+        </div>
+      `;
+      
+      // Insert after the selector
+      const existingError = container.querySelector('.youtube-connect-error');
+      if (existingError) {
+        existingError.remove();
+      }
+      
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'youtube-connect-error';
+      errorDiv.innerHTML = connectHtml;
+      container.appendChild(errorDiv);
+      
+    } else {
+      selector.innerHTML = `<option value="">Error: ${message}</option>`;
+    }
+    
+    selector.disabled = true;
+  }
+}
 
 function switchStreamTab(tab) {
   console.log('[switchStreamTab] ========== START ==========');
@@ -1012,6 +1188,12 @@ function switchStreamTab(tab) {
       if (streamKey) streamKey.required = false;
     }
     
+    // Initialize YouTube stream key validation
+    setupYouTubeStreamKeyValidation();
+    
+    // Load YouTube channels when switching to YouTube tab
+    loadYouTubeChannels();
+    
     // Don't auto-load stream keys - user will click Load button
     // loadYouTubeStreamKeys();
   }
@@ -1026,19 +1208,31 @@ console.log('[stream-modal.js] switchStreamTab function defined and exposed glob
 // Load YouTube stream keys from OAuth (with caching)
 async function loadYouTubeStreamKeys(forceRefresh = false) {
   try {
+    // Check if a channel is selected, if not try to load channels first
+    if (!selectedChannelId) {
+      console.warn('[loadYouTubeStreamKeys] No channel selected, loading channels first...');
+      const channelData = await loadYouTubeChannels();
+      if (!channelData || !selectedChannelId) {
+        // For single channel users, try without channelId parameter (backward compatibility)
+        console.log('[loadYouTubeStreamKeys] Trying without channelId for backward compatibility...');
+      }
+    }
+    
     // Check cache first (unless force refresh)
     const now = Date.now();
+    const cacheKey = `${selectedChannelId || 'default'}_streamkeys`;
     if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime) {
       const cacheAge = now - youtubeStreamKeysCacheTime;
       if (cacheAge < STREAM_KEYS_CACHE_DURATION) {
-        console.log('[loadYouTubeStreamKeys] Using cached stream keys (age:', Math.round(cacheAge / 1000), 'seconds)');
+        console.log('[loadYouTubeStreamKeys] Using cached stream keys for channel', selectedChannelId || 'default', '(age:', Math.round(cacheAge / 1000), 'seconds)');
         youtubeStreamKeys = youtubeStreamKeysCache;
         displayYouTubeStreamKeys(youtubeStreamKeysCache);
         
         // Show cache info
         if (typeof showToast === 'function') {
           const minutes = Math.floor(cacheAge / 60000);
-          showToast('info', `Using cached data (${minutes}m old). Click refresh to update.`);
+          const selectedChannel = youtubeChannels.find(ch => ch.id === selectedChannelId);
+          showToast('info', `Using cached data for ${selectedChannel?.title || 'selected channel'} (${minutes}m old)`);
         }
         return;
       } else {
@@ -1049,32 +1243,70 @@ async function loadYouTubeStreamKeys(forceRefresh = false) {
     // Show loading state
     const container = document.getElementById('youtubeStreamKeysList');
     if (container) {
+      const selectedChannel = youtubeChannels.find(ch => ch.id === selectedChannelId);
       container.innerHTML = `
         <div class="text-center py-4 text-gray-400">
           <i class="ti ti-loader animate-spin text-xl mb-2"></i>
-          <p class="text-xs">Loading stream keys from YouTube...</p>
+          <p class="text-xs">Loading stream keys from ${selectedChannel?.title || 'YouTube'}...</p>
         </div>
       `;
     }
     
-    console.log('[loadYouTubeStreamKeys] Fetching stream keys from YouTube API...');
-    const response = await fetch('/oauth2/youtube/stream-keys');
+    console.log('[loadYouTubeStreamKeys] Fetching stream keys for channel:', selectedChannelId || 'default');
+    
+    // Build URL with optional channel ID parameter
+    let url = '/oauth2/youtube/stream-keys';
+    if (selectedChannelId) {
+      url += `?channelId=${encodeURIComponent(selectedChannelId)}`;
+    }
+    
+    const response = await fetch(url);
     console.log('[loadYouTubeStreamKeys] Response status:', response.status);
     const data = await response.json();
     console.log('[loadYouTubeStreamKeys] Data received:', data);
     
+    if (response.status === 401 && data.needsReconnect) {
+      // Handle case where YouTube is not connected
+      console.log('[loadYouTubeStreamKeys] YouTube not connected, showing connect message');
+      showYouTubeStreamKeysError('No YouTube channels connected. Please connect your YouTube account first.');
+      
+      // Show connect button in the stream keys area
+      const container = document.getElementById('youtubeStreamKeysList');
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <div class="mb-4">
+              <i class="ti ti-brand-youtube text-red-500 text-4xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-300 mb-2">No YouTube Channels Connected</h3>
+            <p class="text-gray-400 text-sm mb-4">Connect your YouTube channel to load stream keys</p>
+            <a href="/oauth2/login" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+              <i class="ti ti-brand-youtube"></i>
+              Connect YouTube Channel
+            </a>
+          </div>
+        `;
+      }
+      
+      if (typeof showToast === 'function') {
+        showToast('warning', 'Please connect your YouTube channel first');
+      }
+      return;
+    }
+    
     if (data.success && data.streamKeys) {
-      // Update cache
+      // Update cache with channel-specific key
       youtubeStreamKeys = data.streamKeys;
       youtubeStreamKeysCache = data.streamKeys;
       youtubeStreamKeysCacheTime = now;
-      console.log('[loadYouTubeStreamKeys] Stream keys cached for', STREAM_KEYS_CACHE_DURATION / 1000, 'seconds');
+      console.log('[loadYouTubeStreamKeys] Stream keys cached for channel', selectedChannelId || 'default', 'for', STREAM_KEYS_CACHE_DURATION / 1000, 'seconds');
       
       displayYouTubeStreamKeys(data.streamKeys);
       
       // Show success message
       if (typeof showToast === 'function') {
-        showToast('success', `Loaded ${data.streamKeys.length} stream key(s) from YouTube`);
+        const selectedChannel = youtubeChannels.find(ch => ch.id === selectedChannelId);
+        showToast('success', `Loaded ${data.streamKeys.length} stream key(s) from ${selectedChannel?.title || 'YouTube'}`);
       }
     } else {
       console.error('Failed to load YouTube stream keys:', data.error);
@@ -1369,6 +1601,154 @@ function toggleYouTubeStreamKeyVisibility() {
     streamKeyToggle.classList.remove('ti-eye-off');
     streamKeyToggle.classList.add('ti-eye');
   }
+}
+
+// Validate YouTube stream key
+async function validateYouTubeStreamKey(streamKey) {
+  if (!streamKey || streamKey.trim().length === 0) {
+    return { valid: false, message: 'Stream key is required' };
+  }
+  
+  try {
+    console.log(`[validateYouTubeStreamKey] Validating stream key: ${streamKey.substring(0, 8)}...`);
+    
+    const response = await fetch('/youtube/validate-stream-key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ streamKey: streamKey.trim() })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      return { valid: false, message: data.error || 'Validation failed' };
+    }
+  } catch (error) {
+    console.error('[validateYouTubeStreamKey] Error:', error);
+    return { valid: false, message: 'Error validating stream key' };
+  }
+}
+
+// Add stream key validation on input change
+function setupYouTubeStreamKeyValidation() {
+  const streamKeyInput = document.getElementById('youtubeStreamKey');
+  if (!streamKeyInput) return;
+  
+  let validationTimeout;
+  let lastValidatedKey = '';
+  
+  // Add validation indicator container
+  const container = streamKeyInput.parentElement;
+  let validationDiv = container.querySelector('.stream-key-validation');
+  if (!validationDiv) {
+    validationDiv = document.createElement('div');
+    validationDiv.className = 'stream-key-validation mt-2';
+    validationDiv.style.display = 'none';
+    container.appendChild(validationDiv);
+  }
+  
+  streamKeyInput.addEventListener('input', function() {
+    const streamKey = this.value.trim();
+    
+    // Clear previous timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    
+    // Clear previous validation state
+    this.classList.remove('border-green-500', 'border-red-500', 'border-yellow-500');
+    
+    if (streamKey.length === 0) {
+      validationDiv.style.display = 'none';
+      lastValidatedKey = '';
+      return;
+    }
+    
+    // Don't validate if same as last validated key
+    if (streamKey === lastValidatedKey) {
+      return;
+    }
+    
+    // Show loading state
+    validationDiv.innerHTML = `
+      <div class="flex items-center gap-2 text-gray-400 text-xs">
+        <i class="ti ti-loader animate-spin"></i>
+        <span>Validating stream key...</span>
+      </div>
+    `;
+    validationDiv.style.display = 'block';
+    
+    // Validate after 1 second of no typing
+    validationTimeout = setTimeout(async () => {
+      const result = await validateYouTubeStreamKey(streamKey);
+      lastValidatedKey = streamKey;
+      
+      if (result.valid) {
+        if (result.hasExistingBroadcast) {
+          // Stream key is bound to existing broadcast
+          streamKeyInput.classList.add('border-yellow-500');
+          streamKeyInput.classList.remove('border-red-500', 'border-green-500');
+          
+          validationDiv.innerHTML = `
+            <div class="p-3 bg-yellow-900/30 border border-yellow-600 rounded-lg text-xs">
+              <div class="flex items-center gap-2 text-yellow-400 mb-2">
+                <i class="ti ti-alert-triangle"></i>
+                <span class="font-medium">Existing Broadcast Found</span>
+              </div>
+              <div class="text-gray-300 mb-2">
+                This stream key is bound to: <strong>"${result.broadcast.title}"</strong>
+              </div>
+              <div class="flex items-center gap-4 text-gray-400 mb-2">
+                <span>Status: ${result.broadcast.status}</span>
+                ${result.broadcast.thumbnailUrl ? `<img src="${result.broadcast.thumbnailUrl}" alt="Thumbnail" class="w-8 h-6 object-cover rounded">` : ''}
+              </div>
+              <div class="text-yellow-300">
+                ✓ StreamBro will reuse this existing broadcast instead of creating a new one
+              </div>
+            </div>
+          `;
+          
+          if (typeof showToast === 'function') {
+            showToast(`Found existing broadcast: "${result.broadcast.title}"`, 'warning');
+          }
+        } else {
+          // Stream key is valid but not bound to any broadcast
+          streamKeyInput.classList.add('border-green-500');
+          streamKeyInput.classList.remove('border-red-500', 'border-yellow-500');
+          
+          validationDiv.innerHTML = `
+            <div class="flex items-center gap-2 text-green-400 text-xs">
+              <i class="ti ti-check-circle"></i>
+              <span>Valid stream key - ready for new broadcast</span>
+            </div>
+          `;
+          
+          if (typeof showToast === 'function') {
+            showToast(`✓ Stream key validated: ${result.stream?.title || 'Valid stream'}`, 'success');
+          }
+        }
+      } else {
+        // Invalid stream key
+        streamKeyInput.classList.add('border-red-500');
+        streamKeyInput.classList.remove('border-green-500', 'border-yellow-500');
+        
+        validationDiv.innerHTML = `
+          <div class="flex items-center gap-2 text-red-400 text-xs">
+            <i class="ti ti-x-circle"></i>
+            <span>${result.message || 'Stream key not found in your YouTube channel'}</span>
+          </div>
+        `;
+        
+        if (typeof showToast === 'function') {
+          showToast(`✗ ${result.message}`, 'error');
+        }
+      }
+    }, 1000);
+  });
 }
 
 // Toggle YouTube stream keys dropdown
@@ -2070,7 +2450,7 @@ async function loadEditYouTubeStreamKeys(forceRefresh = false) {
     
     container.innerHTML = '<div class="text-center py-4 text-gray-400"><i class="ti ti-loader animate-spin text-xl mb-2"></i><p class="text-xs">Loading stream keys...</p></div>';
     
-    const response = await fetch('/api/youtube/stream-keys');
+    const response = await fetch('/oauth2/youtube/stream-keys');
     const data = await response.json();
     
     if (data.success && data.streamKeys) {

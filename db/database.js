@@ -209,6 +209,53 @@ function createTables() {
     }
   });
 
+  // ========================================
+  // Multi-Channel YouTube Support
+  // ========================================
+  
+  // New table for multiple YouTube channels per user
+  db.run(`CREATE TABLE IF NOT EXISTS youtube_channels (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    channel_title TEXT,
+    channel_avatar TEXT,
+    subscriber_count INTEGER DEFAULT 0,
+    access_token TEXT,
+    refresh_token TEXT,
+    expiry_date INTEGER,
+    is_default BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, channel_id)
+  )`, (err) => {
+    if (err) {
+      console.error('Error creating youtube_channels table:', err.message);
+    } else {
+      console.log('✅ Created youtube_channels table for multi-channel support');
+    }
+  });
+
+  // Migrate existing single-channel tokens to multi-channel table
+  db.run(`INSERT OR IGNORE INTO youtube_channels (id, user_id, channel_id, access_token, refresh_token, expiry_date, is_default)
+          SELECT 
+            user_id || '_migrated' as id,
+            user_id,
+            'migrated_' || user_id as channel_id,
+            access_token,
+            refresh_token,
+            expiry_date,
+            1 as is_default
+          FROM youtube_tokens 
+          WHERE user_id NOT IN (SELECT user_id FROM youtube_channels WHERE is_default = 1)`, (err) => {
+    if (err && !err.message.includes('no such table')) {
+      console.error('Error migrating youtube_tokens to youtube_channels:', err.message);
+    } else if (!err) {
+      console.log('✅ Migrated existing YouTube tokens to multi-channel table');
+    }
+  });
+
   // Table for YouTube broadcasts (link broadcast with video and stream)
   db.run(`CREATE TABLE IF NOT EXISTS youtube_broadcasts (
     id TEXT PRIMARY KEY,

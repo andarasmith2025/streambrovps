@@ -173,6 +173,12 @@ class BroadcastScheduler {
       console.log(`[BroadcastScheduler] - Scheduled: ${schedule.schedule_time}`);
       console.log(`[BroadcastScheduler] - Recurring: ${schedule.is_recurring ? 'Yes' : 'No'}`);
 
+      // ⭐ Check if broadcast already exists to prevent duplicates
+      if (schedule.youtube_broadcast_id) {
+        console.log(`[BroadcastScheduler] ⚠️ Broadcast already exists for schedule ${schedule.id}: ${schedule.youtube_broadcast_id}`);
+        return;
+      }
+
       // Mark as creating to prevent duplicate attempts
       await this.updateScheduleBroadcastStatus(schedule.id, 'creating');
 

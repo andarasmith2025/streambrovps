@@ -13,7 +13,8 @@ if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 // Set audience (made for kids, age restriction) on a video/broadcast
 router.post('/broadcasts/:id/audience', async (req, res) => {
   try {
-    const tokens = await getTokensFromReq(req);
+    const channelId = req.body.channelId || req.query.channelId || null;
+    const tokens = await getTokensFromReq(req, channelId);
     if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
     const { selfDeclaredMadeForKids, ageRestricted } = req.body || {};
     const resp = await youtubeService.setAudience(tokens, {
@@ -68,6 +69,70 @@ router.delete('/broadcasts/:id', async (req, res) => {
     console.error('[YouTube] Full error:', err);
     return res.status(500).json({ 
       error: 'Failed to delete broadcast from YouTube', 
+      details: err?.response?.data?.error?.message || err.message 
+    });
+  }
+});
+
+// Validate stream key (check if it exists and get broadcast info)
+router.post('/api/validate-stream-key', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    
+    const { streamKey } = req.body || {};
+    if (!streamKey) return res.status(400).json({ error: 'streamKey is required' });
+    
+    console.log(`[YouTube] Validating stream key: ${streamKey.substring(0, 8)}...`);
+    
+    // Check if there's an existing broadcast bound to this stream key
+    const existingBroadcastInfo = await youtubeService.findBroadcastByStreamKey(tokens, { streamKey });
+    
+    if (existingBroadcastInfo) {
+      console.log(`[YouTube] ✓ Found existing broadcast for stream key`);
+      return res.json({ 
+        valid: true, 
+        hasExistingBroadcast: true,
+        broadcast: {
+          id: existingBroadcastInfo.broadcast.id,
+          title: existingBroadcastInfo.broadcast.snippet?.title || 'Untitled',
+          status: existingBroadcastInfo.broadcast.status?.lifeCycleStatus || 'unknown',
+          thumbnailUrl: existingBroadcastInfo.broadcast.snippet?.thumbnails?.medium?.url || null,
+          scheduledStartTime: existingBroadcastInfo.broadcast.snippet?.scheduledStartTime || null
+        },
+        stream: {
+          id: existingBroadcastInfo.stream.id,
+          title: existingBroadcastInfo.stream.snippet?.title || 'Untitled Stream',
+          status: existingBroadcastInfo.stream.status?.streamStatus || 'unknown'
+        },
+        message: 'Stream key is bound to an existing broadcast'
+      });
+    }
+    
+    // No existing broadcast, just validate the stream key exists
+    const streamInfo = await youtubeService.validateStreamKey(tokens, { streamKey });
+    
+    if (streamInfo) {
+      console.log(`[YouTube] ✓ Stream key is valid but not bound to any broadcast`);
+      return res.json({ 
+        valid: true, 
+        hasExistingBroadcast: false,
+        stream: streamInfo,
+        message: 'Stream key is valid and available for new broadcast'
+      });
+    } else {
+      console.log(`[YouTube] ✗ Stream key not found`);
+      return res.json({ 
+        valid: false, 
+        hasExistingBroadcast: false,
+        message: 'Stream key not found in your YouTube channel'
+      });
+    }
+    
+  } catch (err) {
+    console.error('[YouTube] validate stream key error:', err?.response?.data || err.message);
+    return res.status(500).json({ 
+      error: 'Failed to validate stream key', 
       details: err?.response?.data?.error?.message || err.message 
     });
   }
@@ -365,6 +430,45 @@ const upload = multer({ dest: tmpDir });
 // Root -> redirect to manage
 router.get('/', (req, res) => res.redirect('/youtube/manage'));
 
+// Get user's connected YouTube channels
+router.get('/api/channels', async (req, res) => {
+  try {
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated. Please login first.' 
+      });
+    }
+    
+    const { getUserChannels } = require('../services/youtubeTokenManager');
+    const channels = await getUserChannels(userId);
+    
+    return res.json({
+      success: true,
+      channels: channels.map(ch => ({
+        id: ch.channel_id,
+        title: ch.channel_title,
+        avatar: ch.channel_avatar,
+        subscriberCount: ch.subscriber_count,
+        isDefault: !!ch.is_default,
+        connectedAt: ch.created_at
+      })),
+      count: channels.length,
+      hasMultipleChannels: channels.length > 1
+    });
+    
+  } catch (err) {
+    console.error('YouTube channels error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch YouTube channels',
+      details: err.message 
+    });
+  }
+});
+
 // Manage page (simple page to manage YouTube items)
 router.get('/manage', (req, res) => {
   if (!req.session || (!req.session.youtubeTokens && !(req.session.userId || req.session.user_id))) {
@@ -372,6 +476,47 @@ router.get('/manage', (req, res) => {
   }
   const youtubeConnected = !!(req.session && req.session.youtubeTokens);
   return res.render('youtube_manage', { title: 'YouTube Manage', active: 'youtube-manage', youtubeConnected });
+});
+
+// Validate stream key (check if it exists in user's streams)
+router.post('/api/validate-stream-key', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+    
+    const { streamKey } = req.body || {};
+    if (!streamKey) return res.status(400).json({ error: 'streamKey is required' });
+    
+    console.log(`[YouTube] Validating stream key: ${streamKey.substring(0, 8)}...`);
+    
+    const streamId = await youtubeService.findStreamIdByStreamKey(tokens, { streamKey });
+    
+    if (streamId) {
+      // Get stream details
+      const streams = await youtubeService.listStreams(tokens, { maxResults: 50 });
+      const stream = streams.find(s => s.id === streamId);
+      
+      return res.json({ 
+        valid: true, 
+        streamId,
+        stream: {
+          id: stream?.id,
+          title: stream?.snippet?.title,
+          status: stream?.status?.streamStatus,
+          ingestionAddress: stream?.cdn?.ingestionInfo?.ingestionAddress,
+          createdAt: stream?.snippet?.publishedAt
+        }
+      });
+    } else {
+      return res.json({ 
+        valid: false, 
+        message: 'Stream key not found in your channel' 
+      });
+    }
+  } catch (err) {
+    console.error('[YouTube] validate stream key error:', err?.response?.data || err.message);
+    return res.status(500).json({ error: 'Failed to validate stream key' });
+  }
 });
 
 // List user's live streams (ingestion info + masked stream key)
@@ -420,7 +565,7 @@ router.post('/broadcasts/:id/thumbnail', upload.single('file'), async (req, res)
   }
 });
 
-async function getTokensFromReq(req) {
+async function getTokensFromReq(req, channelId = null) {
   const userId = req.session && (req.session.userId || req.session.user_id);
   
   if (!userId) {
@@ -431,7 +576,7 @@ async function getTokensFromReq(req) {
   // ⭐ ALWAYS use database as source of truth for VPS/background processes
   // Session tokens are unreliable for long-running streams
   try {
-    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId, channelId);
     
     if (!oauth2Client) {
       console.log('[getTokensFromReq] Failed to get authenticated client');
@@ -473,14 +618,97 @@ router.post('/schedule-live', async (req, res) => {
     const tokens = maybeTokens && maybeTokens.access_token ? maybeTokens : null;
     if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
 
-    const { title, description, privacyStatus, scheduledStartTime, streamId, enableAutoStart, enableAutoStop } = req.body || {};
+    const { title, description, privacyStatus, scheduledStartTime, streamId, streamKey, enableAutoStart, enableAutoStop } = req.body || {};
     if (!title || !scheduledStartTime) return res.status(400).json({ error: 'title and scheduledStartTime are required' });
 
-    const result = await youtubeService.scheduleLive(tokens, { title, description, privacyStatus, scheduledStartTime, streamId, enableAutoStart, enableAutoStop });
-    return res.json({ success: true, broadcast: result.broadcast, stream: result.stream });
+    console.log(`[YouTube] schedule-live called with:`);
+    console.log(`[YouTube] - streamId: ${streamId || 'NOT PROVIDED'}`);
+    console.log(`[YouTube] - streamKey: ${streamKey ? streamKey.substring(0, 8) + '...' : 'NOT PROVIDED'}`);
+
+    const result = await youtubeService.scheduleLive(tokens, { 
+      title, 
+      description, 
+      privacyStatus, 
+      scheduledStartTime, 
+      streamId, 
+      streamKey, // Pass manual stream key
+      enableAutoStart, 
+      enableAutoStop 
+    });
+    return res.json({ 
+      success: true, 
+      broadcast: result.broadcast, 
+      stream: result.stream,
+      reusedExisting: result.reusedExisting || false,
+      message: result.message || 'Broadcast created successfully'
+    });
   } catch (err) {
     console.error('[YouTube] schedule-live error:', err?.response?.data || err.message);
     return res.status(500).json({ error: 'Failed to schedule live', detail: err?.response?.data || err.message });
+  }
+});
+
+// ⭐ NEW ENDPOINT: Validate stream key
+router.post('/validate-stream-key', async (req, res) => {
+  try {
+    const tokens = await getTokensFromReq(req);
+    if (!tokens) return res.status(401).json({ error: 'YouTube not connected' });
+
+    const { streamKey } = req.body || {};
+    if (!streamKey) return res.status(400).json({ error: 'streamKey is required' });
+
+    console.log(`[YouTube] Validating stream key: ${streamKey.substring(0, 8)}...`);
+
+    // First, check if there's an existing broadcast bound to this stream key
+    const existingBroadcast = await youtubeService.findBroadcastByStreamKey(tokens, { streamKey });
+    
+    if (existingBroadcast) {
+      console.log(`[YouTube] ✅ Found existing broadcast for stream key`);
+      return res.json({
+        success: true,
+        valid: true,
+        hasExistingBroadcast: true,
+        broadcast: {
+          id: existingBroadcast.broadcast.id,
+          title: existingBroadcast.broadcast.snippet?.title || 'Untitled',
+          status: existingBroadcast.broadcast.status?.lifeCycleStatus || 'unknown',
+          thumbnail: existingBroadcast.broadcast.snippet?.thumbnails?.medium?.url || null,
+          scheduledStartTime: existingBroadcast.broadcast.snippet?.scheduledStartTime || null
+        },
+        stream: {
+          id: existingBroadcast.stream.id,
+          title: existingBroadcast.stream.snippet?.title || 'Untitled Stream',
+          status: existingBroadcast.stream.status?.streamStatus || 'unknown'
+        }
+      });
+    }
+
+    // If no existing broadcast, just validate the stream key exists
+    const streamInfo = await youtubeService.validateStreamKey(tokens, { streamKey });
+    
+    if (streamInfo) {
+      console.log(`[YouTube] ✅ Stream key is valid but no broadcast bound`);
+      return res.json({
+        success: true,
+        valid: true,
+        hasExistingBroadcast: false,
+        stream: streamInfo
+      });
+    } else {
+      console.log(`[YouTube] ❌ Invalid stream key`);
+      return res.json({
+        success: true,
+        valid: false,
+        error: 'Stream key not found in your YouTube channel'
+      });
+    }
+
+  } catch (err) {
+    console.error('[YouTube] validate-stream-key error:', err?.response?.data || err.message);
+    return res.status(500).json({ 
+      error: 'Failed to validate stream key', 
+      detail: err?.response?.data?.error?.message || err.message 
+    });
   }
 });
 

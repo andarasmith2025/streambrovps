@@ -151,26 +151,65 @@ router.get('/callback', async (req, res) => {
       });
     }
 
-    // Fetch channel basic info for UI badge
+    // Fetch channel basic info for UI badge and save to multi-channel table
     try {
       console.log('[OAuth] Fetching YouTube channel info...');
       const yt = getYouTubeClient(tokens, userId);
       const me = await yt.channels.list({ mine: true, part: ['snippet','statistics'] });
       const channel = me?.data?.items?.[0];
       if (channel) {
+        // Save channel info to session for UI
         req.session.youtubeChannel = {
           id: channel.id,
           title: channel.snippet?.title,
           avatar: channel.snippet?.thumbnails?.default?.url || channel.snippet?.thumbnails?.high?.url || null,
           subs: channel.statistics?.subscriberCount || null
         };
-        console.log('[OAuth] ✓ Channel info saved:', channel.snippet?.title);
+        
+        // Check if user already has channels
+        const { getUserChannels, saveChannelTokens } = require('../services/youtubeTokenManager');
+        const existingChannels = await getUserChannels(userId);
+        
+        // Check if this channel is already connected
+        const channelExists = existingChannels.some(ch => ch.channel_id === channel.id);
+        
+        if (!channelExists) {
+          // Save new channel to multi-channel table
+          await saveChannelTokens(userId, {
+            id: channel.id,
+            title: channel.snippet?.title,
+            avatar: channel.snippet?.thumbnails?.default?.url || channel.snippet?.thumbnails?.high?.url || null,
+            subscriberCount: parseInt(channel.statistics?.subscriberCount || '0')
+          }, tokens);
+          
+          console.log(`[OAuth] ✓ New channel saved: ${channel.snippet?.title} (${channel.id})`);
+          req.session.flash = { 
+            type: 'success', 
+            message: `YouTube channel "${channel.snippet?.title}" connected successfully!` 
+          };
+        } else {
+          console.log(`[OAuth] ✓ Channel already exists, updating tokens: ${channel.snippet?.title}`);
+          const { updateTokensInDB } = require('../services/youtubeTokenManager');
+          await updateTokensInDB(userId, channel.id, tokens);
+          req.session.flash = { 
+            type: 'info', 
+            message: `YouTube channel "${channel.snippet?.title}" reconnected successfully!` 
+          };
+        }
       } else {
         console.warn('[OAuth] No channel found for this account');
+        req.session.flash = { 
+          type: 'warning', 
+          message: 'YouTube connected but no channel found. Please make sure you have a YouTube channel.' 
+        };
       }
     } catch (apiErr) {
       // ignore here; tokens may still be valid
       console.warn('[OAuth] YouTube API test failed:', apiErr?.message);
+      req.session.flash = { 
+        type: 'warning', 
+        message: 'YouTube connected but could not fetch channel info. Please try again.' 
+      };
     }
 
     // Flash success and redirect to dashboard
@@ -203,6 +242,7 @@ router.get('/youtube/stream-keys', async (req, res) => {
     console.log('[OAuth] /youtube/stream-keys called');
     
     const userId = req.session && (req.session.userId || req.session.user_id);
+    const channelId = req.query.channelId; // Optional channel ID parameter
     
     if (!userId) {
       console.log('[OAuth] No userId in session');
@@ -212,17 +252,18 @@ router.get('/youtube/stream-keys', async (req, res) => {
       });
     }
     
-    console.log('[OAuth] Fetching stream keys for user:', userId);
+    console.log('[OAuth] Fetching stream keys for user:', userId, 'channel:', channelId || 'default');
     
-    // Use token manager to get authenticated client (with auto-refresh)
+    // Use token manager to get authenticated client (with channel support)
     const tokenManager = require('../services/youtubeTokenManager');
-    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId, channelId);
     
     if (!oauth2Client) {
-      console.log('[OAuth] Failed to get authenticated client');
+      console.log('[OAuth] Failed to get authenticated client - no channels connected');
       return res.status(401).json({ 
         success: false, 
-        error: 'YouTube not connected. Please connect your YouTube account first.' 
+        error: 'YouTube not connected. Please connect your YouTube account first.',
+        needsReconnect: true
       });
     }
     
@@ -296,11 +337,30 @@ router.get('/youtube/stream-keys', async (req, res) => {
     return res.json({
       success: true,
       streamKeys: streamKeys,
-      count: streamKeys.length
+      count: streamKeys.length,
+      channelId: channelId || 'default'
     });
     
   } catch (err) {
     console.error('YouTube stream-keys error:', err);
+    
+    // Handle specific error cases
+    if (err.message && err.message.includes('deleted_client')) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'YouTube connection is no longer valid. Please disconnect and reconnect your channel.',
+        needsReconnect: true
+      });
+    }
+    
+    if (err.message && err.message.includes('invalid_grant')) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'YouTube access token expired. Please reconnect your channel.',
+        needsReconnect: true
+      });
+    }
+    
     return res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch stream keys from YouTube API',
@@ -309,24 +369,169 @@ router.get('/youtube/stream-keys', async (req, res) => {
   }
 });
 
-module.exports = router;
+// GET /oauth2/youtube/channels - get user's connected YouTube channels
+router.get('/youtube/channels', async (req, res) => {
+  try {
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated. Please login first.' 
+      });
+    }
+    
+    const { getUserChannels } = require('../services/youtubeTokenManager');
+    const channels = await getUserChannels(userId);
+    
+    return res.json({
+      success: true,
+      channels: channels.map(ch => ({
+        id: ch.channel_id,
+        title: ch.channel_title,
+        avatar: ch.channel_avatar,
+        subscriberCount: ch.subscriber_count,
+        isDefault: !!ch.is_default,
+        connectedAt: ch.created_at
+      })),
+      count: channels.length
+    });
+    
+  } catch (err) {
+    console.error('YouTube channels error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch YouTube channels',
+      details: err.message 
+    });
+  }
+});
 
+// POST /oauth2/youtube/channels/:channelId/set-default - set default channel
+router.post('/youtube/channels/:channelId/set-default', async (req, res) => {
+  try {
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    const channelId = req.params.channelId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated. Please login first.' 
+      });
+    }
+    
+    // Reset all channels to non-default
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE youtube_channels SET is_default = 0 WHERE user_id = ?', [userId], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    
+    // Set the selected channel as default
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE youtube_channels SET is_default = 1 WHERE user_id = ? AND channel_id = ?', 
+        [userId, channelId], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Default channel updated successfully'
+    });
+    
+  } catch (err) {
+    console.error('Set default channel error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to set default channel',
+      details: err.message 
+    });
+  }
+});
+
+// DELETE /oauth2/youtube/channels/:channelId - disconnect a specific channel
+router.delete('/youtube/channels/:channelId', async (req, res) => {
+  try {
+    const userId = req.session && (req.session.userId || req.session.user_id);
+    const channelId = req.params.channelId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated. Please login first.' 
+      });
+    }
+    
+    const { deleteTokensFromDB, getUserChannels } = require('../services/youtubeTokenManager');
+    
+    // Check if this is the only channel
+    const channels = await getUserChannels(userId);
+    if (channels.length <= 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot disconnect the only connected channel. Connect another channel first.'
+      });
+    }
+    
+    // Delete the specific channel
+    await deleteTokensFromDB(userId, channelId);
+    
+    // If this was the default channel, set another one as default
+    const deletedChannel = channels.find(ch => ch.channel_id === channelId);
+    if (deletedChannel && deletedChannel.is_default) {
+      const remainingChannels = channels.filter(ch => ch.channel_id !== channelId);
+      if (remainingChannels.length > 0) {
+        await new Promise((resolve, reject) => {
+          db.run('UPDATE youtube_channels SET is_default = 1 WHERE user_id = ? AND channel_id = ?', 
+            [userId, remainingChannels[0].channel_id], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+    }
+    
+    return res.json({
+      success: true,
+      message: 'Channel disconnected successfully'
+    });
+    
+  } catch (err) {
+    console.error('Disconnect channel error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to disconnect channel',
+      details: err.message 
+    });
+  }
+});
+
+module.exports = router;
 // GET /oauth2/disconnect - revoke local session (simple disconnect)
 router.get('/disconnect', async (req, res) => {
   try {
     const userId = req.session && (req.session.userId || req.session.user_id);
     if (userId) {
       try {
+        // Delete from both old and new tables for backward compatibility
         db.run('DELETE FROM youtube_tokens WHERE user_id = ?', [userId], (err) => {
-          if (err) console.warn('[OAuth] Failed to delete youtube_tokens on disconnect:', err.message);
+          if (err && !err.message.includes('no such table')) {
+            console.warn('[OAuth] Failed to delete youtube_tokens on disconnect:', err.message);
+          }
         });
+        
+        const { deleteTokensFromDB } = require('../services/youtubeTokenManager');
+        await deleteTokensFromDB(userId); // Delete all channels
       } catch (e) {
         console.warn('[OAuth] Disconnect DB cleanup error:', e?.message);
       }
     }
     delete req.session.youtubeTokens;
     delete req.session.youtubeChannel;
-    req.session.flash = { type: 'info', message: 'YouTube disconnected' };
+    req.session.flash = { type: 'info', message: 'All YouTube channels disconnected' };
   } catch {}
   return res.redirect('/dashboard');
 });

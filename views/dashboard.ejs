@@ -139,13 +139,47 @@
                 <span>New Stream</span>
               </button>
               <% if (youtubeConnected && youtubeChannel) { %>
-                <div
-                  class="w-full sm:w-auto flex items-center gap-2 bg-dark-700 text-white px-3 py-2 rounded-lg border border-gray-600">
+                <!-- Multi-Channel YouTube Status -->
+                <div id="youtubeChannelStatus"
+                  class="w-full sm:w-auto flex items-center gap-2 bg-dark-700 text-white px-3 py-2 rounded-lg border border-gray-600 relative">
                   <img src="<%= youtubeChannel.avatar %>" alt="YT Avatar" class="w-6 h-6 rounded-full flex-shrink-0">
-                  <span class="text-sm flex-1 min-w-0">Connected as <span class="font-semibold truncate inline-block max-w-[120px] sm:max-w-none align-bottom">
-                      <%= youtubeChannel.title %>
-                    </span></span>
-                  <a href="/oauth2/disconnect" class="text-red-400 hover:text-red-300 text-sm flex-shrink-0">Disconnect</a>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i class="ti ti-star text-yellow-400 text-sm" title="Default Channel"></i>
+                      <span class="text-sm text-gray-300">Default:</span>
+                      <span class="font-semibold truncate inline-block max-w-[120px] sm:max-w-none align-bottom text-white">
+                        <%= youtubeChannel.title %>
+                      </span>
+                      <button id="channelDropdownToggle" onclick="toggleChannelDropdown()" 
+                        class="text-gray-400 hover:text-white transition-colors">
+                        <i class="ti ti-chevron-down text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <a href="/oauth2/disconnect" class="text-orange-300 hover:text-orange-200 text-sm flex-shrink-0">Disconnect All</a>
+                  
+                  <!-- Channel Dropdown -->
+                  <div id="channelDropdown" class="hidden absolute top-full left-0 right-0 mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg z-50">
+                    <div class="p-2">
+                      <div class="text-xs text-gray-400 px-2 py-1 border-b border-gray-600 mb-2 flex items-center justify-between">
+                        <span>All Connected Channels</span>
+                        <span class="text-yellow-400">★ = Default</span>
+                      </div>
+                      <div id="channelList" class="space-y-1">
+                        <div class="text-center py-2 text-gray-400">
+                          <i class="ti ti-loader animate-spin text-sm mr-1"></i>
+                          Loading channels...
+                        </div>
+                      </div>
+                      <div class="border-t border-gray-600 mt-2 pt-2">
+                        <a href="/oauth2/login" 
+                          class="flex items-center gap-2 px-2 py-1.5 text-xs text-blue-300 hover:text-blue-200 hover:bg-dark-600 rounded transition-colors">
+                          <i class="ti ti-plus text-sm"></i>
+                          Connect Another Channel
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <% } else { %>
                   <a href="/oauth2/login"
@@ -450,6 +484,68 @@
             transform: translate(-50%, 0);
           }
         }
+        
+        /* Multi-Channel YouTube Dropdown */
+        #channelDropdown {
+          transform-origin: top left;
+          transition: all 0.2s ease-in-out;
+          transform: scale(0.95);
+          opacity: 0;
+        }
+        
+        #channelDropdown:not(.hidden) {
+          transform: scale(1);
+          opacity: 1;
+        }
+        
+        #channelDropdownToggle i {
+          transition: transform 0.2s ease-in-out;
+        }
+        
+        #channelDropdownToggle i.rotate-180 {
+          transform: rotate(180deg);
+        }
+        
+        /* Channel selector in modal */
+        #youtubeChannelSelector {
+          transition: all 0.3s ease-in-out;
+        }
+        
+        #youtubeChannelSelector:not(.hidden) {
+          animation: slideDown 0.3s ease-out;
+        }
+        
+        /* Fix select dropdown styling */
+        #youtubeChannelSelect {
+          color: white !important;
+          background-color: #374151 !important;
+        }
+        
+        #youtubeChannelSelect option {
+          background-color: #374151 !important;
+          color: white !important;
+          padding: 8px 12px;
+        }
+        
+        #youtubeChannelSelect option:hover {
+          background-color: #4B5563 !important;
+        }
+        
+        #youtubeChannelSelect option:checked {
+          background-color: #3B82F6 !important;
+          color: white !important;
+        }
+        
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
       </style>
       <script>
         // Note: All YouTube API and stream modal functions are now loaded from stream-modal.js (loaded in layout.ejs)
@@ -714,10 +810,13 @@
             formData.schedules = schedules;
             console.log('[Form Submit] ✓ Stream will be SCHEDULED with', schedules.length, 'schedule(s)');
             console.log('[Form Submit] Schedule details:', JSON.stringify(schedules, null, 2));
-          } else {
-            // No schedules - Stream Now mode (start immediately)
+          } else if (formData.useYouTubeAPI) {
+            // YouTube API without schedules = Stream Now mode
             formData.streamNow = true;
-            console.log('[Form Submit] ⚠️  No schedules found - Stream Now mode activated');
+            console.log('[Form Submit] ⚠️  YouTube API without schedules - Stream Now mode activated');
+          } else {
+            // Manual RTMP stream - no YouTube broadcast needed
+            console.log('[Form Submit] ✓ Manual RTMP stream - no YouTube broadcast needed');
           }
           const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
           
@@ -3608,6 +3707,409 @@
       <script src="/js/dashboard-stats.js"></script>
       <script src="/js/youtube-title-autocomplete.js?v=1.0.0"></script>
       <!-- Note: stream-modal.js already loaded in layout.ejs -->
+      
+      <!-- Multi-Channel YouTube Management -->
+      <script>
+        let dashboardChannels = [];
+        let channelDropdownOpen = false;
+        
+        // Toggle channel dropdown
+        function toggleChannelDropdown() {
+          const dropdown = document.getElementById('channelDropdown');
+          const toggle = document.getElementById('channelDropdownToggle');
+          
+          if (!dropdown || !toggle) return;
+          
+          channelDropdownOpen = !channelDropdownOpen;
+          
+          if (channelDropdownOpen) {
+            dropdown.classList.remove('hidden');
+            toggle.querySelector('i').classList.add('rotate-180');
+            loadDashboardChannels();
+          } else {
+            dropdown.classList.add('hidden');
+            toggle.querySelector('i').classList.remove('rotate-180');
+          }
+        }
+        
+        // Load channels for dashboard dropdown
+        async function loadDashboardChannels() {
+          try {
+            const response = await fetch('/oauth2/youtube/channels');
+            const data = await response.json();
+            
+            if (data.success && data.channels) {
+              dashboardChannels = data.channels;
+              displayDashboardChannels(data.channels);
+            } else {
+              showChannelError(data.error || 'Failed to load channels');
+            }
+          } catch (error) {
+            console.error('Error loading dashboard channels:', error);
+            showChannelError('Error connecting to server');
+          }
+        }
+        
+        // Display channels in dashboard dropdown
+        function displayDashboardChannels(channels) {
+          const container = document.getElementById('channelList');
+          if (!container) return;
+          
+          if (channels.length === 0) {
+            container.innerHTML = `
+              <div class="text-center py-2 text-gray-400">
+                <p class="text-xs">No channels connected</p>
+              </div>
+            `;
+            return;
+          }
+          
+          // Sort channels: default first, then alphabetically
+          const sortedChannels = [...channels].sort((a, b) => {
+            if (a.isDefault && !b.isDefault) return -1;
+            if (!a.isDefault && b.isDefault) return 1;
+            return a.title.localeCompare(b.title);
+          });
+          
+          container.innerHTML = sortedChannels.map(channel => `
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dark-600 transition-colors ${channel.isDefault ? 'bg-blue-600/10 border border-blue-400/20' : ''}">
+              <img src="${channel.avatar || '/images/default-avatar.png'}" alt="${channel.title}" class="w-5 h-5 rounded-full flex-shrink-0">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  ${channel.isDefault ? '<i class="ti ti-star text-yellow-400 text-xs"></i>' : ''}
+                  <span class="text-xs font-medium text-white truncate">${channel.title}</span>
+                  ${channel.isDefault ? '<span class="text-xs text-yellow-400 font-semibold">(Default)</span>' : ''}
+                </div>
+                <p class="text-xs text-gray-400">${formatSubscriberCount(channel.subscriberCount)} subscribers</p>
+              </div>
+              <div class="flex items-center gap-1">
+                ${!channel.isDefault ? `
+                  <button onclick="setDefaultChannel('${channel.id}')" 
+                    class="text-xs text-blue-300 hover:text-blue-200 transition-colors p-1 rounded hover:bg-blue-400/10"
+                    title="Set as default">
+                    <i class="ti ti-star text-sm"></i>
+                  </button>
+                ` : `
+                  <span class="text-xs text-yellow-400 p-1" title="Current default">
+                    <i class="ti ti-star-filled text-sm"></i>
+                  </span>
+                `}
+                ${channels.length > 1 ? `
+                  <button onclick="disconnectChannel('${channel.id}', '${channel.title}')" 
+                    class="text-xs text-orange-300 hover:text-orange-200 transition-colors p-1 rounded hover:bg-orange-400/10"
+                    title="Disconnect channel">
+                    <i class="ti ti-unlink text-sm"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `).join('');
+        }
+        
+        // Set default channel
+        async function setDefaultChannel(channelId) {
+          try {
+            const response = await fetch(`/oauth2/youtube/channels/${channelId}/set-default`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              if (typeof showToast === 'function') {
+                const channel = dashboardChannels.find(ch => ch.id === channelId);
+                showToast('success', `${channel?.title || 'Channel'} set as default`);
+              }
+              
+              // Reload channels to update UI
+              loadDashboardChannels();
+            } else {
+              if (typeof showToast === 'function') {
+                showToast('error', data.error || 'Failed to set default channel');
+              }
+            }
+          } catch (error) {
+            console.error('Error setting default channel:', error);
+            if (typeof showToast === 'function') {
+              showToast('error', 'Error connecting to server');
+            }
+          }
+        }
+        
+        // Disconnect specific channel
+        async function disconnectChannel(channelId, channelTitle) {
+          if (!confirm(`Are you sure you want to disconnect "${channelTitle}"?`)) {
+            return;
+          }
+          
+          try {
+            const response = await fetch(`/oauth2/youtube/channels/${channelId}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              if (typeof showToast === 'function') {
+                showToast('success', `${channelTitle} disconnected`);
+              }
+              
+              // Reload channels to update UI
+              loadDashboardChannels();
+            } else {
+              if (typeof showToast === 'function') {
+                showToast('error', data.error || 'Failed to disconnect channel');
+              }
+            }
+          } catch (error) {
+            console.error('Error disconnecting channel:', error);
+            if (typeof showToast === 'function') {
+              showToast('error', 'Error connecting to server');
+            }
+          }
+        }
+        
+        // Show error in channel list
+        function showChannelError(message) {
+          const container = document.getElementById('channelList');
+          if (container) {
+            container.innerHTML = `
+              <div class="text-center py-2 text-red-400">
+                <i class="ti ti-alert-triangle text-sm mb-1"></i>
+                <p class="text-xs">${message}</p>
+              </div>
+            `;
+          }
+        }
+        
+        // Format subscriber count (reuse from stream-modal.js)
+        function formatSubscriberCount(count) {
+          if (!count || count === 0) return '0';
+          
+          if (count >= 1000000) {
+            return (count / 1000000).toFixed(1) + 'M';
+          } else if (count >= 1000) {
+            return (count / 1000).toFixed(1) + 'K';
+          } else {
+            return count.toString();
+          }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+          const dropdown = document.getElementById('channelDropdown');
+          const toggle = document.getElementById('channelDropdownToggle');
+          const status = document.getElementById('youtubeChannelStatus');
+          
+          if (channelDropdownOpen && dropdown && !status?.contains(event.target)) {
+            toggleChannelDropdown();
+          }
+        });
+        
+        // Expose functions globally
+        window.toggleChannelDropdown = toggleChannelDropdown;
+        window.setDefaultChannel = setDefaultChannel;
+        window.disconnectChannel = disconnectChannel;
+        
+        // ========================================
+        // Channel Grouping in Stream List
+        // ========================================
+        
+        let streamChannelMapping = {}; // Map stream IDs to channel info
+        
+        // Function to group streams by channel
+        function groupStreamsByChannel(streams) {
+          const grouped = {};
+          const unknownChannelStreams = [];
+          
+          streams.forEach(stream => {
+            // Check if stream has YouTube channel info
+            const channelInfo = streamChannelMapping[stream.id];
+            
+            if (channelInfo && channelInfo.channelId) {
+              const channelId = channelInfo.channelId;
+              if (!grouped[channelId]) {
+                grouped[channelId] = {
+                  channelInfo: channelInfo,
+                  streams: []
+                };
+              }
+              grouped[channelId].streams.push(stream);
+            } else {
+              // Streams without channel info (manual RTMP, etc.)
+              unknownChannelStreams.push(stream);
+            }
+          });
+          
+          return { grouped, unknownChannelStreams };
+        }
+        
+        // Function to render grouped streams
+        function renderGroupedStreams(streams) {
+          const tbody = document.querySelector('tbody');
+          if (!tbody) return;
+          
+          const { grouped, unknownChannelStreams } = groupStreamsByChannel(streams);
+          let html = '';
+          
+          // Render grouped streams by channel
+          Object.keys(grouped).forEach(channelId => {
+            const group = grouped[channelId];
+            const channelInfo = group.channelInfo;
+            
+            // Channel header row
+            html += `
+              <tr class="bg-dark-600/30">
+                <td colspan="8" class="px-6 py-3">
+                  <div class="flex items-center gap-3">
+                    <img src="${channelInfo.avatar || '/images/default-avatar.png'}" 
+                         alt="${channelInfo.title}" 
+                         class="w-6 h-6 rounded-full">
+                    <div class="flex items-center gap-2">
+                      <i class="ti ti-brand-youtube text-red-500"></i>
+                      <span class="font-medium text-white">${channelInfo.title}</span>
+                      ${channelInfo.isDefault ? '<span class="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Default</span>' : ''}
+                      <span class="text-xs text-gray-400">${group.streams.length} stream(s)</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            `;
+            
+            // Render streams for this channel
+            group.streams.forEach(stream => {
+              html += renderStreamRow(stream, true); // true = is grouped
+            });
+          });
+          
+          // Render ungrouped streams (Manual RTMP, etc.)
+          if (unknownChannelStreams.length > 0) {
+            html += `
+              <tr class="bg-dark-600/30">
+                <td colspan="8" class="px-6 py-3">
+                  <div class="flex items-center gap-3">
+                    <i class="ti ti-broadcast text-gray-400"></i>
+                    <span class="font-medium text-white">Manual RTMP Streams</span>
+                    <span class="text-xs text-gray-400">${unknownChannelStreams.length} stream(s)</span>
+                  </div>
+                </td>
+              </tr>
+            `;
+            
+            unknownChannelStreams.forEach(stream => {
+              html += renderStreamRow(stream, true); // true = is grouped
+            });
+          }
+          
+          tbody.innerHTML = html;
+        }
+        
+        // Function to render individual stream row
+        function renderStreamRow(stream, isGrouped = false) {
+          const indentClass = isGrouped ? 'pl-12' : 'pl-6';
+          
+          return `
+            <tr class="hover:bg-dark-700/50 transition-colors" data-stream-id="${stream.id}">
+              <td class="${indentClass} py-3">
+                <input type="checkbox" class="stream-checkbox w-4 h-4 rounded border-gray-600 text-primary focus:ring-primary focus:ring-offset-0 bg-dark-700 cursor-pointer" 
+                       data-stream-id="${stream.id}" onchange="updateBulkActions()">
+              </td>
+              <td class="px-6 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-8 bg-dark-800 rounded overflow-hidden flex-shrink-0">
+                    <img src="${stream.thumbnail || '/images/default-thumbnail.jpg'}" 
+                         alt="" class="w-full h-full object-cover" 
+                         onerror="this.src='/images/default-thumbnail.jpg'">
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-white truncate break-words">${stream.title}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${stream.video_name || 'No video selected'}</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-3">
+                <div class="flex items-center gap-2">
+                  ${stream.platform_icon ? `<i class="${stream.platform_icon} text-lg"></i>` : '<i class="ti ti-broadcast text-gray-400"></i>'}
+                  <span class="text-sm text-gray-300">${stream.platform || 'Custom'}</span>
+                </div>
+              </td>
+              <td class="px-6 py-3">
+                <span class="text-sm text-gray-300">${stream.schedule_info || 'No schedule'}</span>
+              </td>
+              <td class="px-6 py-3">
+                <span class="text-sm text-gray-300">${stream.start_time || '-'}</span>
+              </td>
+              <td class="px-6 py-3">
+                <span class="text-sm text-gray-300">${stream.end_time || '-'}</span>
+              </td>
+              <td class="px-6 py-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(stream.status)}">
+                  ${stream.status}
+                </span>
+              </td>
+              <td class="px-6 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <!-- Stream action buttons here -->
+                  <button onclick="editStream('${stream.id}')" 
+                    class="p-1.5 text-gray-400 hover:text-primary transition-colors rounded hover:bg-dark-600" 
+                    title="Edit Stream">
+                    <i class="ti ti-edit text-sm"></i>
+                  </button>
+                  <button onclick="deleteStream('${stream.id}')" 
+                    class="p-1.5 text-gray-400 hover:text-red-400 transition-colors rounded hover:bg-dark-600" 
+                    title="Delete Stream">
+                    <i class="ti ti-trash text-sm"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+        
+        // Function to get status CSS classes
+        function getStatusClasses(status) {
+          switch(status?.toLowerCase()) {
+            case 'live':
+            case 'streaming':
+              return 'bg-green-500/10 text-green-400 border border-green-500/20';
+            case 'scheduled':
+            case 'pending':
+              return 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+            case 'offline':
+            case 'stopped':
+              return 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
+            case 'error':
+            case 'failed':
+              return 'bg-red-500/10 text-red-400 border border-red-500/20';
+            default:
+              return 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
+          }
+        }
+        
+        // Function to load channel mapping for streams
+        async function loadStreamChannelMapping() {
+          try {
+            // This would be called when loading streams
+            // For now, we'll populate it when we have the data
+            console.log('[loadStreamChannelMapping] Loading channel mapping for streams...');
+            
+            // Example: fetch stream-channel mapping from backend
+            // const response = await fetch('/api/streams/channel-mapping');
+            // const data = await response.json();
+            // streamChannelMapping = data.mapping || {};
+            
+          } catch (error) {
+            console.error('[loadStreamChannelMapping] Error:', error);
+          }
+        }
+        
+        // Initialize channel grouping
+        document.addEventListener('DOMContentLoaded', function() {
+          loadStreamChannelMapping();
+        });
+      </script>
       
       <!-- Initialize Title Autocomplete -->
       <script>

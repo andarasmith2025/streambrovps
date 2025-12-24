@@ -2435,6 +2435,10 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
       streamData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
       streamData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
       
+      // Add category and language (with defaults for testing)
+      streamData.youtube_category_id = req.body.youtubeCategory || '22'; // Default: People & Blogs
+      streamData.youtube_language = req.body.youtubeLanguage || 'en'; // Default: English
+      
       // Handle tags (convert array to JSON string for storage)
       if (req.body.youtubeTags !== undefined) {
         try {
@@ -2444,7 +2448,10 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
           console.log(`[CREATE STREAM] Tags saved: ${tags.length} tags`);
         } catch (e) {
           console.error('[CREATE STREAM] Error parsing tags:', e);
+          streamData.youtube_tags = '[]';
         }
+      } else {
+        streamData.youtube_tags = '[]';
       }
       
       // Handle thumbnail upload
@@ -2522,10 +2529,12 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
           if (hasSchedules && !streamNow) {
             // Use first schedule time - parseScheduleTime returns string, convert to Date first
             const parsedTime = parseScheduleTime(schedules[0].schedule_time);
-            scheduledStartTime = new Date(parsedTime).toISOString();
+            // Fix timezone issue: Remove "Z" suffix to avoid YouTube API rejection
+            scheduledStartTime = new Date(parsedTime).toISOString().replace('Z', '');
           } else {
             // Stream now - set to current time
-            scheduledStartTime = new Date().toISOString();
+            // Fix timezone issue: Remove "Z" suffix to avoid YouTube API rejection
+            scheduledStartTime = new Date().toISOString().replace('Z', '');
           }
           
           // Get YouTube stream ID from request body (sent from frontend)
@@ -2537,98 +2546,125 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
             youtubeStreamId = null;
           }
           
+          // Check if user provided manual stream key
+          const hasManualStreamKey = req.body.streamKey && req.body.streamKey.trim();
+          
           console.log(`[CREATE STREAM] Creating YouTube broadcast for stream ${stream.id}`);
           console.log(`[CREATE STREAM] - Title: ${req.body.streamTitle}`);
           console.log(`[CREATE STREAM] - Scheduled: ${scheduledStartTime}`);
           console.log(`[CREATE STREAM] - Privacy: ${streamData.youtube_privacy}`);
-          console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED - manual input mode'}`);
+          console.log(`[CREATE STREAM] - YouTube Stream ID: ${youtubeStreamId || 'NOT PROVIDED'}`);
+          console.log(`[CREATE STREAM] - Manual Stream Key: ${hasManualStreamKey ? 'PROVIDED' : 'NOT PROVIDED'}`);
+          console.log(`[CREATE STREAM] - Mode: ${youtubeStreamId ? 'DROPDOWN (existing stream)' : hasManualStreamKey ? 'MANUAL INPUT' : 'INVALID'}`);
           
-          // If YouTube Stream ID is provided, create broadcast with existing stream
-          // If not provided, user is using manual input mode (no broadcast creation needed)
-          if (youtubeStreamId) {
-            console.log(`[CREATE STREAM] Using existing YouTube stream: ${youtubeStreamId}`);
-            
-            // Parse tags from request (comma-separated string to array)
-            let tags = null;
-            if (req.body.youtube_tags && typeof req.body.youtube_tags === 'string') {
-              tags = req.body.youtube_tags
-                .split(',')
-                .map(tag => tag.trim())
-                .filter(tag => tag.length > 0)
-                .slice(0, 500); // YouTube limit
-              console.log(`[CREATE STREAM] Parsed ${tags.length} tags from request`);
+          // YouTube API requires either existing stream ID OR manual stream key
+          if (!youtubeStreamId && !hasManualStreamKey) {
+            return res.status(400).json({ 
+              error: 'YouTube API mode requires either selecting a stream from dropdown or entering stream key manually' 
+            });
+          }
+          
+          // Parse tags from request (JSON string to array)
+          let tags = null;
+          if (streamData.youtube_tags && typeof streamData.youtube_tags === 'string') {
+            try {
+              const parsedTags = JSON.parse(streamData.youtube_tags);
+              if (Array.isArray(parsedTags)) {
+                tags = parsedTags.slice(0, 30); // YouTube limit: 30 tags max
+                console.log(`[CREATE STREAM] Parsed ${tags.length} tags from streamData`);
+              }
+            } catch (e) {
+              console.warn(`[CREATE STREAM] Failed to parse tags: ${e.message}`);
             }
+          }
+          
+          // LAZY CREATION: Only create broadcast immediately for "Stream Now"
+          // Scheduled streams will have broadcasts created by broadcastScheduler 10 minutes before
+          if (streamNow && streamData.use_youtube_api) {
+            console.log(`[CREATE STREAM] Stream Now mode - creating broadcast immediately`);
             
-            // LAZY CREATION: Only create broadcast immediately for "Stream Now"
-            // Scheduled streams will have broadcasts created by broadcastScheduler 10 minutes before
-            if (streamNow) {
-              console.log(`[CREATE STREAM] Stream Now mode - creating broadcast immediately`);
+            // Create broadcast via YouTube API
+            // Use existing stream ID (from dropdown) OR manual stream key
+            const broadcastResult = await youtubeService.scheduleLive(tokens, {
+              title: req.body.streamTitle,
+              description: streamData.youtube_description || '',
+              privacyStatus: streamData.youtube_privacy || 'unlisted',
+              scheduledStartTime: scheduledStartTime,
+              streamId: youtubeStreamId, // Use existing stream ID if selected from dropdown
+              streamKey: hasManualStreamKey ? req.body.streamKey.trim() : null, // Use manual stream key if provided
+              enableAutoStart: streamData.youtube_auto_start || false,
+              enableAutoStop: streamData.youtube_auto_end || false,
+              tags: tags,
+              category: streamData.youtube_category_id || null,
+              language: streamData.youtube_language || null
+            });
+            
+            // Update stream with broadcast ID and stream ID
+            if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
+              const updateData = {
+                youtube_broadcast_id: broadcastResult.broadcast.id
+              };
               
-              // Create broadcast via YouTube API with the selected stream ID
-              const broadcastResult = await youtubeService.scheduleLive(tokens, {
-                title: req.body.streamTitle,
-                description: streamData.youtube_description || '',
-                privacyStatus: streamData.youtube_privacy || 'unlisted',
-                scheduledStartTime: scheduledStartTime,
-                streamId: youtubeStreamId, // Use the stream ID selected by user
-                enableAutoStart: streamData.youtube_auto_start || false,
-                enableAutoStop: streamData.youtube_auto_end || false,
-                tags: tags,
-                category: streamData.youtube_category_id || null,
-                language: streamData.youtube_language || null
-              });
+              // If new stream was created (manual stream key mode), save the stream ID
+              if (broadcastResult.stream && broadcastResult.stream.id) {
+                updateData.youtube_stream_id = broadcastResult.stream.id;
+                console.log(`[CREATE STREAM] ✓ New YouTube stream created: ${broadcastResult.stream.id}`);
+              } else if (youtubeStreamId) {
+                // If using existing stream from dropdown, save that ID
+                updateData.youtube_stream_id = youtubeStreamId;
+                console.log(`[CREATE STREAM] ✓ Using existing YouTube stream: ${youtubeStreamId}`);
+              }
               
-              // Update stream with broadcast ID
-              if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
-                await Stream.update(stream.id, {
-                  youtube_broadcast_id: broadcastResult.broadcast.id
-                });
-                
-                console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
-                stream.youtube_broadcast_id = broadcastResult.broadcast.id;
-                
-                // Set audience settings (Made for Kids, Age Restricted)
-                if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted) {
-                  try {
-                    await youtubeService.setAudience(tokens, {
-                      videoId: broadcastResult.broadcast.id,
-                      selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
-                      ageRestricted: streamData.youtube_age_restricted
-                    });
-                    console.log(`[CREATE STREAM] ✓ Audience settings applied (Made for Kids: ${streamData.youtube_made_for_kids}, Age Restricted: ${streamData.youtube_age_restricted})`);
-                  } catch (audienceError) {
-                    console.error('[CREATE STREAM] Error setting audience:', audienceError);
-                  }
+              await Stream.update(stream.id, updateData);
+              
+              console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
+              stream.youtube_broadcast_id = broadcastResult.broadcast.id;
+              
+              // Set audience settings (Made for Kids, Age Restricted, Synthetic Content)
+              if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted || streamData.youtube_synthetic_content) {
+                try {
+                  await youtubeService.setAudience(tokens, {
+                    videoId: broadcastResult.broadcast.id,
+                    selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
+                    ageRestricted: streamData.youtube_age_restricted,
+                    syntheticContent: streamData.youtube_synthetic_content
+                  });
+                  console.log(`[CREATE STREAM] ✓ Audience settings applied:`);
+                  console.log(`[CREATE STREAM]   - Made for Kids: ${streamData.youtube_made_for_kids}`);
+                  console.log(`[CREATE STREAM]   - Age Restricted: ${streamData.youtube_age_restricted}`);
+                  console.log(`[CREATE STREAM]   - Synthetic Content: ${streamData.youtube_synthetic_content}`);
+                } catch (audienceError) {
+                  console.error('[CREATE STREAM] Error setting audience:', audienceError);
                 }
-                
-                // Upload thumbnail if provided (multer stores file in req.file)
-                if (req.file) {
-                  try {
-                    console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
-                    
-                    await youtubeService.setThumbnail(tokens, {
-                      broadcastId: broadcastResult.broadcast.id,
-                      filePath: req.file.path,
-                      mimeType: req.file.mimetype
-                    });
-                    
-                    console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
-                    
-                    // Clean up file after upload
+              }
+              
+              // Upload thumbnail if provided (multer stores file in req.file)
+              if (req.file) {
+                try {
+                  console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
+                  
+                  await youtubeService.setThumbnail(tokens, {
+                    broadcastId: broadcastResult.broadcast.id,
+                    filePath: req.file.path,
+                    mimeType: req.file.mimetype
+                  });
+                  
+                  console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
+                  
+                  // Clean up file after upload
+                  fs.unlinkSync(req.file.path);
+                } catch (thumbnailError) {
+                  console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
+                  // Clean up file even on error
+                  if (req.file && req.file.path && fs.existsSync(req.file.path)) {
                     fs.unlinkSync(req.file.path);
-                  } catch (thumbnailError) {
-                    console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
-                    // Clean up file even on error
-                    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                      fs.unlinkSync(req.file.path);
-                    }
                   }
                 }
               }
             } else {
               // Scheduled stream - broadcast will be created by broadcastScheduler
               console.log(`[CREATE STREAM] ✅ Scheduled stream - broadcast will be created 10 minutes before schedule`);
-              console.log(`[CREATE STREAM] - Stream Key: ${youtubeStreamId} (will be reused for all schedules)`);
+              console.log(`[CREATE STREAM] - Stream Key: ${youtubeStreamId || 'manual input'} (will be reused for all schedules)`);
               console.log(`[CREATE STREAM] - Schedules: ${schedules.length}`);
               console.log(`[CREATE STREAM] - BroadcastScheduler will create ${schedules.length} broadcast(s) automatically`);
               
@@ -2639,16 +2675,6 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
                 });
                 console.log(`[CREATE STREAM] ✓ Thumbnail path saved for scheduler: ${req.file.path}`);
               }
-            }
-          } else {
-            console.log(`[CREATE STREAM] ⚠️  No YouTube Stream ID provided - Manual input mode`);
-            console.log(`[CREATE STREAM] User will use manually entered RTMP URL and Stream Key`);
-            console.log(`[CREATE STREAM] No YouTube broadcast will be created`);
-            
-            // Clean up thumbnail file if uploaded (not needed for manual mode)
-            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-              fs.unlinkSync(req.file.path);
-              console.log(`[CREATE STREAM] Thumbnail file cleaned up (not used in manual mode)`);
             }
           }
         } else {
@@ -2904,6 +2930,220 @@ app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to delete stream' });
   }
 });
+
+// Manual YouTube broadcast cleanup endpoint
+app.post('/api/streams/:id/cleanup-youtube', isAuthenticated, async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id);
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    
+    if (stream.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    if (!stream.youtube_broadcast_id) {
+      return res.json({ 
+        success: true, 
+        message: 'No YouTube broadcast to cleanup',
+        action: 'none'
+      });
+    }
+    
+    console.log(`[Manual Cleanup] Starting cleanup for broadcast ${stream.youtube_broadcast_id}...`);
+    
+    const { getTokensForUser } = require('./routes/youtube');
+    const youtubeService = require('./services/youtubeService');
+    
+    const tokens = await getTokensForUser(stream.user_id);
+    if (!tokens || !tokens.access_token) {
+      return res.status(400).json({ error: 'YouTube not configured or tokens expired' });
+    }
+    
+    let action = 'none';
+    let message = '';
+    
+    try {
+      // Check current broadcast status
+      const broadcast = await youtubeService.getBroadcast(tokens, { 
+        broadcastId: stream.youtube_broadcast_id 
+      });
+      
+      if (!broadcast) {
+        console.log(`[Manual Cleanup] Broadcast ${stream.youtube_broadcast_id} not found, clearing from database`);
+        action = 'cleared_db';
+        message = 'Broadcast not found in YouTube, cleared from database';
+      } else {
+        const currentStatus = broadcast.status?.lifeCycleStatus;
+        console.log(`[Manual Cleanup] Current broadcast status: ${currentStatus}`);
+        
+        if (currentStatus === 'live' || currentStatus === 'testing') {
+          // Try to complete broadcast
+          await youtubeService.transition(tokens, {
+            broadcastId: stream.youtube_broadcast_id,
+            status: 'complete'
+          });
+          console.log(`[Manual Cleanup] ✅ Broadcast transitioned to complete`);
+          action = 'completed';
+          message = 'Broadcast transitioned to complete, VOD processing started';
+          
+        } else if (currentStatus === 'ready') {
+          // Delete unused broadcast
+          await youtubeService.deleteBroadcast(tokens, { 
+            broadcastId: stream.youtube_broadcast_id 
+          });
+          console.log(`[Manual Cleanup] ✅ Unused broadcast deleted`);
+          action = 'deleted';
+          message = 'Unused broadcast deleted from YouTube';
+          
+        } else {
+          console.log(`[Manual Cleanup] Broadcast already in final state: ${currentStatus}`);
+          action = 'already_final';
+          message = `Broadcast already in final state: ${currentStatus}`;
+        }
+      }
+      
+    } catch (transitionError) {
+      console.error(`[Manual Cleanup] Transition failed, trying delete:`, transitionError.message);
+      
+      // Fallback: Try delete
+      try {
+        await youtubeService.deleteBroadcast(tokens, { 
+          broadcastId: stream.youtube_broadcast_id 
+        });
+        console.log(`[Manual Cleanup] ✅ Fallback: Broadcast deleted`);
+        action = 'deleted_fallback';
+        message = 'Transition failed, broadcast deleted as fallback';
+        
+      } catch (deleteError) {
+        console.error(`[Manual Cleanup] Both transition and delete failed:`, deleteError.message);
+        return res.status(500).json({ 
+          error: 'Failed to cleanup broadcast',
+          details: `Transition error: ${transitionError.message}, Delete error: ${deleteError.message}`,
+          broadcastId: stream.youtube_broadcast_id
+        });
+      }
+    }
+    
+    // Clear from database
+    await Stream.update(stream.id, {
+      youtube_broadcast_id: null,
+      youtube_stream_id: null
+    });
+    
+    console.log(`[Manual Cleanup] ✅ Cleared broadcast IDs from database`);
+    
+    res.json({ 
+      success: true, 
+      message: message,
+      action: action,
+      broadcastId: stream.youtube_broadcast_id
+    });
+    
+  } catch (error) {
+    console.error('[Manual Cleanup] Error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during cleanup',
+      details: error.message 
+    });
+  }
+});
+
+// Get YouTube broadcast status endpoint
+app.get('/api/streams/:id/youtube-status', isAuthenticated, async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id);
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    
+    if (stream.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    if (!stream.use_youtube_api) {
+      return res.json({ 
+        success: true, 
+        youtube_enabled: false,
+        message: 'Stream does not use YouTube API'
+      });
+    }
+    
+    if (!stream.youtube_broadcast_id) {
+      return res.json({ 
+        success: true, 
+        youtube_enabled: true,
+        broadcast_id: null,
+        status: 'no_broadcast',
+        message: 'No active YouTube broadcast'
+      });
+    }
+    
+    const { getTokensForUser } = require('./routes/youtube');
+    const youtubeService = require('./services/youtubeService');
+    
+    const tokens = await getTokensForUser(stream.user_id);
+    if (!tokens || !tokens.access_token) {
+      return res.json({ 
+        success: true, 
+        youtube_enabled: true,
+        broadcast_id: stream.youtube_broadcast_id,
+        status: 'no_tokens',
+        message: 'YouTube tokens not available'
+      });
+    }
+    
+    try {
+      const broadcast = await youtubeService.getBroadcast(tokens, { 
+        broadcastId: stream.youtube_broadcast_id 
+      });
+      
+      if (!broadcast) {
+        return res.json({ 
+          success: true, 
+          youtube_enabled: true,
+          broadcast_id: stream.youtube_broadcast_id,
+          status: 'not_found',
+          message: 'Broadcast not found in YouTube (may need cleanup)'
+        });
+      }
+      
+      const lifeCycleStatus = broadcast.status?.lifeCycleStatus;
+      const privacyStatus = broadcast.status?.privacyStatus;
+      const title = broadcast.snippet?.title;
+      
+      res.json({ 
+        success: true, 
+        youtube_enabled: true,
+        broadcast_id: stream.youtube_broadcast_id,
+        status: lifeCycleStatus,
+        privacy: privacyStatus,
+        title: title,
+        message: `Broadcast status: ${lifeCycleStatus}`,
+        needs_cleanup: lifeCycleStatus === 'live' || lifeCycleStatus === 'testing'
+      });
+      
+    } catch (error) {
+      console.error('[YouTube Status] Error checking broadcast:', error);
+      res.json({ 
+        success: true, 
+        youtube_enabled: true,
+        broadcast_id: stream.youtube_broadcast_id,
+        status: 'error',
+        message: `Error checking broadcast: ${error.message}`
+      });
+    }
+    
+  } catch (error) {
+    console.error('[YouTube Status] Error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message 
+    });
+  }
+});
+
 app.post('/api/streams/:id/status', isAuthenticated, [
   body('status').isIn(['live', 'offline', 'scheduled']).withMessage('Invalid status')
 ], async (req, res) => {

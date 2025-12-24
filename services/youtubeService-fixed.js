@@ -23,8 +23,8 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
   console.log(`[YouTubeService.scheduleLive] - Tags: ${tags ? tags.length : 0} tags`);
   console.log(`[YouTubeService.scheduleLive] - Thumbnail: ${thumbnailPath || 'NOT PROVIDED'}`);
   
-  // ✅ CORRECTED LOGIC: YouTube API ALWAYS creates new broadcast
-  // But uses either existing stream ID (dropdown) OR finds stream ID by manual stream key
+  // ✅ CORRECT WORKFLOW: YouTube API ALWAYS creates new broadcast
+  // User can choose stream key: from dropdown (existingStreamId) OR manual input (manualStreamKey)
   let finalStreamId = existingStreamId;
   
   // If manual stream key provided but no existing stream ID, find the stream ID
@@ -35,19 +35,24 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
       finalStreamId = await module.exports.findStreamIdByStreamKey(tokensOrUserId, { streamKey: manualStreamKey });
       
       if (!finalStreamId) {
-        throw new Error(`Stream key not found in your YouTube channel. Please check the stream key or create it in YouTube Studio first.`);
+        throw new Error(`Stream key "${manualStreamKey.substring(0, 8)}..." not found in your YouTube channel. Please check the stream key or create it in YouTube Studio first.`);
       }
       
-      console.log(`[YouTubeService.scheduleLive] ✓ Found stream ID for manual key: ${finalStreamId}`);
+      console.log(`[YouTubeService.scheduleLive] ✅ Found stream ID for manual key: ${finalStreamId}`);
     } catch (err) {
       console.error(`[YouTubeService.scheduleLive] ❌ Error finding stream ID for manual key:`, err.message);
-      throw new Error(`Failed to find stream for manual key: ${err.message}`);
+      throw err;
     }
   }
   
+  console.log(`[YouTubeService.scheduleLive] ========================================`);
+  console.log(`[YouTubeService.scheduleLive] WORKFLOW SUMMARY:`);
+  console.log(`[YouTubeService.scheduleLive] - Mode: YouTube API`);
+  console.log(`[YouTubeService.scheduleLive] - Will create NEW broadcast: YES ✅`);
+  console.log(`[YouTubeService.scheduleLive] - Stream selection: ${existingStreamId ? 'DROPDOWN' : manualStreamKey ? 'MANUAL INPUT' : 'CREATE NEW'}`);
   console.log(`[YouTubeService.scheduleLive] - Final Stream ID: ${finalStreamId || 'WILL CREATE NEW'}`);
-  console.log(`[YouTubeService.scheduleLive] - Will create new stream: ${!finalStreamId ? 'YES ❌' : 'NO ✓'}`);
-  console.log(`[YouTubeService.scheduleLive] - Will create new broadcast: YES ✓ (YouTube API always creates new broadcast)`);
+  console.log(`[YouTubeService.scheduleLive] - Will create new stream: ${!finalStreamId ? 'YES ❌' : 'NO ✅'}`);
+  console.log(`[YouTubeService.scheduleLive] ========================================`);
   
   // Build snippet with optional metadata
   const snippet = {
@@ -60,6 +65,13 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
   if (tags && Array.isArray(tags) && tags.length > 0) {
     snippet.tags = tags;
     console.log(`[YouTubeService.scheduleLive] - Adding ${tags.length} tags to broadcast`);
+    console.log(`[YouTubeService.scheduleLive] - Tags array:`, JSON.stringify(tags));
+    console.log(`[YouTubeService.scheduleLive] - Tags total length: ${tags.join(',').length} characters`);
+  } else {
+    console.log(`[YouTubeService.scheduleLive] - No tags provided or invalid format`);
+    console.log(`[YouTubeService.scheduleLive] - Tags value:`, tags);
+    console.log(`[YouTubeService.scheduleLive] - Tags type:`, typeof tags);
+    console.log(`[YouTubeService.scheduleLive] - Is array:`, Array.isArray(tags));
   }
   
   // Add category if provided
@@ -75,7 +87,10 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
     console.log(`[YouTubeService.scheduleLive] - Language: ${language}`);
   }
   
-  // ✅ ALWAYS CREATE NEW BROADCAST (YouTube API behavior)
+  // ✅ ALWAYS CREATE NEW BROADCAST (YouTube API mode)
+  console.log(`[YouTubeService.scheduleLive] Creating NEW broadcast...`);
+  console.log(`[YouTubeService.scheduleLive] Snippet being sent to YouTube API:`, JSON.stringify(snippet, null, 2));
+  
   const broadcastRes = await yt.liveBroadcasts.insert({
     part: 'snippet,status,contentDetails',
     requestBody: {
@@ -90,38 +105,64 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
     },
   });
   
-  console.log(`[YouTubeService.scheduleLive] ✓ NEW broadcast created: ${broadcastRes.data?.id}`);
+  console.log(`[YouTubeService.scheduleLive] ✅ NEW broadcast created: ${broadcastRes.data?.id}`);
   
-  // ⭐ CRITICAL FIX: Update tags separately if they were provided
-  // YouTube API sometimes doesn't apply tags during creation, so we update them separately
-  if (tags && Array.isArray(tags) && tags.length > 0 && broadcastRes.data?.id) {
-    console.log(`[YouTubeService.scheduleLive] 🏷️ Updating tags separately for better reliability...`);
+  const broadcastId = broadcastRes.data?.id;
+  
+  // ✅ UPDATE broadcast with tags AFTER creation (YouTube API requirement)
+  if (broadcastId && tags && Array.isArray(tags) && tags.length > 0) {
+    console.log(`[YouTubeService.scheduleLive] 🏷️ Updating broadcast with ${tags.length} tags...`);
     try {
-      await yt.liveBroadcasts.update({
+      // Get current broadcast data first
+      const currentBroadcast = await yt.liveBroadcasts.list({
         part: 'snippet',
-        requestBody: {
-          id: broadcastRes.data.id,
-          snippet: {
-            title: snippet.title,
-            description: snippet.description,
-            scheduledStartTime: snippet.scheduledStartTime,
-            tags: tags
-          }
-        }
+        id: broadcastId
       });
-      console.log(`[YouTubeService.scheduleLive] ✅ Tags updated successfully: ${tags.length} tags`);
+      
+      console.log(`[YouTubeService.scheduleLive] Current broadcast data:`, JSON.stringify(currentBroadcast.data, null, 2));
+      
+      if (currentBroadcast.data.items && currentBroadcast.data.items.length > 0) {
+        const currentSnippet = currentBroadcast.data.items[0].snippet;
+        
+        console.log(`[YouTubeService.scheduleLive] Current snippet:`, JSON.stringify(currentSnippet, null, 2));
+        
+        const updatePayload = {
+          id: broadcastId,
+          snippet: {
+            title: currentSnippet.title,
+            description: currentSnippet.description || '',
+            scheduledStartTime: currentSnippet.scheduledStartTime,
+            tags: tags  // ✅ Add tags via UPDATE
+          }
+        };
+        
+        console.log(`[YouTubeService.scheduleLive] Update payload:`, JSON.stringify(updatePayload, null, 2));
+        
+        // Update with tags while preserving other fields
+        const updateResult = await yt.liveBroadcasts.update({
+          part: 'snippet',
+          requestBody: updatePayload
+        });
+        
+        console.log(`[YouTubeService.scheduleLive] Update result:`, JSON.stringify(updateResult.data, null, 2));
+        console.log(`[YouTubeService.scheduleLive] ✅ Tags successfully added to broadcast`);
+        console.log(`[YouTubeService.scheduleLive] - Tags:`, JSON.stringify(tags));
+      } else {
+        console.error(`[YouTubeService.scheduleLive] ❌ No broadcast found with ID: ${broadcastId}`);
+      }
     } catch (tagsError) {
-      console.error(`[YouTubeService.scheduleLive] ❌ Failed to update tags:`, tagsError.message);
+      console.error(`[YouTubeService.scheduleLive] ❌ Error adding tags:`, tagsError.message);
+      console.error(`[YouTubeService.scheduleLive] ❌ Full error:`, tagsError);
       // Don't fail the broadcast creation, just log the error
     }
   }
   
+  // Handle stream: use existing OR create new
   let streamRes = null;
   let streamId = finalStreamId;
   
-  // Create new stream only if no stream ID available (neither dropdown nor manual key)
   if (!streamId) {
-    console.log(`[YouTubeService.scheduleLive] ⚠️ Creating NEW stream because no stream ID available...`);
+    console.log(`[YouTubeService.scheduleLive] Creating NEW stream (no existing stream selected)...`);
     streamRes = await yt.liveStreams.insert({
       part: 'snippet,cdn,contentDetails,status',
       requestBody: {
@@ -136,22 +177,20 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
       },
     });
     streamId = streamRes.data?.id;
-    console.log(`[YouTubeService.scheduleLive] ❌ NEW stream created: ${streamId}`);
+    console.log(`[YouTubeService.scheduleLive] ✅ NEW stream created: ${streamId}`);
   } else {
-    console.log(`[YouTubeService.scheduleLive] ✓ Using existing stream: ${streamId} (from ${existingStreamId ? 'dropdown' : 'manual key'})`);
+    console.log(`[YouTubeService.scheduleLive] ✅ Using EXISTING stream: ${streamId}`);
   }
 
-  const broadcastId = broadcastRes.data?.id;
-  const createdStreamId = streamId;
-
-  if (broadcastId && createdStreamId) {
-    console.log(`[YouTubeService.scheduleLive] Binding NEW broadcast ${broadcastId} to stream ${createdStreamId}...`);
+  // Bind new broadcast to selected stream
+  if (broadcastId && streamId) {
+    console.log(`[YouTubeService.scheduleLive] Binding NEW broadcast ${broadcastId} to ${finalStreamId ? 'EXISTING' : 'NEW'} stream ${streamId}...`);
     await yt.liveBroadcasts.bind({
       id: broadcastId,
       part: 'id,contentDetails',
-      streamId: createdStreamId,
+      streamId: streamId,
     });
-    console.log(`[YouTubeService.scheduleLive] ✓ NEW broadcast bound to stream successfully`);
+    console.log(`[YouTubeService.scheduleLive] ✅ NEW broadcast bound to stream successfully`);
   }
 
   // Upload thumbnail if provided
@@ -175,7 +214,7 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
           }
         });
         
-        console.log(`[YouTubeService.scheduleLive] ✓ Thumbnail uploaded successfully`);
+        console.log(`[YouTubeService.scheduleLive] ✅ Thumbnail uploaded successfully`);
       } else {
         console.warn(`[YouTubeService.scheduleLive] ⚠️ Thumbnail file not found: ${thumbnailPath}`);
       }
@@ -185,10 +224,19 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
     }
   }
 
+  console.log(`[YouTubeService.scheduleLive] ========================================`);
+  console.log(`[YouTubeService.scheduleLive] RESULT SUMMARY:`);
+  console.log(`[YouTubeService.scheduleLive] - NEW Broadcast ID: ${broadcastId}`);
+  console.log(`[YouTubeService.scheduleLive] - Stream ID Used: ${streamId}`);
+  console.log(`[YouTubeService.scheduleLive] - Stream Type: ${finalStreamId ? 'EXISTING (reused)' : 'NEW (created)'}`);
+  console.log(`[YouTubeService.scheduleLive] - Thumbnail: ${thumbnailPath ? 'UPLOADED' : 'NOT PROVIDED'}`);
+  console.log(`[YouTubeService.scheduleLive] ========================================`);
+
   return {
     broadcast: broadcastRes.data,
     stream: streamRes ? streamRes.data : null, // null if reused existing stream
-    isNewBroadcast: true // Always true for YouTube API
+    isNewBroadcast: true, // Always true in YouTube API mode
+    streamType: finalStreamId ? 'existing' : 'new'
   };
 }
 
@@ -218,55 +266,6 @@ module.exports = {
   },
   
   /**
-   * Find broadcast by stream key
-   * Searches for existing broadcast that is bound to a stream with the given stream key
-   */
-  async findBroadcastByStreamKey(tokensOrUserId, { streamKey }) {
-    console.log(`[YouTubeService.findBroadcastByStreamKey] Searching for broadcast with stream key: ${streamKey.substring(0, 8)}...`);
-    
-    try {
-      // Step 1: Get all user's streams and find the one with matching stream key
-      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50 });
-      const matchingStream = streams.find(stream => {
-        const ingestionInfo = stream.cdn?.ingestionInfo;
-        const streamName = ingestionInfo?.streamName;
-        return streamName === streamKey;
-      });
-      
-      if (!matchingStream) {
-        console.log(`[YouTubeService.findBroadcastByStreamKey] ❌ No stream found with key: ${streamKey.substring(0, 8)}...`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService.findBroadcastByStreamKey] ✓ Found matching stream: ${matchingStream.id}`);
-      
-      // Step 2: Get all user's broadcasts and find the one bound to this stream
-      const broadcasts = await module.exports.listBroadcasts(tokensOrUserId, { maxResults: 50 });
-      const matchingBroadcast = broadcasts.find(broadcast => {
-        const boundStreamId = broadcast.contentDetails?.boundStreamId;
-        return boundStreamId === matchingStream.id;
-      });
-      
-      if (!matchingBroadcast) {
-        console.log(`[YouTubeService.findBroadcastByStreamKey] ❌ No broadcast found bound to stream: ${matchingStream.id}`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService.findBroadcastByStreamKey] ✅ Found matching broadcast: ${matchingBroadcast.id}`);
-      console.log(`[YouTubeService.findBroadcastByStreamKey] - Title: ${matchingBroadcast.snippet?.title}`);
-      console.log(`[YouTubeService.findBroadcastByStreamKey] - Status: ${matchingBroadcast.status?.lifeCycleStatus}`);
-      
-      return {
-        broadcast: matchingBroadcast,
-        stream: matchingStream
-      };
-    } catch (error) {
-      console.error(`[YouTubeService.findBroadcastByStreamKey] Error:`, error.message);
-      throw error;
-    }
-  },
-  
-  /**
    * Find stream ID by stream key
    * Returns the stream ID for a given stream key
    */
@@ -286,7 +285,7 @@ module.exports = {
         return null;
       }
       
-      console.log(`[YouTubeService.findStreamIdByStreamKey] ✓ Found stream ID: ${matchingStream.id}`);
+      console.log(`[YouTubeService.findStreamIdByStreamKey] ✅ Found stream ID: ${matchingStream.id}`);
       return matchingStream.id;
     } catch (error) {
       console.error(`[YouTubeService.findStreamIdByStreamKey] Error:`, error.message);
@@ -464,32 +463,6 @@ module.exports = {
   },
   
   /**
-   * Find stream ID by stream key (streamName)
-   * Returns stream ID if found, null if not found
-   */
-  async findStreamIdByStreamKey(tokensOrUserId, { streamKey }) {
-    try {
-      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50 });
-      
-      for (const stream of streams) {
-        const ingestionInfo = stream.cdn?.ingestionInfo || {};
-        const streamName = ingestionInfo.streamName || '';
-        
-        if (streamName === streamKey) {
-          console.log(`[YouTubeService] ✓ Found stream ID ${stream.id} for stream key ${streamKey.substring(0, 8)}...`);
-          return stream.id;
-        }
-      }
-      
-      console.log(`[YouTubeService] ✗ Stream key ${streamKey.substring(0, 8)}... not found in user's streams`);
-      return null;
-    } catch (err) {
-      console.error(`[YouTubeService] Error finding stream by key:`, err.message);
-      return null;
-    }
-  },
-  
-  /**
    * Get stream status by stream ID
    * Returns stream object with status information
    */
@@ -637,109 +610,5 @@ module.exports = {
     }
     
     throw new Error(`Failed to transition after retries: ${lastError?.message || 'Unknown error'}`);
-  },
-  
-  /**
-   * Find broadcast by stream key (manual stream key lookup)
-   * Returns broadcast info if found, null if not found
-   */
-  async findBroadcastByStreamKey(tokensOrUserId, { streamKey }) {
-    console.log(`[YouTubeService] Looking for broadcast with stream key: ${streamKey?.substring(0, 8)}...`);
-    
-    try {
-      const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
-      
-      // Step 1: Get all user's streams
-      const streams = await yt.liveStreams.list({
-        part: 'id,snippet,cdn,status',
-        mine: true,
-        maxResults: 50
-      });
-      
-      // Step 2: Find stream with matching stream key
-      const matchingStream = (streams.data?.items || []).find(stream => {
-        const streamName = stream.cdn?.ingestionInfo?.streamName;
-        return streamName === streamKey;
-      });
-      
-      if (!matchingStream) {
-        console.log(`[YouTubeService] No stream found with key: ${streamKey?.substring(0, 8)}...`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService] ✓ Found matching stream: ${matchingStream.id}`);
-      
-      // Step 3: Get all broadcasts and find one bound to this stream
-      const broadcasts = await yt.liveBroadcasts.list({
-        part: 'id,snippet,status,contentDetails',
-        mine: true,
-        maxResults: 50
-      });
-      
-      const matchingBroadcast = (broadcasts.data?.items || []).find(broadcast => {
-        return broadcast.contentDetails?.boundStreamId === matchingStream.id;
-      });
-      
-      if (!matchingBroadcast) {
-        console.log(`[YouTubeService] No broadcast found bound to stream: ${matchingStream.id}`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService] ✅ Found broadcast bound to stream: ${matchingBroadcast.id}`);
-      
-      return {
-        broadcast: matchingBroadcast,
-        stream: matchingStream,
-        streamKey: streamKey
-      };
-      
-    } catch (err) {
-      console.error(`[YouTubeService] Error finding broadcast by stream key:`, err.message);
-      throw err;
-    }
-  },
-  
-  /**
-   * Validate stream key and return stream info
-   * Returns stream info if valid, null if not found
-   */
-  async validateStreamKey(tokensOrUserId, { streamKey }) {
-    console.log(`[YouTubeService] Validating stream key: ${streamKey?.substring(0, 8)}...`);
-    
-    try {
-      const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
-      
-      // Get all user's streams
-      const streams = await yt.liveStreams.list({
-        part: 'id,snippet,cdn,status',
-        mine: true,
-        maxResults: 50
-      });
-      
-      // Find stream with matching stream key
-      const matchingStream = (streams.data?.items || []).find(stream => {
-        const streamName = stream.cdn?.ingestionInfo?.streamName;
-        return streamName === streamKey;
-      });
-      
-      if (!matchingStream) {
-        console.log(`[YouTubeService] ❌ Invalid stream key: ${streamKey?.substring(0, 8)}...`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService] ✅ Valid stream key: ${matchingStream.id}`);
-      
-      return {
-        id: matchingStream.id,
-        title: matchingStream.snippet?.title || 'Untitled Stream',
-        status: matchingStream.status?.streamStatus || 'unknown',
-        ingestionAddress: matchingStream.cdn?.ingestionInfo?.ingestionAddress || '',
-        streamKey: streamKey
-      };
-      
-    } catch (err) {
-      console.error(`[YouTubeService] Error validating stream key:`, err.message);
-      throw err;
-    }
   }
 };

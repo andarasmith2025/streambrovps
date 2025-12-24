@@ -835,7 +835,12 @@ async function stopStream(streamId, options = {}) {
     const { isGracefulShutdown = false } = options;
     const ffmpegProcess = activeStreams.get(streamId);
     const isActive = ffmpegProcess !== undefined;
-    console.log(`[StreamingService] Stop request for stream ${streamId}, isActive: ${isActive}, isGracefulShutdown: ${isGracefulShutdown}`);
+    
+    console.log(`[StreamingService] ========== SIMPLIFIED STOP STREAM ==========`);
+    console.log(`[StreamingService] Stream ID: ${streamId}`);
+    console.log(`[StreamingService] Is Active: ${isActive}`);
+    console.log(`[StreamingService] Graceful Shutdown: ${isGracefulShutdown}`);
+    
     if (!isActive) {
       const stream = await Stream.findById(streamId);
       if (stream && stream.status === 'live') {
@@ -848,12 +853,13 @@ async function stopStream(streamId, options = {}) {
       }
       return { success: false, error: 'Stream is not active' };
     }
+
     addStreamLog(streamId, isGracefulShutdown ? 'Stopping stream (graceful shutdown)...' : 'Stopping stream...');
     console.log(`[StreamingService] Stopping active stream ${streamId} (${isGracefulShutdown ? 'graceful shutdown' : 'manual stop'})`);
+    
     manuallyStoppingStreams.add(streamId);
     
-    // Mark stream as manually stopped in database to prevent auto-recovery
-    // BUT: Don't set manual_stop flag during graceful shutdown (allow auto-recovery after restart)
+    // Mark stream as manually stopped in database (except during graceful shutdown)
     if (!isGracefulShutdown) {
       try {
         await new Promise((resolve, reject) => {
@@ -862,7 +868,6 @@ async function stopStream(streamId, options = {}) {
             [streamId],
             (err) => {
               if (err) {
-                // Column might not exist yet, ignore error
                 console.log(`[StreamingService] Note: manual_stop flag not set (column may not exist yet)`);
               }
               resolve();
@@ -872,13 +877,12 @@ async function stopStream(streamId, options = {}) {
       } catch (err) {
         // Ignore error if column doesn't exist
       }
-    } else {
-      console.log(`[StreamingService] Skipping manual_stop flag (graceful shutdown - allow auto-recovery)`);
     }
-    
+
+    // ===== CORE STOP LOGIC (Manual-like, Immediate) =====
     try {
       ffmpegProcess.kill('SIGTERM');
-      console.log(`[StreamingService] Sent SIGTERM to stream ${streamId}`);
+      console.log(`[StreamingService] ✅ Sent SIGTERM to stream ${streamId}`);
       
       // Set up force kill timeout
       const forceKillTimeout = setTimeout(() => {
@@ -900,13 +904,9 @@ async function stopStream(streamId, options = {}) {
       
     } catch (killError) {
       console.error(`[StreamingService] Error killing FFmpeg process: ${killError.message}`);
-      // Keep in manuallyStoppingStreams to prevent restart attempts
     }
-    
-    // DON'T delete from activeStreams here - let the exit handler do cleanup
-    // This prevents race condition where UI shows offline but FFmpeg still running
-    const stream = await Stream.findById(streamId);
-    
+
+    // Clean up temporary files
     const tempConcatFile = path.join(__dirname, '..', 'temp', `playlist_${streamId}.txt`);
     try {
       if (fs.existsSync(tempConcatFile)) {
@@ -916,88 +916,22 @@ async function stopStream(streamId, options = {}) {
     } catch (cleanupError) {
       console.error(`[StreamingService] Error cleaning up temporary file: ${cleanupError.message}`);
     }
+
+    const stream = await Stream.findById(streamId);
     
     if (stream) {
-      // ⭐ IMPORTANT: Transition YouTube broadcast BEFORE clearing active_schedule_id
-      // This ensures we can check if schedule is recurring
-      if (stream.use_youtube_api && stream.youtube_broadcast_id) {
-        try {
-          const { getTokensForUser } = require('../routes/youtube');
-          const youtubeService = require('./youtubeService');
-          
-          const tokens = await getTokensForUser(stream.user_id);
-          if (tokens && tokens.access_token) {
-            console.log(`[StreamingService] Transitioning YouTube broadcast ${stream.youtube_broadcast_id} to complete`);
-            
-            // Transition broadcast to complete
-            await youtubeService.transition(tokens, {
-              broadcastId: stream.youtube_broadcast_id,
-              status: 'complete'
-            });
-            console.log(`[StreamingService] ✅ YouTube broadcast ${stream.youtube_broadcast_id} transitioned to complete`);
-            
-            // Clear broadcast_id from recurring schedules so new broadcast can be created next time
-            if (stream.active_schedule_id) {
-              try {
-                const schedule = await new Promise((resolve, reject) => {
-                  db.get(
-                    'SELECT is_recurring FROM stream_schedules WHERE id = ?',
-                    [stream.active_schedule_id],
-                    (err, row) => {
-                      if (err) reject(err);
-                      else resolve(row);
-                    }
-                  );
-                });
-                
-                if (schedule && schedule.is_recurring) {
-                  await new Promise((resolve, reject) => {
-                    db.run(
-                      'UPDATE stream_schedules SET youtube_broadcast_id = NULL, broadcast_status = ? WHERE id = ?',
-                      ['pending', stream.active_schedule_id],
-                      (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                      }
-                    );
-                  });
-                  console.log(`[StreamingService] ✅ Cleared broadcast_id from recurring schedule ${stream.active_schedule_id}`);
-                }
-              } catch (clearError) {
-                console.error('[StreamingService] Error clearing broadcast_id from schedule:', clearError);
-              }
-            }
-            
-            // Clear broadcast_id from stream
-            await Stream.update(streamId, { 
-              youtube_broadcast_id: null,
-              youtube_stream_id: null 
-            });
-            console.log(`[StreamingService] ✅ Cleared broadcast_id from stream ${streamId}`);
-            
-          } else {
-            console.error(`[StreamingService] ❌ Cannot transition broadcast - no valid tokens for user ${stream.user_id}`);
-          }
-        } catch (ytError) {
-          console.error('[StreamingService] ❌ Error transitioning YouTube broadcast to complete:', ytError);
-          console.error('[StreamingService] Error details:', ytError.stack);
-          // Don't fail the stream stop, but log prominently
-          console.error('[StreamingService] ⚠️ WARNING: YouTube broadcast may still be live in YouTube Studio!');
-        }
-      }
-      
-      // Clear active_schedule_id when stopping (AFTER YouTube transition)
+      // ===== IMMEDIATE DATABASE UPDATE (Manual-like) =====
+      // Clear active_schedule_id immediately
       await Stream.update(streamId, { active_schedule_id: null });
-      console.log(`[StreamingService] ✓ Cleared active_schedule_id for stream ${streamId}`);
+      console.log(`[StreamingService] ✅ Cleared active_schedule_id for stream ${streamId}`);
       
-      // ⭐ Check if there are more schedules today - if yes, set status to 'scheduled' instead of 'offline'
+      // Determine new status based on upcoming schedules
       let hasUpcomingScheduleToday = false;
       try {
         const now = new Date();
         const currentDay = now.getDay();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
         
-        // Check for upcoming schedules
         const upcomingSchedules = await new Promise((resolve, reject) => {
           db.all(
             `SELECT * FROM stream_schedules 
@@ -1016,43 +950,21 @@ async function stopStream(streamId, options = {}) {
         
         for (const schedule of upcomingSchedules) {
           if (schedule.is_recurring) {
-            // Check if today is in recurring days
             if (schedule.recurring_days) {
               const allowedDays = schedule.recurring_days.split(',').map(d => parseInt(d));
               if (allowedDays.includes(currentDay)) {
-                // Parse schedule time
-                let scheduleHour, scheduleMinute;
-                
-                if (schedule.schedule_time.includes(':') && !schedule.schedule_time.includes('T')) {
-                  const timeParts = schedule.schedule_time.split(':');
-                  scheduleHour = parseInt(timeParts[0]);
-                  scheduleMinute = parseInt(timeParts[1]);
-                } else if (schedule.schedule_time.includes('T')) {
-                  if (schedule.schedule_time.endsWith('Z')) {
-                    const utcDate = new Date(schedule.schedule_time);
-                    scheduleHour = utcDate.getHours();
-                    scheduleMinute = utcDate.getMinutes();
-                  } else {
-                    const timePart = schedule.schedule_time.split('T')[1].split('.')[0];
-                    const timeParts = timePart.split(':');
-                    scheduleHour = parseInt(timeParts[0]);
-                    scheduleMinute = parseInt(timeParts[1]);
+                const timeMatch = schedule.schedule_time.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                  const scheduleTimeMinutes = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+                  if (scheduleTimeMinutes > currentTimeMinutes) {
+                    hasUpcomingScheduleToday = true;
+                    console.log(`[StreamingService] ✓ Found upcoming schedule today at ${timeMatch[1]}:${timeMatch[2]}`);
+                    break;
                   }
-                }
-                
-                const scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
-                const nowTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-                
-                // If schedule time is later today
-                if (scheduleTimeInMinutes > nowTimeInMinutes) {
-                  hasUpcomingScheduleToday = true;
-                  console.log(`[StreamingService] ✓ Found upcoming schedule today at ${scheduleHour}:${scheduleMinute}`);
-                  break;
                 }
               }
             }
           } else {
-            // One-time schedule
             const scheduleTime = new Date(schedule.schedule_time);
             if (scheduleTime > now && scheduleTime.toDateString() === now.toDateString()) {
               hasUpcomingScheduleToday = true;
@@ -1065,24 +977,30 @@ async function stopStream(streamId, options = {}) {
         console.error('[StreamingService] Error checking upcoming schedules:', scheduleCheckError);
       }
       
-      // Set status based on whether there are upcoming schedules
+      // Set status immediately (don't wait for YouTube API)
       const newStatus = hasUpcomingScheduleToday ? 'scheduled' : 'offline';
       await Stream.updateStatus(streamId, newStatus, stream.user_id);
-      console.log(`[StreamingService] ✓ Stream ${streamId} status set to '${newStatus}' (upcoming schedules today: ${hasUpcomingScheduleToday})`);
+      console.log(`[StreamingService] ✅ Status updated to '${newStatus}' immediately (upcoming today: ${hasUpcomingScheduleToday})`);
+      
+      // ===== YOUTUBE VOD OPTIMIZATION (Background, Non-blocking) =====
+      if (stream.use_youtube_api && stream.youtube_broadcast_id) {
+        console.log(`[StreamingService] 🎬 Starting background YouTube VOD optimization...`);
+        optimizeYouTubeVODInBackground(stream.youtube_broadcast_id, stream.user_id, streamId);
+      }
       
       const updatedStream = await Stream.findById(streamId);
       await saveStreamHistory(updatedStream);
     }
+
     if (typeof schedulerService !== 'undefined' && schedulerService.cancelStreamTermination) {
       schedulerService.handleStreamStopped(streamId);
     }
     
-    // NOTE: Cleanup is handled by the exit handler to prevent race conditions
-    // Don't delete from activeStreams, streamLogs, etc. here
-    // The exit handler will properly cleanup after FFmpeg process terminates
-    console.log(`[StreamingService] Stop request completed for stream ${streamId}, waiting for FFmpeg to terminate...`);
+    console.log(`[StreamingService] ✅ Stream ${streamId} stopped successfully (immediate response)`);
+    console.log(`[StreamingService] ===============================================`);
     
-    return { success: true, message: 'Stream stop initiated, waiting for FFmpeg to terminate' };
+    return { success: true, message: 'Stream stopped successfully' };
+    
   } catch (error) {
     console.error(`[StreamingService] Error in stopStream for ${streamId}:`, error);
     
@@ -1097,6 +1015,106 @@ async function stopStream(streamId, options = {}) {
     
     return { success: false, error: error.message };
   }
+}
+
+// ===== BACKGROUND YOUTUBE VOD OPTIMIZATION (Non-blocking) =====
+async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
+  setImmediate(async () => {
+    try {
+      console.log(`[YouTube VOD] 🎬 Starting optimization for broadcast ${broadcastId}...`);
+      
+      const { getTokensForUser } = require('../routes/youtube');
+      const youtubeService = require('./youtubeService');
+      
+      const tokens = await getTokensForUser(userId);
+      if (!tokens || !tokens.access_token) {
+        console.warn('[YouTube VOD] ⚠️ No valid tokens for VOD optimization');
+        return;
+      }
+      
+      // Check current broadcast status
+      const broadcast = await youtubeService.getBroadcast(tokens, { broadcastId });
+      if (!broadcast) {
+        console.warn('[YouTube VOD] ⚠️ Broadcast not found, may already be cleaned up');
+        return;
+      }
+      
+      const currentStatus = broadcast.status?.lifeCycleStatus;
+      console.log(`[YouTube VOD] Current broadcast status: ${currentStatus}`);
+      
+      // Optimize based on current status
+      if (currentStatus === 'live' || currentStatus === 'testing') {
+        await youtubeService.transition(tokens, {
+          broadcastId: broadcastId,
+          status: 'complete'
+        });
+        console.log('[YouTube VOD] ✅ Broadcast transitioned to complete - VOD processing accelerated');
+        
+      } else if (currentStatus === 'ready') {
+        // Broadcast never went live, clean it up
+        await youtubeService.deleteBroadcast(tokens, { broadcastId });
+        console.log('[YouTube VOD] ✅ Unused broadcast cleaned up');
+        
+      } else {
+        console.log(`[YouTube VOD] ℹ️ Broadcast already in final state: ${currentStatus}`);
+      }
+      
+      // Clear broadcast IDs from database
+      await Stream.update(streamId, { 
+        youtube_broadcast_id: null,
+        youtube_stream_id: null 
+      });
+      console.log(`[YouTube VOD] ✅ Cleared broadcast IDs from database`);
+      
+      // Clear from recurring schedules if needed
+      const stream = await Stream.findById(streamId);
+      if (stream && stream.active_schedule_id) {
+        try {
+          const schedule = await new Promise((resolve, reject) => {
+            db.get(
+              'SELECT is_recurring FROM stream_schedules WHERE id = ?',
+              [stream.active_schedule_id],
+              (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+              }
+            );
+          });
+          
+          if (schedule && schedule.is_recurring) {
+            await new Promise((resolve, reject) => {
+              db.run(
+                'UPDATE stream_schedules SET youtube_broadcast_id = NULL, broadcast_status = ? WHERE id = ?',
+                ['pending', stream.active_schedule_id],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+            console.log(`[YouTube VOD] ✅ Cleared broadcast_id from recurring schedule`);
+          }
+        } catch (clearError) {
+          console.error('[YouTube VOD] Error clearing broadcast_id from schedule:', clearError);
+        }
+      }
+      
+    } catch (error) {
+      console.error('[YouTube VOD] ❌ VOD optimization failed (non-critical):', error.message);
+      console.log('[YouTube VOD] 📝 Logged for manual review if needed');
+      
+      // Still try to clear database even if API failed
+      try {
+        await Stream.update(streamId, { 
+          youtube_broadcast_id: null,
+          youtube_stream_id: null 
+        });
+        console.log(`[YouTube VOD] ✅ Cleared broadcast IDs from database (fallback)`);
+      } catch (dbError) {
+        console.error('[YouTube VOD] ❌ Failed to clear database:', dbError.message);
+      }
+    }
+  });
 }
 async function syncStreamStatuses() {
   try {
