@@ -537,8 +537,9 @@ async function startStream(streamId, options = {}) {
       }
     }
     
-    // Transition YouTube broadcast to live if using YouTube API
-    if (stream.use_youtube_api && stream.youtube_broadcast_id) {
+    // Transition YouTube broadcast to live if using YouTube API AND auto start is enabled
+    if (stream.use_youtube_api && stream.youtube_broadcast_id && stream.youtube_auto_start) {
+      console.log(`[StreamingService] Auto Start enabled - will transition broadcast to live`);
       // Use smart transition with stream status checking
       setTimeout(async () => {
         try {
@@ -569,6 +570,9 @@ async function startStream(streamId, options = {}) {
           // Don't fail the stream start, just log the error
         }
       }, 5000); // Initial 5 second delay before starting transition process
+    } else if (stream.use_youtube_api && stream.youtube_broadcast_id && !stream.youtube_auto_start) {
+      console.log(`[StreamingService] ⚠️ Auto Start disabled - broadcast created but NOT transitioned to live`);
+      console.log(`[StreamingService] User must manually start broadcast in YouTube Studio`);
     }
     
     // Clear manual_stop flag when stream starts
