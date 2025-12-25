@@ -2792,13 +2792,23 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
     if (req.body.streamTitle) updateData.title = req.body.streamTitle;
     if (req.body.videoId) updateData.video_id = req.body.videoId;
     
-    // Only update RTMP URL and Stream Key if NOT using YouTube API
-    // (YouTube API streams have these managed by broadcast)
-    if (!isYouTubeAPI) {
+    // Update RTMP URL and Stream Key
+    // For YouTube API streams: Allow stream_key update (user can input manual or load from list)
+    // For Manual RTMP streams: Allow both rtmpUrl and streamKey update
+    if (isYouTubeAPI) {
+      // YouTube API mode: Only update stream_key (from YouTube API tab input)
+      if (req.body.streamKey) {
+        updateData.stream_key = req.body.streamKey;
+        console.log(`[UPDATE STREAM] Updated stream_key for YouTube API stream ${req.params.id}: ${req.body.streamKey.substring(0, 8)}...`);
+      }
+      // Keep rtmp_url as YouTube ingestion server
+      if (req.body.rtmpUrl) {
+        updateData.rtmp_url = req.body.rtmpUrl;
+      }
+    } else {
+      // Manual RTMP mode: Update both rtmpUrl and streamKey
       if (req.body.rtmpUrl) updateData.rtmp_url = req.body.rtmpUrl;
       if (req.body.streamKey) updateData.stream_key = req.body.streamKey;
-    } else {
-      console.log(`[UPDATE STREAM] Preserving RTMP settings for YouTube API stream ${req.params.id}`);
     }
     
     if (req.body.loopVideo !== undefined) {

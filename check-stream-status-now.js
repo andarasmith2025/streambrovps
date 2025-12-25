@@ -1,5 +1,5 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./streambro.db');
+const db = new sqlite3.Database('./db/streambro.db');
 
 console.log('[Check Stream Status] Checking active/scheduled streams...\n');
 

@@ -66,12 +66,12 @@ class BroadcastScheduler {
       const currentMinute = now.getMinutes();
       const currentTimeMinutes = currentHour * 60 + currentMinute;
       
-      // For recurring schedules, we need to check if they will execute in next 10-15 minutes TODAY
-      const tenMinutesLater = currentTimeMinutes + 10;
-      const fifteenMinutesLater = currentTimeMinutes + 15;
+      // ⭐ UPDATED: Create broadcast 3-5 minutes before schedule time (closer to stream start)
+      const threeMinutesLater = currentTimeMinutes + 3;
+      const fiveMinutesLater = currentTimeMinutes + 5;
 
       console.log(`[BroadcastScheduler] Checking schedules at ${currentHour}:${String(currentMinute).padStart(2, '0')}`);
-      console.log(`[BroadcastScheduler] Looking for schedules between ${Math.floor(tenMinutesLater/60)}:${String(tenMinutesLater%60).padStart(2, '0')} and ${Math.floor(fifteenMinutesLater/60)}:${String(fifteenMinutesLater%60).padStart(2, '0')}`);
+      console.log(`[BroadcastScheduler] Looking for schedules between ${Math.floor(threeMinutesLater/60)}:${String(threeMinutesLater%60).padStart(2, '0')} and ${Math.floor(fiveMinutesLater/60)}:${String(fiveMinutesLater%60).padStart(2, '0')}`);
 
       // Get all pending schedules (both one-time and recurring)
       const query = `
@@ -125,8 +125,8 @@ class BroadcastScheduler {
                 const scheduleMinute = scheduleDate.getMinutes();
                 const scheduleTimeMinutes = scheduleHour * 60 + scheduleMinute;
                 
-                // Check if schedule time is in the 10-15 minute window
-                if (scheduleTimeMinutes >= tenMinutesLater && scheduleTimeMinutes <= fifteenMinutesLater) {
+                // Check if schedule time is in the 3-5 minute window
+                if (scheduleTimeMinutes >= threeMinutesLater && scheduleTimeMinutes <= fiveMinutesLater) {
                   shouldCreateBroadcast = true;
                   console.log(`[BroadcastScheduler] ✓ Recurring schedule matched: ${schedule.title} at ${scheduleHour}:${String(scheduleMinute).padStart(2, '0')}`);
                 }
@@ -135,10 +135,10 @@ class BroadcastScheduler {
           } else {
             // One-time schedule - check if schedule_time is in window
             const scheduleTime = new Date(schedule.schedule_time);
-            const tenMinutesLaterDate = new Date(now.getTime() + 10 * 60 * 1000);
-            const fifteenMinutesLaterDate = new Date(now.getTime() + 15 * 60 * 1000);
+            const threeMinutesLaterDate = new Date(now.getTime() + 3 * 60 * 1000);
+            const fiveMinutesLaterDate = new Date(now.getTime() + 5 * 60 * 1000);
             
-            if (scheduleTime >= tenMinutesLaterDate && scheduleTime <= fifteenMinutesLaterDate) {
+            if (scheduleTime >= threeMinutesLaterDate && scheduleTime <= fiveMinutesLaterDate) {
               shouldCreateBroadcast = true;
               console.log(`[BroadcastScheduler] ✓ One-time schedule matched: ${schedule.title} at ${scheduleTime.toISOString()}`);
             }
@@ -260,13 +260,33 @@ class BroadcastScheduler {
         console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
       }
 
+      // ⭐ CRITICAL: Get stream_key from stream (user's manual input)
+      // System will find stream ID from this stream key via YouTube API
+      const streamData = await new Promise((resolve, reject) => {
+        db.get(
+          'SELECT stream_key FROM streams WHERE id = ?',
+          [schedule.stream_id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      if (!streamData || !streamData.stream_key) {
+        throw new Error('Stream key not found - user must input stream key first');
+      }
+
+      console.log(`[BroadcastScheduler] Using stream key from user input: ${streamData.stream_key.substring(0, 8)}...`);
+
       // Create broadcast via YouTube API
+      // YouTube API will find stream ID from stream key and bind broadcast to it
       const broadcastResult = await youtubeService.scheduleLive(tokens, {
         title: schedule.title,
         description: schedule.youtube_description || '',
         privacyStatus: schedule.youtube_privacy || 'unlisted',
         scheduledStartTime: scheduledStartTime.toISOString(),
-        streamId: schedule.youtube_stream_id, // Use existing stream key!
+        streamKey: streamData.stream_key, // ⭐ Pass stream key, API will find stream ID
         enableAutoStart: schedule.youtube_auto_start || false,
         enableAutoStop: schedule.youtube_auto_end || false,
         tags: tags,
@@ -283,7 +303,7 @@ class BroadcastScheduler {
 
         console.log(`[BroadcastScheduler] ✅ Broadcast created: ${broadcastId}`);
         console.log(`[BroadcastScheduler] - Schedule: ${schedule.id}`);
-        console.log(`[BroadcastScheduler] - Stream Key: ${schedule.youtube_stream_id}`);
+        console.log(`[BroadcastScheduler] - Using user's stream key: ${streamData.stream_key}`);
         console.log(`[BroadcastScheduler] - Start Time: ${scheduledStartTime.toISOString()}`);
         console.log(`[BroadcastScheduler] - Thumbnail: ${thumbnailPath ? 'Uploaded' : 'Not provided'}`);
 
