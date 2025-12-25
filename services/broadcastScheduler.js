@@ -344,8 +344,8 @@ class BroadcastScheduler {
       // Check if error is due to invalid stream ID
       if (error.message && error.message.includes('Stream not found')) {
         console.error(`[BroadcastScheduler] ❌ CRITICAL: Stream ID is invalid or deleted from YouTube`);
-        console.error(`[BroadcastScheduler] Stream ID: ${streamData.youtube_stream_id || 'none'}`);
-        console.error(`[BroadcastScheduler] Stream Key: ${streamData.stream_key || 'none'}`);
+        console.error(`[BroadcastScheduler] Stream ID: ${schedule.youtube_stream_id || 'none'}`);
+        console.error(`[BroadcastScheduler] Stream Key: ${schedule.stream_key || 'none'}`);
         console.error(`[BroadcastScheduler] User must update stream configuration with valid stream from dropdown`);
         
         // Mark as failed permanently to prevent retry loop
