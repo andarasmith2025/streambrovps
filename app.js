@@ -2418,12 +2418,16 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
       video_id: req.body.videoId || null,
       rtmp_url: req.body.rtmpUrl,
       stream_key: req.body.streamKey,
+      youtube_stream_id: req.body.youtubeStreamId || null, // ⭐ Save youtube_stream_id from dropdown
       platform,
       platform_icon,
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
       use_youtube_api: useYouTubeAPI,
       user_id: req.session.userId
     };
+    
+    console.log(`[CREATE STREAM] Stream key: ${req.body.streamKey ? req.body.streamKey.substring(0, 8) + '...' : 'none'}`);
+    console.log(`[CREATE STREAM] YouTube stream ID: ${req.body.youtubeStreamId || 'none'}`);
     
     // Add YouTube API specific fields if using YouTube API
     if (useYouTubeAPI) {
@@ -2793,13 +2797,17 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
     if (req.body.videoId) updateData.video_id = req.body.videoId;
     
     // Update RTMP URL and Stream Key
-    // For YouTube API streams: Allow stream_key update (user can input manual or load from list)
+    // For YouTube API streams: Allow stream_key and youtube_stream_id update (user can input manual or load from list)
     // For Manual RTMP streams: Allow both rtmpUrl and streamKey update
     if (isYouTubeAPI) {
-      // YouTube API mode: Only update stream_key (from YouTube API tab input)
+      // YouTube API mode: Update stream_key and youtube_stream_id (from YouTube API tab)
       if (req.body.streamKey) {
         updateData.stream_key = req.body.streamKey;
         console.log(`[UPDATE STREAM] Updated stream_key for YouTube API stream ${req.params.id}: ${req.body.streamKey.substring(0, 8)}...`);
+      }
+      if (req.body.youtubeStreamId) {
+        updateData.youtube_stream_id = req.body.youtubeStreamId;
+        console.log(`[UPDATE STREAM] Updated youtube_stream_id for YouTube API stream ${req.params.id}: ${req.body.youtubeStreamId}`);
       }
       // Keep rtmp_url as YouTube ingestion server
       if (req.body.rtmpUrl) {

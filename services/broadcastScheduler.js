@@ -260,11 +260,11 @@ class BroadcastScheduler {
         console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
       }
 
-      // ⭐ CRITICAL: Get stream_key from stream (user's manual input)
-      // System will find stream ID from this stream key via YouTube API
+      // ⭐ CRITICAL: Get stream configuration from database
+      // Priority: youtube_stream_id (from dropdown) > stream_key (manual input)
       const streamData = await new Promise((resolve, reject) => {
         db.get(
-          'SELECT stream_key FROM streams WHERE id = ?',
+          'SELECT stream_key, youtube_stream_id FROM streams WHERE id = ?',
           [schedule.stream_id],
           (err, row) => {
             if (err) reject(err);
@@ -273,27 +273,39 @@ class BroadcastScheduler {
         );
       });
 
-      if (!streamData || !streamData.stream_key) {
-        throw new Error('Stream key not found - user must input stream key first');
+      if (!streamData) {
+        throw new Error('Stream not found in database');
       }
 
-      console.log(`[BroadcastScheduler] Using stream key from user input: ${streamData.stream_key.substring(0, 8)}...`);
+      console.log(`[BroadcastScheduler] Stream config: youtube_stream_id=${streamData.youtube_stream_id || 'none'}, stream_key=${streamData.stream_key ? streamData.stream_key.substring(0, 8) + '...' : 'none'}`);
 
-      // Create broadcast via YouTube API
-      // YouTube API will find stream ID from stream key and bind broadcast to it
-      const broadcastResult = await youtubeService.scheduleLive(tokens, {
+      // Determine which to use: streamId (from dropdown) or streamKey (manual input)
+      let broadcastOptions = {
         title: schedule.title,
         description: schedule.youtube_description || '',
         privacyStatus: schedule.youtube_privacy || 'unlisted',
         scheduledStartTime: scheduledStartTime.toISOString(),
-        streamKey: streamData.stream_key, // ⭐ Pass stream key, API will find stream ID
         enableAutoStart: schedule.youtube_auto_start || false,
         enableAutoStop: schedule.youtube_auto_end || false,
         tags: tags,
         category: schedule.youtube_category_id || null,
         language: schedule.youtube_language || null,
-        thumbnailPath: thumbnailPath // Use thumbnail from video or saved path
-      });
+        thumbnailPath: thumbnailPath
+      };
+
+      // Priority: Use youtube_stream_id if available (from dropdown selection)
+      if (streamData.youtube_stream_id) {
+        broadcastOptions.streamId = streamData.youtube_stream_id;
+        console.log(`[BroadcastScheduler] Using youtube_stream_id from database: ${streamData.youtube_stream_id}`);
+      } else if (streamData.stream_key) {
+        broadcastOptions.streamKey = streamData.stream_key;
+        console.log(`[BroadcastScheduler] Using stream_key from database: ${streamData.stream_key.substring(0, 8)}...`);
+      } else {
+        throw new Error('No stream_key or youtube_stream_id found - user must configure stream first');
+      }
+
+      // Create broadcast via YouTube API
+      const broadcastResult = await youtubeService.scheduleLive(tokens, broadcastOptions);
 
       if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
         const broadcastId = broadcastResult.broadcast.id;
