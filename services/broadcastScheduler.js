@@ -94,6 +94,7 @@ class BroadcastScheduler {
         JOIN streams s ON ss.stream_id = s.id
         WHERE ss.status = 'pending'
           AND (ss.broadcast_status IS NULL OR ss.broadcast_status = 'pending' OR ss.broadcast_status = 'failed')
+          AND ss.broadcast_status != 'failed_invalid_stream'
           AND s.use_youtube_api = 1
         ORDER BY ss.schedule_time ASC
       `;
@@ -339,6 +340,19 @@ class BroadcastScheduler {
       }
     } catch (error) {
       console.error(`[BroadcastScheduler] ❌ Error creating broadcast for schedule ${schedule.id}:`, error);
+      
+      // Check if error is due to invalid stream ID
+      if (error.message && error.message.includes('Stream not found')) {
+        console.error(`[BroadcastScheduler] ❌ CRITICAL: Stream ID is invalid or deleted from YouTube`);
+        console.error(`[BroadcastScheduler] Stream ID: ${streamData.youtube_stream_id || 'none'}`);
+        console.error(`[BroadcastScheduler] Stream Key: ${streamData.stream_key || 'none'}`);
+        console.error(`[BroadcastScheduler] User must update stream configuration with valid stream from dropdown`);
+        
+        // Mark as failed permanently to prevent retry loop
+        await this.updateScheduleBroadcastStatus(schedule.id, 'failed_invalid_stream');
+        await this.logBroadcastError(schedule.id, 'Invalid stream ID - stream not found in YouTube channel');
+        return null;
+      }
       
       // Mark as failed
       await this.updateScheduleBroadcastStatus(schedule.id, 'failed');

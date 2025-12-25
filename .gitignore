@@ -1,8 +1,49 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Uploads & Logs
 public/uploads/
 logs/
+temp/
+backups/
 
-# ignore real env from repo
+# Environment files
 .env
 .env.production
 .env.google
+.env.backup
+
+# Database
+db/*.db
+db/*.db-*
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.backup
+*.old
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Development artifacts
+streambro.db
+dashboard.ejs.backup
+settings.ejs.backup
+*.ejs.backup
+temp_backup/
