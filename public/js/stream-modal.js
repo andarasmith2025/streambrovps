@@ -2929,7 +2929,7 @@ function populateEditYouTubeAPIFields(stream) {
     safeSetValueIfEmpty('editYoutubeDescription', stream.youtube_description);
     safeSetValue('editYoutubeRtmpUrl', stream.rtmp_url);
     safeSetValue('editYoutubeStreamKey', stream.stream_key);
-    safeSetValue('editYoutubeStreamId', stream.youtube_stream_id);
+    // ⚠️ REMOVED: editYoutubeStreamId (no longer used)
     
     // Populate Additional Settings with EDIT prefix
     safeSetValue('editYoutubePrivacy', stream.youtube_privacy || 'unlisted');

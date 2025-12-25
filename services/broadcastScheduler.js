@@ -80,7 +80,6 @@ class BroadcastScheduler {
           s.title,
           s.youtube_description,
           s.youtube_privacy,
-          s.youtube_stream_id,
           s.youtube_made_for_kids,
           s.youtube_age_restricted,
           s.youtube_auto_start,
@@ -261,11 +260,10 @@ class BroadcastScheduler {
         console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
       }
 
-      // ⭐ CRITICAL: Get stream configuration from database
-      // Priority: youtube_stream_id (from dropdown) > stream_key (manual input)
+      // ⭐ Get stream_key from database (youtube_stream_id is no longer used)
       const streamData = await new Promise((resolve, reject) => {
         db.get(
-          'SELECT stream_key, youtube_stream_id FROM streams WHERE id = ?',
+          'SELECT stream_key FROM streams WHERE id = ?',
           [schedule.stream_id],
           (err, row) => {
             if (err) reject(err);
@@ -278,7 +276,7 @@ class BroadcastScheduler {
         throw new Error('Stream not found in database');
       }
 
-      console.log(`[BroadcastScheduler] Stream config: youtube_stream_id=${streamData.youtube_stream_id || 'none'}, stream_key=${streamData.stream_key ? streamData.stream_key.substring(0, 8) + '...' : 'none'}`);
+      console.log(`[BroadcastScheduler] Stream config: stream_key=${streamData.stream_key ? streamData.stream_key.substring(0, 8) + '...' : 'none'}`);
 
       // Determine which to use: streamId (from dropdown) or streamKey (manual input)
       let broadcastOptions = {
@@ -294,15 +292,14 @@ class BroadcastScheduler {
         thumbnailPath: thumbnailPath
       };
 
-      // Priority: Use youtube_stream_id if available (from dropdown selection)
-      if (streamData.youtube_stream_id) {
-        broadcastOptions.streamId = streamData.youtube_stream_id;
-        console.log(`[BroadcastScheduler] Using youtube_stream_id from database: ${streamData.youtube_stream_id}`);
-      } else if (streamData.stream_key) {
+      // ⚠️ CRITICAL FIX: Always use stream_key, NEVER use youtube_stream_id
+      // Reason: youtube_stream_id can become invalid if stream is deleted from YouTube
+      // stream_key is more reliable and always works
+      if (streamData.stream_key) {
         broadcastOptions.streamKey = streamData.stream_key;
         console.log(`[BroadcastScheduler] Using stream_key from database: ${streamData.stream_key.substring(0, 8)}...`);
       } else {
-        throw new Error('No stream_key or youtube_stream_id found - user must configure stream first');
+        throw new Error('No stream_key found - user must configure stream first');
       }
 
       // Create broadcast via YouTube API
@@ -341,12 +338,11 @@ class BroadcastScheduler {
     } catch (error) {
       console.error(`[BroadcastScheduler] ❌ Error creating broadcast for schedule ${schedule.id}:`, error);
       
-      // Check if error is due to invalid stream ID
+      // Check if error is due to invalid stream
       if (error.message && error.message.includes('Stream not found')) {
-        console.error(`[BroadcastScheduler] ❌ CRITICAL: Stream ID is invalid or deleted from YouTube`);
-        console.error(`[BroadcastScheduler] Stream ID: ${schedule.youtube_stream_id || 'none'}`);
+        console.error(`[BroadcastScheduler] ❌ CRITICAL: Stream not found in YouTube`);
         console.error(`[BroadcastScheduler] Stream Key: ${schedule.stream_key || 'none'}`);
-        console.error(`[BroadcastScheduler] User must update stream configuration with valid stream from dropdown`);
+        console.error(`[BroadcastScheduler] User must check stream key is correct`);
         
         // Mark as failed permanently to prevent retry loop
         await this.updateScheduleBroadcastStatus(schedule.id, 'failed_invalid_stream');

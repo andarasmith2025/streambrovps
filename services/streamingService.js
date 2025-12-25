@@ -363,7 +363,7 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
     description: stream.youtube_description || stream.description || '',
     privacyStatus: stream.youtube_privacy || 'unlisted',
     scheduledStartTime: new Date().toISOString(),
-    streamId: stream.youtube_stream_id, // Reuse existing stream key
+    streamKey: stream.stream_key, // ⚠️ Use stream_key (not streamId)
     // ⭐ IMPORTANT: Auto Start/Stop settings
     // enableAutoStart: true = YouTube auto-transitions to live when stream data arrives (RECOMMENDED)
     // enableAutoStop: true = YouTube auto-ends broadcast and starts VOD processing faster (RECOMMENDED)
@@ -388,46 +388,23 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
   const newBroadcast = await youtubeService.scheduleLive(tokens, broadcastOptions);
   
   const newBroadcastId = newBroadcast.broadcast.id;
-  const newStreamId = newBroadcast.stream?.id || stream.youtube_stream_id; // Use existing if available
   console.log(`[StreamingService] ✓ New broadcast created: ${newBroadcastId}`);
-  console.log(`[StreamingService] ✓ Stream ID: ${newStreamId} ${newBroadcast.stream?.id ? '(new)' : '(reused)'}`);
   
   // Update stream with new broadcast ID
-  // Only update youtube_stream_id if it was newly created (not reused)
-  if (newBroadcast.stream?.id) {
-    // New stream was created, update both broadcast_id and stream_id
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE streams SET youtube_broadcast_id = ?, youtube_stream_id = ? WHERE id = ?`,
-        [newBroadcastId, newStreamId, streamId],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-    console.log(`[StreamingService] ✓ Stream updated with NEW broadcast ID and NEW stream ID`);
-  } else {
-    // Existing stream was reused, only update broadcast_id
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
-        [newBroadcastId, streamId],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-    console.log(`[StreamingService] ✓ Stream updated with NEW broadcast ID, REUSED stream ID: ${stream.youtube_stream_id}`);
-  }
+  await new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
+      [newBroadcastId, streamId],
+      (err) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+  console.log(`[StreamingService] ✓ Stream updated with broadcast ID`);
   
   // Update stream object
   stream.youtube_broadcast_id = newBroadcastId;
-  if (newBroadcast.stream?.id) {
-    stream.youtube_stream_id = newStreamId;
-  }
-  // If reused, keep existing stream.youtube_stream_id
 }
 
 async function startStream(streamId, options = {}) {
@@ -1061,10 +1038,9 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       
       // Clear broadcast IDs from database
       await Stream.update(streamId, { 
-        youtube_broadcast_id: null,
-        youtube_stream_id: null 
+        youtube_broadcast_id: null
       });
-      console.log(`[YouTube VOD] ✅ Cleared broadcast IDs from database`);
+      console.log(`[YouTube VOD] ✅ Cleared broadcast ID from database`);
       
       // Clear from recurring schedules if needed
       const stream = await Stream.findById(streamId);
@@ -1106,10 +1082,9 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       // Still try to clear database even if API failed
       try {
         await Stream.update(streamId, { 
-          youtube_broadcast_id: null,
-          youtube_stream_id: null 
+          youtube_broadcast_id: null
         });
-        console.log(`[YouTube VOD] ✅ Cleared broadcast IDs from database (fallback)`);
+        console.log(`[YouTube VOD] ✅ Cleared broadcast ID from database (fallback)`);
       } catch (dbError) {
         console.error('[YouTube VOD] ❌ Failed to clear database:', dbError.message);
       }

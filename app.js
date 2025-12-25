@@ -2418,7 +2418,7 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
       video_id: req.body.videoId || null,
       rtmp_url: req.body.rtmpUrl,
       stream_key: req.body.streamKey,
-      youtube_stream_id: req.body.youtubeStreamId || null, // ⭐ Save youtube_stream_id from dropdown
+      // ⚠️ REMOVED: youtube_stream_id (not used, unreliable)
       platform,
       platform_icon,
       loop_video: req.body.loopVideo === 'true' || req.body.loopVideo === true,
@@ -2427,7 +2427,6 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
     };
     
     console.log(`[CREATE STREAM] Stream key: ${req.body.streamKey ? req.body.streamKey.substring(0, 8) + '...' : 'none'}`);
-    console.log(`[CREATE STREAM] YouTube stream ID: ${req.body.youtubeStreamId || 'none'}`);
     
     // Add YouTube API specific fields if using YouTube API
     if (useYouTubeAPI) {
@@ -2609,15 +2608,10 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
                 youtube_broadcast_id: broadcastResult.broadcast.id
               };
               
-              // If new stream was created (manual stream key mode), save the stream ID
-              if (broadcastResult.stream && broadcastResult.stream.id) {
-                updateData.youtube_stream_id = broadcastResult.stream.id;
-                console.log(`[CREATE STREAM] ✓ New YouTube stream created: ${broadcastResult.stream.id}`);
-              } else if (youtubeStreamId) {
-                // If using existing stream from dropdown, save that ID
-                updateData.youtube_stream_id = youtubeStreamId;
-                console.log(`[CREATE STREAM] ✓ Using existing YouTube stream: ${youtubeStreamId}`);
-              }
+              // ⚠️ REMOVED: youtube_stream_id is no longer saved (unreliable, can become invalid)
+              // We only use stream_key which is more reliable
+              // If new stream was created (manual stream key mode), we don't need to save the stream ID
+              // YouTube will automatically match stream_key to the correct stream
               
               await Stream.update(stream.id, updateData);
               
@@ -2812,15 +2806,13 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
     // For YouTube API streams: Allow stream_key and youtube_stream_id update (user can input manual or load from list)
     // For Manual RTMP streams: Allow both rtmpUrl and streamKey update
     if (isYouTubeAPI) {
-      // YouTube API mode: Update stream_key and youtube_stream_id (from YouTube API tab)
+      // YouTube API mode: Update stream_key only (youtube_stream_id is deprecated and not used)
       if (req.body.streamKey) {
         updateData.stream_key = req.body.streamKey;
         console.log(`[UPDATE STREAM] Updated stream_key for YouTube API stream ${req.params.id}: ${req.body.streamKey.substring(0, 8)}...`);
       }
-      if (req.body.youtubeStreamId) {
-        updateData.youtube_stream_id = req.body.youtubeStreamId;
-        console.log(`[UPDATE STREAM] Updated youtube_stream_id for YouTube API stream ${req.params.id}: ${req.body.youtubeStreamId}`);
-      }
+      // ⚠️ REMOVED: youtube_stream_id is no longer used (unreliable, can become invalid)
+      // We always use stream_key which is more reliable
       // Keep rtmp_url as YouTube ingestion server
       if (req.body.rtmpUrl) {
         updateData.rtmp_url = req.body.rtmpUrl;
@@ -3058,8 +3050,7 @@ app.post('/api/streams/:id/cleanup-youtube', isAuthenticated, async (req, res) =
     
     // Clear from database
     await Stream.update(stream.id, {
-      youtube_broadcast_id: null,
-      youtube_stream_id: null
+      youtube_broadcast_id: null
     });
     
     console.log(`[Manual Cleanup] ✅ Cleared broadcast IDs from database`);
