@@ -2633,6 +2633,12 @@
                 formData.rtmpUrl = document.getElementById('editYoutubeRtmpUrl')?.value || '';
                 formData.streamKey = document.getElementById('editYoutubeStreamKey')?.value || '';
                 formData.youtubeStreamId = document.getElementById('editYoutubeStreamId')?.value || '';
+                
+                console.log('[Edit Stream] YouTube API fields:');
+                console.log('  - RTMP URL:', formData.rtmpUrl);
+                console.log('  - Stream Key:', formData.streamKey ? '***' + formData.streamKey.slice(-4) : 'missing');
+                console.log('  - YouTube Stream ID:', formData.youtubeStreamId || 'missing');
+                
                 formData.youtubeDescription = document.getElementById('editYoutubeDescription')?.value || '';
                 
                 // YouTube Additional Settings

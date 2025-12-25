@@ -2782,6 +2782,18 @@ app.delete('/api/streams/:id/schedules/:scheduleId', isAuthenticated, async (req
 
 app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThumbnail'), async (req, res) => {
   try {
+    console.log('\n========================================');
+    console.log('[PUT /api/streams/:id] EDIT STREAM REQUEST');
+    console.log('========================================');
+    console.log('Stream ID:', req.params.id);
+    console.log('Session userId:', req.session.userId);
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Stream Title:', req.body.streamTitle);
+    console.log('Stream Key:', req.body.streamKey ? '***' + req.body.streamKey.slice(-4) : 'missing');
+    console.log('YouTube Stream ID:', req.body.youtubeStreamId || 'missing');
+    console.log('Use YouTube API:', req.body.useYouTubeAPI);
+    console.log('========================================\n');
+    
     const stream = await Stream.findById(req.params.id);
     if (!stream) {
       return res.status(404).json({ success: false, error: 'Stream not found' });

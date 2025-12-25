@@ -2601,14 +2601,25 @@ function selectEditYouTubeStreamKey(keyId) {
   const selectedKey = youtubeStreamKeys.find(k => k.id === keyId);
   if (!selectedKey) return;
   
-  // Fill in the form fields
-  const rtmpUrlInput = document.getElementById('youtubeRtmpUrl');
-  const streamKeyInput = document.getElementById('youtubeStreamKey');
-  const streamIdInput = document.getElementById('youtubeStreamId');
+  // Fill in the form fields - USE EDIT FORM IDs (with 'edit' prefix)
+  const rtmpUrlInput = document.getElementById('editYoutubeRtmpUrl');
+  const streamKeyInput = document.getElementById('editYoutubeStreamKey');
+  const streamIdInput = document.getElementById('editYoutubeStreamId'); // ⭐ FIX: Use correct edit form ID
+  
+  console.log('[selectEditYouTubeStreamKey] Setting form fields:');
+  console.log('  - RTMP URL input found:', !!rtmpUrlInput);
+  console.log('  - Stream Key input found:', !!streamKeyInput);
+  console.log('  - Stream ID input found:', !!streamIdInput);
+  console.log('  - Selected stream ID:', selectedKey.id);
   
   if (rtmpUrlInput) rtmpUrlInput.value = selectedKey.rtmpUrl;
   if (streamKeyInput) streamKeyInput.value = selectedKey.streamKey;
-  if (streamIdInput) streamIdInput.value = selectedKey.id;
+  if (streamIdInput) {
+    streamIdInput.value = selectedKey.id;
+    console.log('[selectEditYouTubeStreamKey] ✓ Set editYoutubeStreamId to:', streamIdInput.value);
+  } else {
+    console.error('[selectEditYouTubeStreamKey] ❌ editYoutubeStreamId field not found!');
+  }
   
   // Close dropdown
   const dropdown = document.getElementById('editYoutubeStreamKeysDropdown');
