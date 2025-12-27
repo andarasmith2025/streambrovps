@@ -27,6 +27,41 @@ async function scheduleLive(tokensOrUserId, { channelId = null, title, descripti
   console.log(`[YouTubeService.scheduleLive] - Tags: ${tags ? tags.length : 0} tags`);
   console.log(`[YouTubeService.scheduleLive] - Thumbnail: ${thumbnailPath || 'NOT PROVIDED'}`);
   
+  // ⭐ VALIDATION: Check thumbnail exists before creating broadcast
+  if (thumbnailPath) {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Resolve full path
+    const fullThumbnailPath = path.isAbsolute(thumbnailPath) 
+      ? thumbnailPath 
+      : path.join(process.cwd(), thumbnailPath);
+    
+    if (!fs.existsSync(fullThumbnailPath)) {
+      const error = new Error(`❌ THUMBNAIL VALIDATION FAILED: File not found at ${fullThumbnailPath}`);
+      error.code = 'THUMBNAIL_NOT_FOUND';
+      console.error(`[YouTubeService.scheduleLive] ${error.message}`);
+      console.error(`[YouTubeService.scheduleLive] ⚠️  BROADCAST CREATION SKIPPED to save API quota`);
+      console.error(`[YouTubeService.scheduleLive] 💡 Please upload thumbnail and try again`);
+      throw error;
+    }
+    
+    // Check file size (YouTube limit: 2MB)
+    const stats = fs.statSync(fullThumbnailPath);
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    
+    if (fileSizeInMB > 2) {
+      const error = new Error(`❌ THUMBNAIL VALIDATION FAILED: File too large (${fileSizeInMB.toFixed(2)}MB, max 2MB)`);
+      error.code = 'THUMBNAIL_TOO_LARGE';
+      console.error(`[YouTubeService.scheduleLive] ${error.message}`);
+      console.error(`[YouTubeService.scheduleLive] ⚠️  BROADCAST CREATION SKIPPED to save API quota`);
+      throw error;
+    }
+    
+    console.log(`[YouTubeService.scheduleLive] ✅ Thumbnail validated: ${(fileSizeInMB * 1024).toFixed(2)}KB`);
+  } else {
+    console.warn(`[YouTubeService.scheduleLive] ⚠️  No thumbnail provided - broadcast will be created without thumbnail`);
+  }
   // ✅ CORRECTED LOGIC: YouTube API ALWAYS creates new broadcast
   // But uses either existing stream ID (dropdown) OR finds stream ID by manual stream key
   let finalStreamId = existingStreamId;

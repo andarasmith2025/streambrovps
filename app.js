@@ -3891,6 +3891,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
   broadcastScheduler.start();
   console.log('[Startup] ✅ Broadcast scheduler started');
   
+  // Start token refresh service for auto-refreshing YouTube OAuth tokens
+  const tokenRefreshService = require('./services/tokenRefreshService');
+  tokenRefreshService.start();
+  console.log('[Startup] ✅ Token refresh service started');
+  
   // Sync stream statuses
   try {
     await streamingService.syncStreamStatuses();

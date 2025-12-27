@@ -3980,6 +3980,23 @@
             return;
           }
           
+          // ⭐ UPDATE HEADER: Find default channel and update header display
+          const defaultChannel = channels.find(ch => ch.isDefault);
+          if (defaultChannel) {
+            // Update header channel name
+            const headerChannelName = document.querySelector('#youtubeChannelStatus .font-semibold.truncate');
+            if (headerChannelName) {
+              headerChannelName.textContent = defaultChannel.title;
+            }
+            
+            // Update header avatar
+            const headerAvatar = document.querySelector('#youtubeChannelStatus img');
+            if (headerAvatar) {
+              headerAvatar.src = defaultChannel.avatar || '/images/default-avatar.png';
+              headerAvatar.alt = defaultChannel.title;
+            }
+          }
+          
           // Sort channels: default first, then alphabetically
           const sortedChannels = [...channels].sort((a, b) => {
             if (a.isDefault && !b.isDefault) return -1;
