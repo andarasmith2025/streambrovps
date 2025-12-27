@@ -21,6 +21,11 @@ class Stream {
       youtube_synthetic_content = false,
       youtube_auto_start = false,
       youtube_auto_end = false,
+      youtube_channel_id = null,
+      youtube_thumbnail_path = null,
+      youtube_tags = null,
+      youtube_category_id = null,
+      youtube_language = null,
       user_id
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
@@ -39,14 +44,16 @@ class Stream {
           loop_video, schedule_time, duration, status, status_updated_at,
           use_youtube_api, youtube_description, youtube_privacy, 
           youtube_made_for_kids, youtube_age_restricted, youtube_synthetic_content,
-          youtube_auto_start, youtube_auto_end, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          youtube_auto_start, youtube_auto_end, youtube_channel_id, 
+          youtube_thumbnail_path, youtube_tags, youtube_category_id, youtube_language, user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           loop_video_int, schedule_time, duration, status, status_updated_at,
           use_youtube_api_int, youtube_description, youtube_privacy,
           youtube_made_for_kids_int, youtube_age_restricted_int, youtube_synthetic_content_int,
-          youtube_auto_start_int, youtube_auto_end_int, user_id
+          youtube_auto_start_int, youtube_auto_end_int, youtube_channel_id,
+          youtube_thumbnail_path, youtube_tags, youtube_category_id, youtube_language, user_id
         ],
         function (err) {
           if (err) {
@@ -84,6 +91,8 @@ class Stream {
                v.bitrate AS video_bitrate,        
                v.fps AS video_fps,
                p.name AS playlist_name,
+               yc.channel_title AS youtube_channel_name,
+               yc.channel_avatar AS youtube_channel_avatar,
                CASE 
                  WHEN p.id IS NOT NULL THEN 'playlist'
                  WHEN v.id IS NOT NULL THEN 'video'
@@ -92,6 +101,7 @@ class Stream {
         FROM streams s
         LEFT JOIN videos v ON s.video_id = v.id
         LEFT JOIN playlists p ON s.video_id = p.id
+        LEFT JOIN youtube_channels yc ON s.youtube_channel_id = yc.channel_id AND s.user_id = yc.user_id
       `;
       const params = [];
       if (userId) {

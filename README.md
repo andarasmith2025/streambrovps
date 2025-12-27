@@ -105,6 +105,8 @@ Login with admin credentials you created.
 
 ### Installation & Setup
 - **[Complete Installation Guide](INSTALLATION_GUIDE.md)** - Step-by-step VPS setup
+- **[VPS Deployment Guide](VPS_DEPLOYMENT_GUIDE.md)** - Full deployment guide
+- **[Quick Deploy Reference](QUICK_DEPLOY_REFERENCE.md)** - ⚡ Copy-paste commands untuk deploy cepat
 - **[User Management](USER_MANAGEMENT.md)** - Create users, reset passwords, manage quota
 
 ### Technical Guides

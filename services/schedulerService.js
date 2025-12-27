@@ -192,14 +192,19 @@ async function checkScheduledStreams() {
           }
         }
         
-        // Update stream duration and active_schedule_id to match this specific schedule
-        // This ensures auto-stop uses the correct duration and we know which schedule is active
+        // Update stream with schedule info (end_time and active_schedule_id)
+        // This ensures auto-stop uses the correct end time and we know which schedule is active
         console.log(`[Scheduler] Setting active_schedule_id=${schedule.id} for stream ${schedule.stream_id}`);
+        
+        // Calculate end_time from schedule
+        const scheduleEndTime = schedule.end_time || new Date(new Date(schedule.schedule_time).getTime() + schedule.duration * 60 * 1000).toISOString();
+        
         await Stream.update(schedule.stream_id, { 
           duration: schedule.duration,
+          scheduled_end_time: scheduleEndTime,
           active_schedule_id: schedule.id
         });
-        console.log(`[Scheduler] ✓ Stream ${schedule.stream_id} updated with active_schedule_id=${schedule.id}`);
+        console.log(`[Scheduler] ✓ Stream ${schedule.stream_id} updated: active_schedule=${schedule.id}, end_time=${scheduleEndTime}`);
         
         const result = await streamingService.startStream(stream.id);
         
@@ -237,36 +242,101 @@ async function checkStreamDurations() {
       return;
     }
     
+    const now = new Date();
+    const currentTimeWIB = now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false });
+    console.log(`[Duration Check] ⏰ Running at ${currentTimeWIB} WIB`);
+    
     const liveStreams = await Stream.findAll(null, 'live');
     console.log(`[Duration Check] Found ${liveStreams.length} live stream(s)`);
     
+    if (liveStreams.length === 0) {
+      console.log('[Duration Check] No live streams to check');
+      return;
+    }
+    
     for (const stream of liveStreams) {
-      console.log(`[Duration Check] Checking stream ${stream.id}: duration=${stream.duration}, start_time=${stream.start_time}`);
+      console.log(`\n[Duration Check] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`[Duration Check] Checking stream: ${stream.title} (ID: ${stream.id})`);
+      console.log(`[Duration Check]   scheduled_end_time: ${stream.scheduled_end_time || 'NOT SET'}`);
+      console.log(`[Duration Check]   active_schedule_id: ${stream.active_schedule_id || 'NOT SET'}`);
+      console.log(`[Duration Check]   duration: ${stream.duration || 'NOT SET'} minutes`);
+      console.log(`[Duration Check]   start_time: ${stream.start_time || 'NOT SET'}`);
       
-      if (stream.duration && stream.start_time) {
-        const startTime = new Date(stream.start_time);
-        const durationMs = stream.duration * 60 * 1000;
-        const shouldEndAt = new Date(startTime.getTime() + durationMs);
-        const now = new Date();
+      // ⭐ NEW LOGIC: Use scheduled_end_time if available (most reliable)
+      let endTime = stream.scheduled_end_time;
+      let endTimeSource = 'scheduled_end_time';
+      
+      // Fallback 1: If stream has active_schedule_id, get end_time from schedule
+      if (!endTime && stream.active_schedule_id) {
+        console.log(`[Duration Check] No scheduled_end_time, checking active schedule ${stream.active_schedule_id}...`);
         
-        const elapsedMs = now.getTime() - startTime.getTime();
-        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+        const StreamSchedule = require('../models/StreamSchedule');
+        const schedule = await StreamSchedule.findById(stream.active_schedule_id);
+        
+        if (schedule) {
+          if (schedule.end_time) {
+            endTime = schedule.end_time;
+            endTimeSource = 'schedule.end_time';
+            console.log(`[Duration Check] ✓ Using schedule.end_time: ${endTime}`);
+          } else {
+            // Calculate from schedule time + duration
+            endTime = new Date(new Date(schedule.schedule_time).getTime() + schedule.duration * 60 * 1000).toISOString();
+            endTimeSource = 'schedule.time + duration';
+            console.log(`[Duration Check] ✓ Calculated from schedule: ${endTime}`);
+          }
+        } else {
+          console.warn(`[Duration Check] ⚠️  Active schedule ${stream.active_schedule_id} not found in database!`);
+        }
+      }
+      
+      // Fallback 2: Calculate from start_time + duration (old method)
+      if (!endTime && stream.duration && stream.start_time) {
+        const start = new Date(stream.start_time);
+        endTime = new Date(start.getTime() + stream.duration * 60 * 1000).toISOString();
+        endTimeSource = 'start_time + duration';
+        console.log(`[Duration Check] ✓ Calculated from start_time + duration: ${endTime}`);
+      }
+      
+      if (endTime) {
+        const shouldEndAt = new Date(endTime);
+        const shouldEndAtWIB = shouldEndAt.toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour12: false });
+        
         const remainingMs = shouldEndAt.getTime() - now.getTime();
         const remainingMinutes = Math.floor(remainingMs / 60000);
         
-        console.log(`[Duration Check] Stream ${stream.id}: elapsed=${elapsedMinutes}m, remaining=${remainingMinutes}m, shouldEnd=${shouldEndAt.toLocaleString()}`);
+        console.log(`[Duration Check] End time analysis:`);
+        console.log(`[Duration Check]   Source: ${endTimeSource}`);
+        console.log(`[Duration Check]   Should end at: ${shouldEndAtWIB} WIB`);
+        console.log(`[Duration Check]   Current time: ${currentTimeWIB} WIB`);
+        console.log(`[Duration Check]   Time remaining: ${remainingMinutes} minutes`);
         
         if (shouldEndAt <= now) {
-          console.log(`[Duration Check] ⚠️ Stream ${stream.id} exceeded duration by ${Math.abs(remainingMinutes)} minutes, stopping now!`);
-          await streamingService.stopStream(stream.id);
-          scheduledTerminations.delete(stream.id);
-        } else if (!scheduledTerminations.has(stream.id)) {
-          const timeUntilEnd = shouldEndAt.getTime() - now.getTime();
-          scheduleStreamTermination(stream.id, timeUntilEnd / 60000);
+          console.log(`[Duration Check] 🛑 Stream ${stream.id} exceeded end time by ${Math.abs(remainingMinutes)} minutes!`);
+          console.log(`[Duration Check] 🛑 Stopping stream now...`);
+          
+          const stopResult = await streamingService.stopStream(stream.id);
+          
+          if (stopResult.success) {
+            console.log(`[Duration Check] ✅ Stream ${stream.id} stopped successfully`);
+          } else {
+            console.error(`[Duration Check] ❌ Failed to stop stream ${stream.id}: ${stopResult.error}`);
+            
+            // ⭐ CRITICAL FIX: If stop failed, force update status to offline
+            // This handles edge cases where stream is stuck in "live" status
+            console.log(`[Duration Check] 🔧 Force updating stream ${stream.id} status to offline`);
+            const Stream = require('../models/Stream');
+            await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+            await Stream.update(stream.id, { active_schedule_id: null, scheduled_end_time: null });
+            console.log(`[Duration Check] ✅ Stream ${stream.id} forced to offline`);
+          }
+        } else {
+          console.log(`[Duration Check] ✓ Stream ${stream.id} will stop in ${remainingMinutes} minutes`);
         }
       } else {
-        console.log(`[Duration Check] Stream ${stream.id} missing duration or start_time, skipping`);
+        console.warn(`[Duration Check] ⚠️  Stream ${stream.id} has NO end time information!`);
+        console.warn(`[Duration Check] ⚠️  Cannot determine when to stop this stream`);
       }
+      console.log(`[Duration Check] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     }
   } catch (error) {
     console.error('[Duration Check] Error checking stream durations:', error);

@@ -207,6 +207,8 @@
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Platform
                 </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Channel
+                </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Schedule
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Start Time
@@ -220,7 +222,7 @@
             </thead>
             <tbody class="divide-y divide-gray-700">
               <tr id="empty-state" class="hover:bg-dark-700/50 transition-colors" style="display: none;">
-                <td colspan="7" class="px-6 py-10 text-center">
+                <td colspan="8" class="px-6 py-10 text-center">
                   <div class="flex flex-col items-center">
                     <div class="w-16 h-16 rounded-full bg-dark-700 flex items-center justify-center mb-4">
                       <i class="ti ti-broadcast text-gray-500 text-2xl"></i>
@@ -672,8 +674,22 @@
 
         updateSystemStats();
         setInterval(updateSystemStats, 5000);
-        document.getElementById('newStreamForm').addEventListener('submit', function (e) {
-          e.preventDefault();
+        
+        console.log('[Dashboard] Looking for newStreamForm...');
+        const newStreamForm = document.getElementById('newStreamForm');
+        console.log('[Dashboard] newStreamForm found:', !!newStreamForm);
+        console.log('[Dashboard] newStreamForm element:', newStreamForm);
+        
+        if (!newStreamForm) {
+          console.error('[Dashboard] ❌ newStreamForm NOT FOUND! Cannot attach event listener.');
+        } else {
+          console.log('[Dashboard] ✅ Attaching submit event listener to newStreamForm');
+          newStreamForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            
+            console.log('='.repeat(60));
+            console.log('[Form Submit] ========== CREATE STREAM BUTTON CLICKED ==========');
+            console.log('='.repeat(60));
           
           // ⭐ DETECT ACTIVE TAB - YouTube API or Manual RTMP
           const currentTab = (window.currentStreamTab || 'manual').toLowerCase();
@@ -751,11 +767,8 @@
               return;
             }
             
-            // Validate stream key uniqueness
-            if (!isStreamKeyValid) {
-              showNotification('Warning', 'Please use a different stream key. This one is already in use.', 'warning');
-              return;
-            }
+            // Stream key validation removed - allow duplicate keys
+            // Only one stream can be active at a time (handled by streaming platform)
           }
           
           const formData = {
@@ -770,6 +783,20 @@
             formData.useYouTubeAPI = true;
             formData.rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value || '';
             formData.streamKey = document.getElementById('youtubeStreamKey')?.value || '';
+            
+            // Get YouTube channel ID from selector
+            const youtubeChannelSelect = document.getElementById('youtubeChannelSelect');
+            const channelIdValue = youtubeChannelSelect?.value;
+            
+            console.log('[Form Submit] ========== CHANNEL DEBUG ==========');
+            console.log('[Form Submit] youtubeChannelSelect element:', youtubeChannelSelect);
+            console.log('[Form Submit] youtubeChannelSelect.value:', channelIdValue);
+            console.log('[Form Submit] youtubeChannelSelect.options:', youtubeChannelSelect?.options);
+            console.log('[Form Submit] youtubeChannelSelect.selectedIndex:', youtubeChannelSelect?.selectedIndex);
+            
+            formData.youtubeChannelId = channelIdValue;
+            console.log('[Form Submit] ✅ YouTube Channel ID:', formData.youtubeChannelId);
+            console.log('[Form Submit] ========================================');
             
             // Get YouTube stream ID from hidden field or sessionStorage fallback
             const youtubeStreamIdInput = document.getElementById('youtubeStreamId');
@@ -954,7 +981,8 @@
               submitBtn.innerHTML = originalBtnText;
               showNotification('Error', `Failed to create stream: ${error.message}`, 'error');
             });
-        });
+          });
+        }
         // Auto-refresh configuration
         let autoRefreshInterval = null;
         let lastRefreshTime = Date.now();
@@ -996,16 +1024,12 @@
         }
         
         function displayStreams(streams) {
-          console.log('[displayStreams] Called with', streams?.length || 0, 'streams');
           if (!streams || streams.length === 0) {
-            console.log('[displayStreams] No streams, showing empty state');
             showEmptyState();
             return;
           }
-          console.log('[displayStreams] Rendering streams...');
           displayMobileStreams(streams);
           displayDesktopStreams(streams);
-          console.log('[displayStreams] Rendering complete');
         }
         
         function displayMobileStreams(streams) {
@@ -1059,16 +1083,10 @@
           
           // Add cache busting to prevent stale data
           const cacheBuster = `?_=${Date.now()}`;
-          console.log('[loadStreams] Fetching streams with cache buster:', cacheBuster);
           fetch(`/api/streams${cacheBuster}`)
-            .then(response => {
-              console.log('[loadStreams] Response status:', response.status);
-              return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-              console.log('[loadStreams] Response data:', data);
               if (data.success) {
-                console.log('[loadStreams] Got', data.streams?.length || 0, 'streams');
                 displayStreams(data.streams);
                 updateStreamCounters(data.streams);
                 setupSmartRefresh(data.streams);
@@ -1113,15 +1131,12 @@
           if (hasActiveStreams) {
             refreshInterval = 20000; // Increased from 10s to 20s
             intervalText = '20s';
-            console.log('[Auto-Refresh] Active streams detected, refreshing every 20 seconds');
           } else if (hasScheduledStreams) {
             refreshInterval = 60000; // Increased from 30s to 60s
             intervalText = '1m';
-            console.log('[Auto-Refresh] Scheduled streams detected, refreshing every 60 seconds');
           } else {
             refreshInterval = 120000; // Keep 2 minutes
             intervalText = '2m';
-            console.log('[Auto-Refresh] All streams offline, refreshing every 2 minutes');
           }
           
           // Update indicator
@@ -1138,11 +1153,9 @@
                                 !document.getElementById('newStreamModal').classList.contains('hidden');
             
             if (editModalOpen || newModalOpen) {
-              console.log('[Auto-Refresh] Skipping refresh - modal is open');
               return;
             }
             
-            console.log('[Auto-Refresh] Refreshing stream status...');
             loadStreams(true);
           }, refreshInterval);
         }
@@ -1272,6 +1285,11 @@
               <span>${stream.use_youtube_api ? 'YouTube API' : (stream.platform || 'Custom')}</span>
             </div>
           </div>
+          ${stream.youtube_channel_name ? `
+          <div class="flex items-center gap-2 mb-2 text-xs text-gray-400">
+            ${stream.youtube_channel_avatar ? `<img src="${stream.youtube_channel_avatar}" class="w-5 h-5 rounded-full" alt="${stream.youtube_channel_name}">` : '<i class="ti ti-user-circle"></i>'}
+            <span>${stream.youtube_channel_name}</span>
+          </div>` : ''}
           <div class="text-xs text-gray-400 mb-2">
             ${settingsDisplay}
           </div>
@@ -1455,6 +1473,13 @@
             <i class="ti ti-brand-${getPlatformIcon(stream.use_youtube_api ? 'YouTube' : stream.platform)} text-${getPlatformColor(stream.use_youtube_api ? 'YouTube' : stream.platform)} mr-1.5"></i>
             <span class="text-sm">${stream.use_youtube_api ? 'YouTube API' : (stream.platform || 'Custom')}</span>
           </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          ${stream.youtube_channel_name ? `
+          <div class="flex items-center gap-2">
+            ${stream.youtube_channel_avatar ? `<img src="${stream.youtube_channel_avatar}" class="w-6 h-6 rounded-full" alt="${stream.youtube_channel_name}">` : '<i class="ti ti-user-circle text-gray-400"></i>'}
+            <span class="text-sm text-gray-300">${stream.youtube_channel_name}</span>
+          </div>` : '<span class="text-xs text-gray-500">—</span>'}
         </td>
         <td class="px-6 py-4">
           ${stream.schedules && stream.schedules.length > 0
@@ -2312,10 +2337,7 @@
               }
             });
             
-            // Load schedules for this stream
-            loadStreamSchedules(stream.id);
-            
-            // ⭐ Switch to correct tab based on stream mode
+            // ⭐ Switch to correct tab based on stream mode FIRST
             console.log('[Edit Modal] Stream data:', {
               id: stream.id,
               title: stream.title,
@@ -2340,6 +2362,10 @@
                   } else {
                     console.error('[Edit Modal] populateEditYouTubeAPIFields function not found!');
                   }
+                  
+                  // Load schedules AFTER tab switch and field population
+                  console.log('[Edit Modal] Loading schedules for stream:', stream.id);
+                  loadStreamSchedules(stream.id);
                 }, 100);
               }, 50);
             } else {
@@ -2349,6 +2375,12 @@
               setTimeout(() => {
                 console.log('[Edit Modal] Calling switchStreamTab("manual")');
                 switchStreamTab('manual');
+                
+                // Load schedules AFTER tab switch
+                setTimeout(() => {
+                  console.log('[Edit Modal] Loading schedules for stream:', stream.id);
+                  loadStreamSchedules(stream.id);
+                }, 100);
               }, 50);
             }
           } catch (error) {
@@ -2599,7 +2631,9 @@
           }
           const editForm = document.getElementById('editStreamForm');
           if (editForm) {
+            console.log('[Edit Form] Attaching submit event listener');
             editForm.addEventListener('submit', function (e) {
+              console.log('[Edit Form] ⭐ Form submitted!');
               e.preventDefault();
               const streamId = document.getElementById('editStreamId').value;
               if (!streamId) {
@@ -2633,6 +2667,20 @@
                 formData.rtmpUrl = document.getElementById('editYoutubeRtmpUrl')?.value || '';
                 formData.streamKey = document.getElementById('editYoutubeStreamKey')?.value || '';
                 formData.youtubeStreamId = document.getElementById('editYoutubeStreamId')?.value || '';
+                
+                // ⭐ MULTI-CHANNEL: Get YouTube channel ID from selector
+                const editYoutubeChannelSelect = document.getElementById('editYoutubeChannelSelect');
+                const editChannelIdValue = editYoutubeChannelSelect?.value;
+                
+                console.log('[Edit Stream] ========== CHANNEL DEBUG ==========');
+                console.log('[Edit Stream] editYoutubeChannelSelect element:', editYoutubeChannelSelect);
+                console.log('[Edit Stream] editYoutubeChannelSelect.value:', editChannelIdValue);
+                console.log('[Edit Stream] editYoutubeChannelSelect.options:', editYoutubeChannelSelect?.options);
+                console.log('[Edit Stream] editYoutubeChannelSelect.selectedIndex:', editYoutubeChannelSelect?.selectedIndex);
+                
+                formData.youtubeChannelId = editChannelIdValue;
+                console.log('[Edit Stream] ✅ YouTube Channel ID:', formData.youtubeChannelId);
+                console.log('[Edit Stream] ========================================');
                 
                 console.log('[Edit Stream] YouTube API fields:');
                 console.log('  - RTMP URL:', formData.rtmpUrl);
@@ -2707,10 +2755,16 @@
 
               // Collect multiple schedules
               const schedules = collectEditSchedules();
+              console.log('[Edit Form] Collected schedules:', schedules);
               if (schedules.length > 0) {
                 formData.schedules = schedules;
+                console.log('[Edit Form] Added schedules to formData');
+              } else {
+                console.log('[Edit Form] No schedules to add');
               }
               const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
+              console.log('[Edit Form] Sending PUT request to /api/streams/' + streamId);
+              console.log('[Edit Form] Form data:', formData);
               fetch(`/api/streams/${streamId}`, {
                 method: 'PUT',
                 headers: {
@@ -2993,12 +3047,56 @@
         }
 
         function collectSchedules() {
+          console.log('[collectSchedules] Starting to collect schedules for NEW stream');
           const slots = document.querySelectorAll('#scheduleSlotsContainer .schedule-slot');
+          console.log('[collectSchedules] Found', slots.length, 'schedule slots');
           const schedules = [];
 
-          slots.forEach(slot => {
-            const time = slot.querySelector('.schedule-time').value;
-            const duration = slot.querySelector('.schedule-duration').value;
+          slots.forEach((slot, index) => {
+            const timeInput = slot.querySelector('.schedule-time');
+            const endTimeInput = slot.querySelector('.schedule-endtime');
+            const durationInput = slot.querySelector('.schedule-duration');
+            const hoursInput = slot.querySelector('.duration-hours');
+            const minutesInput = slot.querySelector('.duration-minutes');
+            
+            const time = timeInput?.value;
+            const endTime = endTimeInput?.value;
+            let duration = durationInput?.value;
+            
+            // ⭐ FIX: Recalculate duration from hours/minutes inputs if they exist
+            if (hoursInput && minutesInput) {
+              const hours = parseInt(hoursInput.value) || 0;
+              const minutes = parseInt(minutesInput.value) || 0;
+              duration = (hours * 60) + minutes;
+              console.log(`[collectSchedules] Recalculated duration from inputs: ${hours}h ${minutes}m = ${duration} minutes`);
+            }
+            
+            // ⭐ NEW: If duration is still empty but we have start and end time, calculate it
+            if ((!duration || duration === '0') && time && endTime) {
+              const [startHour, startMin] = time.split(':').map(Number);
+              const [endHour, endMin] = endTime.split(':').map(Number);
+              
+              let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+              
+              // Handle overnight streams
+              if (durationMinutes < 0) {
+                durationMinutes += 24 * 60;
+              }
+              
+              duration = durationMinutes;
+              console.log(`[collectSchedules] Calculated duration from end time: ${time} -> ${endTime} = ${duration} minutes`);
+            }
+            
+            console.log(`[collectSchedules] Slot ${index + 1}:`, {
+              time,
+              endTime,
+              duration,
+              timeInput: !!timeInput,
+              endTimeInput: !!endTimeInput,
+              durationInput: !!durationInput,
+              hoursInput: hoursInput?.value,
+              minutesInput: minutesInput?.value
+            });
 
             if (time && duration) {
               // Check if any recurring days are selected
@@ -3032,15 +3130,25 @@
               // This tells the system it's already in local time
               const localTimeString = `${year}-${month}-${day}T${time}:00.000`;
               
+              // ⭐ Calculate end_time from start time + duration
+              const endDateTime = new Date(scheduleDate.getTime() + parseInt(duration) * 60 * 1000);
+              const endYear = endDateTime.getFullYear();
+              const endMonth = String(endDateTime.getMonth() + 1).padStart(2, '0');
+              const endDay = String(endDateTime.getDate()).padStart(2, '0');
+              const endHours = String(endDateTime.getHours()).padStart(2, '0');
+              const endMinutes = String(endDateTime.getMinutes()).padStart(2, '0');
+              const endTimeString = `${endYear}-${endMonth}-${endDay}T${endHours}:${endMinutes}:00.000`;
+              
               // Get user's timezone for reference
               const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
               
-              console.log(`[Schedule] Created schedule: ${localTimeString} (${userTimezone})`);
+              console.log(`[Schedule] Created schedule: ${localTimeString} -> ${endTimeString} (${userTimezone})`);
               
               const scheduleData = {
                 schedule_time: localTimeString, // Local time format (no Z)
+                end_time: endTimeString, // ⭐ NEW: Send end_time to backend
                 user_timezone: userTimezone, // Store user's timezone for reference
-                duration: parseInt(duration)
+                duration: parseInt(duration) // Keep for backward compatibility
               };
 
               // Add recurring info if days are selected
@@ -3050,8 +3158,13 @@
               }
 
               schedules.push(scheduleData);
+              console.log(`[collectSchedules] ✅ Added schedule ${schedules.length}:`, scheduleData);
+            } else {
+              console.log(`[collectSchedules] ⚠️ Skipping slot ${index + 1} - missing time or duration`);
             }
           });
+
+          console.log('[collectSchedules] Total schedules collected:', schedules.length);
 
           return schedules;
         }
@@ -3064,7 +3177,7 @@
           <div class="flex gap-3 items-start mb-3">
             <div class="flex-1">
               <label class="text-xs text-gray-400 mb-1.5 block">Start</label>
-              <input type="time" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditDurationFromEndTime(this)">
+              <input type="time" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditFromDuration(this)">
             </div>
             <div class="flex-1">
               <label class="text-xs text-gray-400 mb-1.5 block">End</label>
@@ -3156,6 +3269,7 @@
           const minutesInput = slot.querySelector('.duration-minutes');
 
           if (!startTimeInput.value || !endTimeInput.value) {
+            console.log('[calculateEditDurationFromEndTime] Missing start or end time');
             return;
           }
 
@@ -3168,9 +3282,24 @@
             durationMinutes += 24 * 60;
           }
 
-          durationInput.value = durationMinutes;
-          hoursInput.value = Math.floor(durationMinutes / 60);
-          minutesInput.value = durationMinutes % 60;
+          // ⭐ Update all duration-related inputs
+          if (durationInput) {
+            durationInput.value = durationMinutes;
+          }
+          if (hoursInput) {
+            hoursInput.value = Math.floor(durationMinutes / 60);
+          }
+          if (minutesInput) {
+            minutesInput.value = durationMinutes % 60;
+          }
+          
+          console.log('[calculateEditDurationFromEndTime] Updated duration:', {
+            start: startTimeInput.value,
+            end: endTimeInput.value,
+            durationMinutes: durationMinutes,
+            hours: Math.floor(durationMinutes / 60),
+            minutes: durationMinutes % 60
+          });
         }
 
         // Calculate end time from start and duration for edit modal
@@ -3186,9 +3315,14 @@
           const minutes = parseInt(minutesInput.value) || 0;
           const totalMinutes = (hours * 60) + minutes;
 
-          durationInput.value = totalMinutes;
+          // ⭐ Update hidden duration input
+          if (durationInput) {
+            durationInput.value = totalMinutes;
+            console.log('[calculateEditFromDuration] Updated duration to:', totalMinutes, 'minutes');
+          }
 
           if (!startTimeInput.value) {
+            console.log('[calculateEditFromDuration] No start time, skipping end time calculation');
             return;
           }
 
@@ -3203,6 +3337,7 @@
           const endMin = endTotalMinutes % 60;
 
           endTimeInput.value = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+          console.log('[calculateEditFromDuration] Updated end time to:', endTimeInput.value);
         }
 
         // Attach recurring day listeners for edit modal
@@ -3225,12 +3360,56 @@
         }
 
         function collectEditSchedules() {
+          console.log('[collectEditSchedules] Starting to collect schedules');
           const slots = document.querySelectorAll('#editScheduleSlotsContainer .schedule-slot');
+          console.log('[collectEditSchedules] Found', slots.length, 'schedule slots');
           const schedules = [];
 
-          slots.forEach(slot => {
-            const time = slot.querySelector('.schedule-time').value;
-            const duration = slot.querySelector('.schedule-duration').value;
+          slots.forEach((slot, index) => {
+            const timeInput = slot.querySelector('.schedule-time');
+            const endTimeInput = slot.querySelector('.schedule-endtime');
+            const durationInput = slot.querySelector('.schedule-duration');
+            const hoursInput = slot.querySelector('.duration-hours');
+            const minutesInput = slot.querySelector('.duration-minutes');
+            
+            const time = timeInput?.value;
+            const endTime = endTimeInput?.value;
+            let duration = durationInput?.value;
+            
+            // ⭐ FIX: Recalculate duration from hours/minutes inputs if they exist
+            if (hoursInput && minutesInput) {
+              const hours = parseInt(hoursInput.value) || 0;
+              const minutes = parseInt(minutesInput.value) || 0;
+              duration = (hours * 60) + minutes;
+              console.log(`[collectEditSchedules] Recalculated duration from inputs: ${hours}h ${minutes}m = ${duration} minutes`);
+            }
+            
+            // ⭐ NEW: If duration is still empty but we have start and end time, calculate it
+            if ((!duration || duration === '0') && time && endTime) {
+              const [startHour, startMin] = time.split(':').map(Number);
+              const [endHour, endMin] = endTime.split(':').map(Number);
+              
+              let durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+              
+              // Handle overnight streams
+              if (durationMinutes < 0) {
+                durationMinutes += 24 * 60;
+              }
+              
+              duration = durationMinutes;
+              console.log(`[collectEditSchedules] Calculated duration from end time: ${time} -> ${endTime} = ${duration} minutes`);
+            }
+            
+            console.log(`[collectEditSchedules] Slot ${index + 1}:`, {
+              time,
+              endTime,
+              duration,
+              timeInput: !!timeInput,
+              endTimeInput: !!endTimeInput,
+              durationInput: !!durationInput,
+              hoursInput: hoursInput?.value,
+              minutesInput: minutesInput?.value
+            });
             
             // Get selected recurring days
             const selectedDays = [];
@@ -3270,10 +3449,22 @@
               
               console.log(`[Edit Schedule] Created schedule: ${localTimeString} (${userTimezone})`);
               
+              // ⭐ Calculate end_time from start time + duration
+              const endDateTime = new Date(scheduleDate.getTime() + parseInt(duration) * 60 * 1000);
+              const endYear = endDateTime.getFullYear();
+              const endMonth = String(endDateTime.getMonth() + 1).padStart(2, '0');
+              const endDay = String(endDateTime.getDate()).padStart(2, '0');
+              const endHours = String(endDateTime.getHours()).padStart(2, '0');
+              const endMinutes = String(endDateTime.getMinutes()).padStart(2, '0');
+              const endTimeString = `${endYear}-${endMonth}-${endDay}T${endHours}:${endMinutes}:00.000`;
+              
+              console.log(`[Edit Schedule] End time: ${endTimeString}`);
+              
               const schedule = {
                 schedule_time: localTimeString, // Local time format (no Z)
+                end_time: endTimeString, // ⭐ NEW: Send end_time to backend
                 user_timezone: userTimezone, // User's timezone
-                duration: parseInt(duration)
+                duration: parseInt(duration) // Keep for backward compatibility
               };
               
               // Add recurring info if days are selected
@@ -3283,22 +3474,38 @@
               }
               
               schedules.push(schedule);
+              console.log(`[collectEditSchedules] ✅ Added schedule ${schedules.length}:`, schedule);
+            } else {
+              console.log(`[collectEditSchedules] ⚠️ Skipping slot - missing time or duration`);
             }
           });
 
+          console.log('[collectEditSchedules] Total schedules collected:', schedules.length);
           return schedules;
         }
 
         async function loadStreamSchedules(streamId) {
+          console.log('[loadStreamSchedules] Starting to load schedules for stream:', streamId);
           try {
             const response = await fetch(`/api/streams/${streamId}/schedules`);
             const data = await response.json();
+            
+            console.log('[loadStreamSchedules] API response:', data);
 
             if (data.success && data.schedules && data.schedules.length > 0) {
+              console.log('[loadStreamSchedules] Found', data.schedules.length, 'schedules');
               const container = document.getElementById('editScheduleSlotsContainer');
+              
+              if (!container) {
+                console.error('[loadStreamSchedules] Container #editScheduleSlotsContainer not found!');
+                return;
+              }
+              
+              console.log('[loadStreamSchedules] Container found, clearing existing slots');
               container.innerHTML = ''; // Clear existing
 
-              data.schedules.forEach(schedule => {
+              data.schedules.forEach((schedule, index) => {
+                console.log(`[loadStreamSchedules] Processing schedule ${index + 1}:`, schedule);
                 // Parse schedule time correctly
                 // If it has 'Z' at the end, it's UTC - convert to local
                 // If no 'Z', it's already in local format - parse directly
@@ -3339,7 +3546,7 @@
                 <div class="flex gap-3 items-start mb-3">
                   <div class="flex-1">
                     <label class="text-xs text-gray-400 mb-1.5 block">Start</label>
-                    <input type="time" value="${formattedTime}" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditDurationFromEndTime(this)">
+                    <input type="time" value="${formattedTime}" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditFromDuration(this)">
                   </div>
                   <div class="flex-1">
                     <label class="text-xs text-gray-400 mb-1.5 block">End</label>
@@ -3380,15 +3587,18 @@
                 container.insertAdjacentHTML('beforeend', slotHTML);
               });
               
+              console.log('[loadStreamSchedules] All schedules rendered, attaching listeners');
               attachEditRecurringDayListeners();
 
               updateEditRemoveButtons();
+              console.log('[loadStreamSchedules] ✅ Successfully loaded schedules');
             } else {
+              console.log('[loadStreamSchedules] No schedules found, adding empty slot');
               // No schedules, add one empty slot
               addEditScheduleSlot();
             }
           } catch (error) {
-            console.error('Error loading schedules:', error);
+            console.error('[loadStreamSchedules] ❌ Error loading schedules:', error);
             // Add one empty slot on error
             addEditScheduleSlot();
           }
@@ -3711,7 +3921,7 @@
         </div>
       </div>
       <script src="/js/dashboard-stats.js"></script>
-      <script src="/js/youtube-title-autocomplete.js?v=1.0.0"></script>
+      <script src="/js/youtube-title-autocomplete.js?v=2.1.2"></script>
       <!-- Note: stream-modal.js already loaded in layout.ejs -->
       
       <!-- Multi-Channel YouTube Management -->
@@ -4016,6 +4226,19 @@
         function renderStreamRow(stream, isGrouped = false) {
           const indentClass = isGrouped ? 'pl-12' : 'pl-6';
           
+          // Get channel name - with better fallback
+          let channelName = '-';
+          if (stream.youtube_channel_name) {
+            // Has channel name from database
+            channelName = stream.youtube_channel_name;
+          } else if (stream.use_youtube_api === 1 || stream.use_youtube_api === true) {
+            // Using YouTube API but channel name not loaded yet
+            channelName = 'YouTube API (loading...)';
+          } else if (stream.platform && stream.platform.toLowerCase().includes('youtube')) {
+            // Manual YouTube RTMP
+            channelName = 'YouTube (Manual)';
+          }
+          
           return `
             <tr class="hover:bg-dark-700/50 transition-colors" data-stream-id="${stream.id}">
               <td class="${indentClass} py-3">
@@ -4040,6 +4263,9 @@
                   ${stream.platform_icon ? `<i class="${stream.platform_icon} text-lg"></i>` : '<i class="ti ti-broadcast text-gray-400"></i>'}
                   <span class="text-sm text-gray-300">${stream.platform || 'Custom'}</span>
                 </div>
+              </td>
+              <td class="px-6 py-3">
+                <span class="text-sm text-gray-300">${channelName}</span>
               </td>
               <td class="px-6 py-3">
                 <span class="text-sm text-gray-300">${stream.schedule_info || 'No schedule'}</span>
@@ -4119,16 +4345,60 @@
       
       <!-- Initialize Title Autocomplete -->
       <script>
-        document.addEventListener('DOMContentLoaded', () => {
-          // Initialize for new stream modal
-          initTitleAutocomplete('streamTitle', 'streamTitleSuggestionsDropdown');
+        // Initialize title autocomplete when ready
+        function initializeTitleAutocomplete() {
+          console.log('[Dashboard] Attempting to initialize title autocomplete...');
           
-          // Initialize for edit stream modal
-          initTitleAutocomplete('editStreamTitle', 'editTitleSuggestionsDropdown');
-          
-          console.log('[Dashboard] Title autocomplete initialized');
-        });
+          if (typeof initTitleAutocomplete === 'function') {
+            // Initialize for new stream modal
+            initTitleAutocomplete('streamTitle', 'streamTitleSuggestionsDropdown');
+            
+            // Initialize for edit stream modal
+            initTitleAutocomplete('editStreamTitle', 'editTitleSuggestionsDropdown');
+            
+            console.log('[Dashboard] ✓ Title autocomplete initialized');
+          } else {
+            console.warn('[Dashboard] ⚠️ initTitleAutocomplete function not found, retrying...');
+            setTimeout(initializeTitleAutocomplete, 100);
+          }
+        }
+        
+        // Try to initialize after DOM is ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initializeTitleAutocomplete);
+        } else {
+          initializeTitleAutocomplete();
+        }
       </script>
 
       <!-- Stream Templates UI -->
       <%- include('partials/stream-templates-ui') %>
+
+<!-- Prevent Modal Close on Backdrop Click -->
+<script>
+  // Prevent closing modals when clicking backdrop (only close via Cancel/X button)
+  // NOTE: This runs AFTER all event listeners are attached to avoid removing them
+  window.addEventListener('load', () => {
+    const modalsToProtect = ['newStreamModal', 'editStreamModal'];
+    
+    modalsToProtect.forEach(modalId => {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        // Add click listener that prevents backdrop close
+        // WITHOUT cloning (which would remove existing event listeners)
+        modal.addEventListener('click', (e) => {
+          // If clicking directly on modal overlay (not on content), prevent close
+          if (e.target === modal) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`[Modal Protection] Prevented ${modalId} from closing via backdrop click`);
+          }
+        });
+        
+        console.log(`[Modal Protection] ${modalId} protected from backdrop close`);
+      }
+    });
+    
+    console.log('[Modal Protection] Modals can only be closed via Cancel/X button');
+  });
+</script>

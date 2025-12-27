@@ -18,25 +18,39 @@ const createOAuthClient = (credentials) => {
  * If channelId is not provided, returns the default channel
  */
 const getTokensFromDB = async (userId, channelId = null) => {
+  // ⭐ DEBUG: Log parameter yang diterima
+  console.log(`[getTokensFromDB] ========== DEBUG ==========`);
+  console.log(`[getTokensFromDB] userId:`, userId);
+  console.log(`[getTokensFromDB] channelId (raw):`, channelId);
+  console.log(`[getTokensFromDB] channelId type:`, typeof channelId);
+  console.log(`[getTokensFromDB] channelId truthy?:`, !!channelId);
+  console.log(`[getTokensFromDB] =====================================`);
+  
   return new Promise((resolve, reject) => {
     let query, params;
     
     if (channelId) {
       // Get specific channel
+      console.log(`[getTokensFromDB] Using specific channel query`);
       query = 'SELECT * FROM youtube_channels WHERE user_id = ? AND channel_id = ?';
       params = [userId, channelId];
     } else {
       // Get default channel or first available channel
+      console.log(`[getTokensFromDB] Using default channel query`);
       query = `SELECT * FROM youtube_channels WHERE user_id = ? 
                ORDER BY is_default DESC, created_at ASC LIMIT 1`;
       params = [userId];
     }
+    
+    console.log(`[getTokensFromDB] Query:`, query);
+    console.log(`[getTokensFromDB] Params:`, params);
     
     db.get(query, params, (err, row) => {
       if (err) {
         console.error('[TokenManager] Error getting tokens from DB:', err);
         reject(err);
       } else {
+        console.log(`[getTokensFromDB] Result:`, row ? `Found channel: ${row.channel_title || row.channel_id}` : 'Not found');
         resolve(row);
       }
     });

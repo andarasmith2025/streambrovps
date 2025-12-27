@@ -24,13 +24,24 @@
         
         <div class="space-y-3">
           <!-- Video Selector -->
-          <%- include('stream-modal-video-selector', {
-            videoIdField: 'editSelectedVideoId',
-            selectedVideoField: 'editSelectedVideo',
-            dropdownId: 'editVideoSelectorDropdown',
-            searchInputId: 'editVideoSearchInput',
-            listContainerId: 'editVideoListContainer'
-          }) %>
+          <div class="border border-blue-500/30 bg-blue-500/5 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <i class="ti ti-video text-blue-500 text-lg"></i>
+              <label class="text-sm font-medium text-white">Select Video or Playlist</label>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+              <i class="ti ti-info-circle mr-1"></i>
+              You can change the video/playlist for this stream. Click the button below to browse and select.
+            </p>
+            <%- include('stream-modal-video-selector', {
+              videoIdField: 'editSelectedVideoId',
+              selectedVideoField: 'editSelectedVideo',
+              dropdownId: 'editVideoSelectorDropdown',
+              searchInputId: 'editVideoSearchInput',
+              listContainerId: 'editVideoListContainer',
+              toggleFunction: 'toggleEditVideoSelector'
+            }) %>
+          </div>
           
           <!-- Stream Title with Autocomplete and AI Generate -->
           <div>
@@ -47,12 +58,16 @@
               </button>
             </div>
             <div class="relative">
-              <input type="text" id="editStreamTitle" name="streamTitle" required
+              <input type="text" 
+                id="editStreamTitle" 
+                name="streamTitle" 
+                autocomplete="off"
+                required
                 class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
                 placeholder="Enter stream title (suggestions will appear as you type)">
               
               <!-- Autocomplete Dropdown -->
-              <div id="editTitleSuggestionsDropdown" class="hidden absolute z-20 w-full mt-1 bg-dark-700 border border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+              <div id="editTitleSuggestionsDropdown" class="hidden absolute z-[9999] w-full mt-1 bg-dark-700 border border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                 <!-- Suggestions will be populated here -->
               </div>
             </div>
@@ -62,22 +77,22 @@
           <div id="editYoutubeApiFields" class="hidden space-y-3">
             
             <!-- YouTube Channel Selector for Edit Modal -->
-            <div id="editYoutubeChannelSelector" class="hidden">
+            <div id="editYoutubeChannelSelector">
               <label class="text-sm font-medium text-white block mb-2">
                 <i class="ti ti-brand-youtube text-red-500 mr-1"></i>
                 YouTube Channel
               </label>
               <div class="relative">
                 <select id="editYoutubeChannelSelect" name="youtubeChannelId" 
-                  class="w-full px-4 py-2.5 pl-10 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer text-white">
+                  class="w-full px-4 py-2.5 pl-10 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary appearance-none text-white">
                   <option value="" class="bg-dark-700 text-white">Loading channels...</option>
                 </select>
                 <i class="ti ti-brand-youtube text-red-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
                 <i class="ti ti-chevron-down text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               </div>
               <p class="text-xs text-gray-400 mt-1">
-                Select which YouTube channel to use for this stream. 
-                <a href="/oauth2/login" class="text-primary hover:underline">Connect another channel</a>
+                <i class="ti ti-info-circle mr-1"></i>
+                Select the YouTube channel for this stream. Changing channel will update the broadcast settings.
               </p>
             </div>
             
@@ -273,22 +288,32 @@
                       <option value="private">Private</option>
                     </select>
                   </div>
+                </div>
+                
+                <!-- Thumbnail Upload (MOVED OUTSIDE GRID - MORE PROMINENT) -->
+                <div class="border border-yellow-500/30 bg-yellow-500/5 rounded-lg p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <i class="ti ti-photo text-yellow-500 text-lg"></i>
+                    <label class="text-sm font-medium text-white">
+                      YouTube Thumbnail
+                      <span class="text-yellow-500 ml-1">⭐ Recommended</span>
+                    </label>
+                  </div>
+                  <p class="text-xs text-gray-400 mb-3">
+                    <i class="ti ti-info-circle mr-1"></i>
+                    Upload custom thumbnail for this stream (16:9 ratio, min 1280x720px). If not uploaded, video thumbnail will be used automatically.
+                  </p>
+                  <input type="file" name="youtubeThumbnail" id="editYoutubeThumbnail" accept="image/*" onchange="previewEditYoutubeThumbnail(this)"
+                    class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded text-sm cursor-pointer hover:border-primary transition-colors">
+                  <p id="editYoutubeThumbnailInfo" class="text-xs text-gray-400 mt-2"></p>
                   
-                  <!-- Thumbnail -->
-                  <div>
-                    <label class="text-sm font-medium text-white block mb-2">Thumbnail (16:9 ratio recommended)</label>
-                    <input type="file" name="youtubeThumbnail" id="editYoutubeThumbnail" accept="image/*" onchange="previewEditYoutubeThumbnail(this)"
-                      class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded text-sm cursor-pointer hover:border-primary transition-colors">
-                    <p id="editYoutubeThumbnailInfo" class="text-xs text-gray-400 mt-1"></p>
-                    
-                    <!-- Thumbnail Preview (below file input) -->
-                    <div id="editYoutubeThumbnailPreview" class="hidden mt-3">
-                      <div class="relative inline-block">
-                        <img id="editYoutubeThumbnailImg" src="" alt="Thumbnail preview" class="w-32 h-18 object-cover rounded border border-gray-600">
-                        <button type="button" onclick="clearEditYoutubeThumbnail()" class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs shadow-lg">
-                          <i class="ti ti-x text-xs"></i>
-                        </button>
-                      </div>
+                  <!-- Thumbnail Preview -->
+                  <div id="editYoutubeThumbnailPreview" class="hidden mt-3">
+                    <div class="relative inline-block">
+                      <img id="editYoutubeThumbnailImg" src="" alt="Thumbnail preview" class="w-40 h-22.5 object-cover rounded border border-gray-600 shadow-lg">
+                      <button type="button" onclick="clearEditYoutubeThumbnail()" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg transition-colors">
+                        <i class="ti ti-x text-sm"></i>
+                      </button>
                     </div>
                   </div>
                 </div>

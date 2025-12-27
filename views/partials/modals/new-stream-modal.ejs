@@ -23,13 +23,23 @@
         
         <div class="space-y-3">
           <!-- Video Selector -->
-          <%- include('stream-modal-video-selector', {
-            videoIdField: 'selectedVideoId',
-            selectedVideoField: 'selectedVideo',
-            dropdownId: 'videoSelectorDropdown',
-            searchInputId: 'videoSearchInput',
-            listContainerId: 'videoListContainer'
-          }) %>
+          <div class="border border-blue-500/30 bg-blue-500/5 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <i class="ti ti-video text-blue-500 text-lg"></i>
+              <label class="text-sm font-medium text-white">Select Video or Playlist</label>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+              <i class="ti ti-info-circle mr-1"></i>
+              Choose a video or playlist from your gallery to stream. You can search by name or browse all available content.
+            </p>
+            <%- include('stream-modal-video-selector', {
+              videoIdField: 'selectedVideoId',
+              selectedVideoField: 'selectedVideo',
+              dropdownId: 'videoSelectorDropdown',
+              searchInputId: 'videoSearchInput',
+              listContainerId: 'videoListContainer'
+            }) %>
+          </div>
           
           <!-- Stream Title -->
           <%- include('stream-modal-title', {

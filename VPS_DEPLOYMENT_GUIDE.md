@@ -6,11 +6,16 @@ Panduan deployment sederhana untuk VPS baru.
 
 ## 📋 Persiapan
 
-### Info yang Dibutuhkan:
-- IP VPS: `94.237.3.164` (contoh)
-- Username: `root`
-- Password: (dari provider VPS)
-- Domain: `streambro.nivarastudio.site` (opsional)
+### Info Server Saat Ini:
+- **Server:** UpCloud NYC
+- **IP VPS:** `85.9.195.103`
+- **Username:** `root`
+- **SSH Key:** `id_rsa_upcloud_nyc` (lokasi: `~/.ssh/id_rsa_upcloud_nyc`)
+- **Domain:** `streambro.nivarastudio.site` (opsional)
+- **App Path:** `/root/streambrovps`
+
+### Old Server (Archived):
+- IP: `94.237.3.164` (tidak digunakan lagi)
 
 ---
 
@@ -19,31 +24,71 @@ Panduan deployment sederhana untuk VPS baru.
 ### Windows (PowerShell):
 
 ```powershell
-# 1. Generate SSH Key
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-# Tekan Enter 3x (simpan di lokasi default, no passphrase)
+# 1. Generate SSH Key khusus untuk UpCloud NYC
+ssh-keygen -t rsa -b 4096 -f $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc
+# Tekan Enter 2x (no passphrase)
 
 # 2. Copy public key ke VPS
-type $env:USERPROFILE\.ssh\id_rsa.pub | ssh root@94.237.3.164 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+type $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc.pub | ssh root@85.9.195.103 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
 # Masukkan password VPS
 
 # 3. Test koneksi (tidak perlu password lagi)
-ssh root@94.237.3.164
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103
 ```
 
 ### Linux/Mac:
 
 ```bash
-# 1. Generate SSH Key
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-# Tekan Enter 3x
+# 1. Generate SSH Key khusus untuk UpCloud NYC
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_upcloud_nyc
+# Tekan Enter 2x (no passphrase)
 
 # 2. Copy public key ke VPS
-ssh-copy-id root@94.237.3.164
+ssh-copy-id -i ~/.ssh/id_rsa_upcloud_nyc.pub root@85.9.195.103
 # Masukkan password VPS
 
 # 3. Test koneksi
-ssh root@94.237.3.164
+ssh -i ~/.ssh/id_rsa_upcloud_nyc root@85.9.195.103
+```
+
+---
+
+## 🚀 Quick Deploy Commands (PowerShell)
+
+### Upload File & Restart (Tanpa Git)
+```powershell
+# Upload single file
+scp -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc views/dashboard.ejs root@85.9.195.103:/root/streambrovps/views/
+
+# Upload + Restart sekaligus
+scp -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc views/dashboard.ejs root@85.9.195.103:/root/streambrovps/views/ ; ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "pm2 restart streambro"
+```
+
+### Deploy dengan Git Pull
+```powershell
+# Pull latest code + restart
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "cd /root/streambrovps && git pull && pm2 restart streambro"
+```
+
+### Check Status & Logs
+```powershell
+# Check PM2 status
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "pm2 status"
+
+# View logs (last 50 lines)
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "pm2 logs streambro --lines 50 --nostream"
+
+# Check disk space & memory
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "df -h && free -h"
+```
+
+### Backup Database
+```powershell
+# Create backup on server
+ssh -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103 "cd /root/streambrovps && cp db/streambro.db db/backup_$(date +%Y%m%d_%H%M%S).db"
+
+# Download backup to local
+scp -i $env:USERPROFILE\.ssh\id_rsa_upcloud_nyc root@85.9.195.103:/root/streambrovps/db/streambro.db ./backups/streambro_$(Get-Date -Format 'yyyyMMdd_HHmmss').db
 ```
 
 ---
@@ -54,12 +99,12 @@ ssh root@94.237.3.164
 
 **Dengan Password:**
 ```bash
-ssh root@94.237.3.164
+ssh root@85.9.195.103
 ```
 
 **Dengan SSH Key:**
 ```bash
-ssh root@94.237.3.164
+ssh -i ~/.ssh/id_rsa_upcloud_nyc root@85.9.195.103
 # Langsung masuk tanpa password
 ```
 

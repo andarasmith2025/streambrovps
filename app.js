@@ -1787,7 +1787,7 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
     const user = await User.findById(userId);
     
     if (user) {
-      // Get current storage usage
+      // ⭐ VALIDATE STORAGE LIMIT BEFORE ACCEPTING UPLOAD
       const videos = await Video.findAll(userId);
       let totalStorageBytes = 0;
       if (videos && videos.length > 0) {
@@ -1798,22 +1798,33 @@ app.post('/upload/video', isAuthenticated, uploadVideo.single('video'), async (r
       const totalAfterUpload = totalStorageBytes + newFileSize;
       const maxStorageBytes = (user.max_storage_gb || 3) * 1024 * 1024 * 1024;
       
+      console.log(`[UPLOAD VIDEO] Storage check: Current=${(totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2)}GB, New=${(newFileSize / (1024 * 1024 * 1024)).toFixed(2)}GB, Total=${(totalAfterUpload / (1024 * 1024 * 1024)).toFixed(2)}GB, Limit=${(maxStorageBytes / (1024 * 1024 * 1024)).toFixed(2)}GB`);
+      
       if (totalAfterUpload > maxStorageBytes) {
         // Delete the uploaded file since we're rejecting it
         const uploadedFilePath = req.file.path;
         if (fs.existsSync(uploadedFilePath)) {
           fs.unlinkSync(uploadedFilePath);
+          console.log(`[UPLOAD VIDEO] Deleted rejected file: ${uploadedFilePath}`);
         }
         
         const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
         const maxGB = user.max_storage_gb || 3;
         const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
         
+        console.log(`[UPLOAD VIDEO] ❌ Storage limit exceeded: ${currentGB}GB + ${newFileGB}GB > ${maxGB}GB`);
+        
         return res.status(413).json({
+          success: false,
           error: `Storage limit exceeded. You have used ${currentGB}/${maxGB} GB. This file (${newFileGB} GB) would exceed your limit. Please delete some videos to free up space.`
         });
       }
+      
+      console.log(`[UPLOAD VIDEO] ✅ Storage check passed`);
+    } else {
+      console.log(`[UPLOAD VIDEO] ⚠️ User not found for storage validation, proceeding anyway`);
     }
+    
     const { filename, originalname, path: videoPath, mimetype, size } = req.file;
     const thumbnailName = path.basename(filename, path.extname(filename)) + '.jpg';
     const videoInfo = await getVideoInfo(videoPath);
@@ -1916,23 +1927,33 @@ app.post('/api/videos/upload', isAuthenticated, (req, res, next) => {
       const totalAfterUpload = totalStorageBytes + newFileSize;
       const maxStorageBytes = (user.max_storage_gb || 3) * 1024 * 1024 * 1024;
       
+      console.log(`[UPLOAD THUMBNAIL] Storage check: Current=${(totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2)}GB, New=${(newFileSize / (1024 * 1024 * 1024)).toFixed(2)}GB, Total=${(totalAfterUpload / (1024 * 1024 * 1024)).toFixed(2)}GB, Limit=${(maxStorageBytes / (1024 * 1024 * 1024)).toFixed(2)}GB`);
+      
       if (totalAfterUpload > maxStorageBytes) {
         // Delete the uploaded file since we're rejecting it
         const uploadedFilePath = path.join(__dirname, 'public', 'uploads', 'videos', req.file.filename);
         if (fs.existsSync(uploadedFilePath)) {
           fs.unlinkSync(uploadedFilePath);
+          console.log(`[UPLOAD THUMBNAIL] Deleted rejected file: ${uploadedFilePath}`);
         }
         
         const currentGB = (totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2);
         const maxGB = user.max_storage_gb || 3;
         const newFileGB = (newFileSize / (1024 * 1024 * 1024)).toFixed(2);
         
+        console.log(`[UPLOAD THUMBNAIL] ❌ Storage limit exceeded: ${currentGB}GB + ${newFileGB}GB > ${maxGB}GB`);
+        
         return res.status(413).json({
           success: false,
           error: `Storage limit exceeded. You have used ${currentGB}/${maxGB} GB. This file (${newFileGB} GB) would exceed your limit. Please delete some videos to free up space.`
         });
       }
+      
+      console.log(`[UPLOAD THUMBNAIL] ✅ Storage check passed`);
+    } else {
+      console.log(`[UPLOAD THUMBNAIL] ⚠️ User not found for storage validation, proceeding anyway`);
     }
+    
     let title = path.parse(req.file.originalname).name;
     const filePath = `/uploads/videos/${req.file.filename}`;
     const fullFilePath = path.join(__dirname, 'public', filePath);
@@ -2348,10 +2369,27 @@ app.get('/api/streams', isAuthenticated, async (req, res) => {
     const filter = req.query.filter;
     const streams = await Stream.findAll(req.session.userId, filter);
     
-    // Fetch schedules for each stream
+    // Fetch schedules for each stream and check if has active schedule
     const StreamSchedule = require('./models/StreamSchedule');
+    const now = new Date();
+    
     for (const stream of streams) {
       stream.schedules = await StreamSchedule.findByStreamId(stream.id);
+      
+      // Check if stream has any active schedule (schedule that should be running now or in future)
+      stream.has_active_schedule = false;
+      if (stream.schedules && stream.schedules.length > 0) {
+        for (const schedule of stream.schedules) {
+          const scheduleTime = new Date(schedule.schedule_time);
+          const endTime = new Date(scheduleTime.getTime() + (schedule.duration * 60 * 1000));
+          
+          // Active if: schedule is in future OR currently running
+          if (endTime > now) {
+            stream.has_active_schedule = true;
+            break;
+          }
+        }
+      }
     }
     
     res.json({ success: true, streams });
@@ -2376,12 +2414,49 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
     console.log('RTMP URL:', req.body.rtmpUrl);
     console.log('Stream Key:', req.body.streamKey ? '***' + req.body.streamKey.slice(-4) : 'missing');
     console.log('Use YouTube API:', req.body.useYouTubeAPI);
+    console.log('========================================');
+    console.log('🔍 CHANNEL DEBUG:');
+    console.log('  req.body.youtubeChannelId:', req.body.youtubeChannelId);
+    console.log('  Type:', typeof req.body.youtubeChannelId);
+    console.log('  Is null?:', req.body.youtubeChannelId === null);
+    console.log('  Is undefined?:', req.body.youtubeChannelId === undefined);
+    console.log('  Is empty string?:', req.body.youtubeChannelId === '');
+    console.log('  Truthy?:', !!req.body.youtubeChannelId);
+    console.log('========================================');
     console.log('Stream Now:', req.body.streamNow);
     console.log('Schedules:', req.body.schedules ? 'present' : 'missing');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Has file upload?:', !!req.file);
     console.log('========================================\n');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, error: errors.array()[0].msg });
+    }
+    
+    // ⭐ VALIDATE STREAM LIMIT BEFORE CREATING STREAM
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    // Count total streams (not just active ones) for this user
+    const userStreams = await Stream.findAll(req.session.userId);
+    const totalStreamCount = userStreams ? userStreams.length : 0;
+    const maxStreams = user.max_concurrent_streams || 1;
+    
+    console.log(`[CREATE STREAM] Stream limit check: ${totalStreamCount}/${maxStreams} streams`);
+    
+    if (totalStreamCount >= maxStreams) {
+      // Clean up uploaded thumbnail if validation fails
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+        console.log(`[CREATE STREAM] Cleaned up uploaded thumbnail due to stream limit`);
+      }
+      
+      return res.status(403).json({ 
+        success: false, 
+        error: `Stream limit exceeded. You have ${totalStreamCount}/${maxStreams} streams. Please delete some streams before creating new ones.` 
+      });
     }
     // Allow same stream key for multiple streams
     // User can use the same YouTube/Facebook key for different scheduled streams
@@ -2430,6 +2505,19 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
     
     // Add YouTube API specific fields if using YouTube API
     if (useYouTubeAPI) {
+      // ⭐ MULTI-CHANNEL: Save selected channel ID to database
+      const rawChannelId = req.body.youtubeChannelId;
+      
+      console.log(`[CREATE STREAM] 🔍 Processing YouTube Channel ID:`);
+      console.log(`  Raw value from req.body:`, rawChannelId);
+      console.log(`  Type:`, typeof rawChannelId);
+      console.log(`  After || null:`, rawChannelId || null);
+      
+      // Handle empty string as null
+      streamData.youtube_channel_id = (rawChannelId && rawChannelId !== '' && rawChannelId !== 'null' && rawChannelId !== 'undefined') ? rawChannelId : null;
+      
+      console.log(`[CREATE STREAM] ⭐ Final YouTube Channel ID to save: ${streamData.youtube_channel_id || 'NULL (will use default)'}`);
+      
       streamData.youtube_description = req.body.youtubeDescription || '';
       streamData.youtube_privacy = req.body.youtubePrivacy || 'unlisted';
       streamData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
@@ -2478,6 +2566,15 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
     }
     const hasSchedules = schedules && Array.isArray(schedules) && schedules.length > 0;
     
+    // ⭐ DEBUG: Log stream mode determination
+    console.log('[CREATE STREAM] ========== STREAM MODE DEBUG ==========');
+    console.log('[CREATE STREAM] streamNow from request:', req.body.streamNow, '(type:', typeof req.body.streamNow, ')');
+    console.log('[CREATE STREAM] streamNow parsed:', streamNow);
+    console.log('[CREATE STREAM] schedules from request:', schedules);
+    console.log('[CREATE STREAM] hasSchedules:', hasSchedules);
+    console.log('[CREATE STREAM] Final mode:', hasSchedules ? 'SCHEDULED' : (streamNow ? 'STREAM NOW' : 'OFFLINE'));
+    console.log('[CREATE STREAM] ==========================================');
+    
     if (streamNow) {
       // Stream Now mode - start immediately
       streamData.status = 'offline'; // Will be started by user clicking "Start"
@@ -2499,7 +2596,8 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
     // Create schedule records for scheduled streams
     if (hasSchedules && !streamNow) {
       const StreamSchedule = require('./models/StreamSchedule');
-      for (const schedule of schedules) {
+      for (let idx = 0; idx < schedules.length; idx++) {
+        const schedule = schedules[idx];
         const scheduleData = {
           stream_id: stream.id,
           schedule_time: parseScheduleTime(schedule.schedule_time),
@@ -2507,6 +2605,13 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
           is_recurring: schedule.is_recurring || false,
           recurring_days: schedule.recurring_days || null
         };
+        
+        // Calculate end_time from schedule_time + duration
+        const startTime = new Date(scheduleData.schedule_time);
+        const endTime = new Date(startTime.getTime() + (scheduleData.duration * 60 * 1000));
+        scheduleData.end_time = endTime.toISOString();
+        
+        console.log(`[CREATE STREAM] Schedule ${idx + 1}: ${startTime.toISOString()} -> ${endTime.toISOString()} (${scheduleData.duration} min)`);
         
         await StreamSchedule.create(scheduleData);
         
@@ -2523,8 +2628,12 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
         const youtubeService = require('./services/youtubeService');
         const { getTokensForUser } = require('./routes/youtube');
         
-        // Get user's YouTube tokens
-        const tokens = await getTokensForUser(req.session.userId);
+        // ⭐ MULTI-CHANNEL: Get tokens for specific channel
+        const channelId = streamData.youtube_channel_id || null;
+        console.log(`[CREATE STREAM] Getting tokens for channel: ${channelId || 'default'}`);
+        
+        // Get user's YouTube tokens for the selected channel
+        const tokens = await getTokensForUser(req.session.userId, channelId);
         
         if (tokens && tokens.access_token) {
           // Determine scheduled start time
@@ -2637,27 +2746,73 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
               }
               
               // Upload thumbnail if provided (multer stores file in req.file)
+              // OR use video thumbnail as fallback
+              let thumbnailToUpload = null;
+              let thumbnailPath = null;
+              let shouldCleanup = false;
+              
               if (req.file) {
+                // User uploaded custom thumbnail
+                thumbnailToUpload = req.file.path;
+                thumbnailPath = req.file.path;
+                shouldCleanup = true;
+                console.log(`[CREATE STREAM] Using custom thumbnail: ${req.file.filename}`);
+              } else if (req.body.videoId) {
+                // No custom thumbnail - use video thumbnail as fallback
                 try {
-                  console.log(`[CREATE STREAM] Thumbnail file received:`, req.file.filename);
+                  const Video = require('./models/Video');
+                  const video = await Video.findById(req.body.videoId);
+                  
+                  if (video && video.thumbnail_path) {
+                    // Convert relative path to absolute path
+                    const path = require('path');
+                    thumbnailPath = path.join(__dirname, 'public', video.thumbnail_path);
+                    
+                    if (fs.existsSync(thumbnailPath)) {
+                      thumbnailToUpload = thumbnailPath;
+                      shouldCleanup = false; // Don't delete video thumbnail
+                      console.log(`[CREATE STREAM] Using video thumbnail as fallback: ${video.thumbnail_path}`);
+                    } else {
+                      console.warn(`[CREATE STREAM] Video thumbnail not found: ${thumbnailPath}`);
+                    }
+                  }
+                } catch (videoError) {
+                  console.error('[CREATE STREAM] Error getting video thumbnail:', videoError);
+                }
+              }
+              
+              // Upload thumbnail to YouTube if available
+              if (thumbnailToUpload) {
+                try {
+                  console.log(`[CREATE STREAM] Uploading thumbnail to YouTube...`);
+                  
+                  // Determine mime type
+                  const path = require('path');
+                  const ext = path.extname(thumbnailToUpload).toLowerCase();
+                  const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
                   
                   await youtubeService.setThumbnail(tokens, {
                     broadcastId: broadcastResult.broadcast.id,
-                    filePath: req.file.path,
-                    mimeType: req.file.mimetype
+                    filePath: thumbnailToUpload,
+                    mimeType: mimeType
                   });
                   
                   console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
                   
-                  // Clean up file after upload
-                  fs.unlinkSync(req.file.path);
+                  // Clean up custom thumbnail file after upload (but not video thumbnail)
+                  if (shouldCleanup && fs.existsSync(thumbnailToUpload)) {
+                    fs.unlinkSync(thumbnailToUpload);
+                    console.log(`[CREATE STREAM] ✓ Custom thumbnail file cleaned up`);
+                  }
                 } catch (thumbnailError) {
                   console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
-                  // Clean up file even on error
-                  if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                    fs.unlinkSync(req.file.path);
+                  // Clean up custom thumbnail file even on error
+                  if (shouldCleanup && thumbnailToUpload && fs.existsSync(thumbnailToUpload)) {
+                    fs.unlinkSync(thumbnailToUpload);
                   }
                 }
+              } else {
+                console.log(`[CREATE STREAM] ⚠️ No thumbnail available - YouTube will use auto-generated thumbnail`);
               }
             } else {
               // Scheduled stream - broadcast will be created by broadcastScheduler
@@ -2667,11 +2822,38 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
               console.log(`[CREATE STREAM] - BroadcastScheduler will create ${schedules.length} broadcast(s) automatically`);
               
               // Save thumbnail path to stream for scheduler to use later
+              let thumbnailForScheduler = null;
+              
               if (req.file && req.file.path) {
+                // Custom thumbnail uploaded
+                thumbnailForScheduler = req.file.path;
+                console.log(`[CREATE STREAM] ✓ Custom thumbnail path saved for scheduler: ${req.file.path}`);
+              } else if (req.body.videoId) {
+                // Use video thumbnail as fallback
+                try {
+                  const Video = require('./models/Video');
+                  const video = await Video.findById(req.body.videoId);
+                  
+                  if (video && video.thumbnail_path) {
+                    const path = require('path');
+                    thumbnailForScheduler = path.join(__dirname, 'public', video.thumbnail_path);
+                    
+                    if (fs.existsSync(thumbnailForScheduler)) {
+                      console.log(`[CREATE STREAM] ✓ Video thumbnail path saved for scheduler: ${video.thumbnail_path}`);
+                    } else {
+                      thumbnailForScheduler = null;
+                      console.warn(`[CREATE STREAM] Video thumbnail not found: ${thumbnailForScheduler}`);
+                    }
+                  }
+                } catch (videoError) {
+                  console.error('[CREATE STREAM] Error getting video thumbnail for scheduler:', videoError);
+                }
+              }
+              
+              if (thumbnailForScheduler) {
                 await Stream.update(stream.id, {
-                  video_thumbnail: req.file.path
+                  youtube_thumbnail_path: thumbnailForScheduler
                 });
-                console.log(`[CREATE STREAM] ✓ Thumbnail path saved for scheduler: ${req.file.path}`);
               }
             }
           }
@@ -2786,6 +2968,10 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
     console.log('Stream Key:', req.body.streamKey ? '***' + req.body.streamKey.slice(-4) : 'missing');
     console.log('YouTube Stream ID:', req.body.youtubeStreamId || 'missing');
     console.log('Use YouTube API:', req.body.useYouTubeAPI);
+    console.log('========================================');
+    console.log('🔍 EDIT CHANNEL DEBUG:');
+    console.log('  req.body.youtubeChannelId:', req.body.youtubeChannelId);
+    console.log('  Type:', typeof req.body.youtubeChannelId);
     console.log('========================================\n');
     
     const stream = await Stream.findById(req.params.id);
@@ -2829,6 +3015,19 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
     
     // Update YouTube Additional Settings if stream uses YouTube API
     if (isYouTubeAPI && req.body.useYouTubeAPI) {
+      // ⭐ MULTI-CHANNEL: Update channel ID if provided
+      if (req.body.youtubeChannelId !== undefined) {
+        const rawChannelId = req.body.youtubeChannelId;
+        console.log(`[UPDATE STREAM] 🔍 Processing YouTube Channel ID:`);
+        console.log(`  Raw value from req.body:`, rawChannelId);
+        console.log(`  Type:`, typeof rawChannelId);
+        
+        // Handle empty string as null
+        updateData.youtube_channel_id = (rawChannelId && rawChannelId !== '' && rawChannelId !== 'null' && rawChannelId !== 'undefined') ? rawChannelId : null;
+        
+        console.log(`[UPDATE STREAM] ⭐ YouTube Channel ID updated to: ${updateData.youtube_channel_id || 'NULL (will use default)'}`);
+      }
+      
       if (req.body.youtubeDescription !== undefined) updateData.youtube_description = req.body.youtubeDescription;
       if (req.body.youtubePrivacy !== undefined) updateData.youtube_privacy = req.body.youtubePrivacy;
       if (req.body.youtubeMadeForKids !== undefined) updateData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
@@ -2886,7 +3085,8 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
       const StreamSchedule = require('./models/StreamSchedule');
       await StreamSchedule.deleteByStreamId(req.params.id);
       
-      for (const schedule of schedules) {
+      for (let idx = 0; idx < schedules.length; idx++) {
+        const schedule = schedules[idx];
         try {
           const scheduleData = {
             stream_id: req.params.id,
@@ -2895,6 +3095,13 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
             is_recurring: schedule.is_recurring || false,
             recurring_days: schedule.recurring_days || null
           };
+          
+          // Calculate end_time from schedule_time + duration
+          const startTime = new Date(scheduleData.schedule_time);
+          const endTime = new Date(startTime.getTime() + (scheduleData.duration * 60 * 1000));
+          scheduleData.end_time = endTime.toISOString();
+          
+          console.log(`[UPDATE STREAM] Schedule ${idx + 1}: ${startTime.toISOString()} -> ${endTime.toISOString()} (${scheduleData.duration} min)`);
           
           await StreamSchedule.create(scheduleData);
           

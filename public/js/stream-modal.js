@@ -6,8 +6,10 @@ let isDropdownOpen = false;
 const videoSelectorDropdown = document.getElementById('videoSelectorDropdown');
 let desktopVideoPlayer = null;
 let streamKeyTimeout = null;
-let isStreamKeyValid = true;
 let currentPlatform = 'Custom';
+
+// Expose to global scope for dashboard.ejs validation
+window.isStreamKeyValid = true;
 
 console.log('[stream-modal.js] Variables initialized');
 
@@ -43,6 +45,7 @@ function openNewStreamModal() {
   switchStreamTab('manual');
   
   loadGalleryVideos();
+  loadYouTubeChannels(); // Load available YouTube channels
   
   // Check if there's a selected YouTube stream from sessionStorage
   const selectedStreamId = sessionStorage.getItem('selectedYouTubeStreamId');
@@ -430,7 +433,7 @@ function toggleStreamKeyVisibility() {
 function validateStreamKeyForPlatform(streamKey, platform) {
   // Allow duplicate stream keys - user can use the same key for multiple streams
   // Only one stream can be active at a time (handled by streaming platform)
-  isStreamKeyValid = true;
+  window.isStreamKeyValid = true;
   
   // Remove any existing error messages
   const streamKeyInput = document.getElementById('streamKey');
@@ -938,24 +941,43 @@ async function loadYouTubeChannels() {
   }
 }
 
-// Update channel selector dropdown
-function updateChannelSelector(channels, hasMultipleChannels) {
-  const selector = document.getElementById('youtubeChannelSelect');
-  const container = document.getElementById('youtubeChannelSelector');
+// Load YouTube channels for edit modal
+async function loadEditYouTubeChannels(currentChannelId) {
+  try {
+    console.log('[loadEditYouTubeChannels] Fetching channels, current:', currentChannelId);
+    const response = await fetch('/youtube/api/channels');
+    const data = await response.json();
+    
+    if (data.success && data.channels) {
+      console.log('[loadEditYouTubeChannels] Loaded', data.channels.length, 'channels');
+      
+      // Update edit channel selector
+      updateEditChannelSelector(data.channels, currentChannelId);
+      
+      return data;
+    } else {
+      console.error('[loadEditYouTubeChannels] Failed to load channels:', data.error);
+      return null;
+    }
+  } catch (error) {
+    console.error('[loadEditYouTubeChannels] Error:', error);
+    return null;
+  }
+}
+
+// Update edit channel selector dropdown
+function updateEditChannelSelector(channels, currentChannelId) {
+  const selector = document.getElementById('editYoutubeChannelSelect');
+  const container = document.getElementById('editYoutubeChannelSelector');
   
   if (!selector || !container) {
-    console.warn('[updateChannelSelector] Channel selector elements not found');
+    console.warn('[updateEditChannelSelector] Channel selector elements not found');
     return;
   }
   
-  // Show/hide channel selector based on number of channels
-  if (hasMultipleChannels) {
-    container.classList.remove('hidden');
-    console.log('[updateChannelSelector] Showing channel selector (multiple channels)');
-  } else {
-    container.classList.add('hidden');
-    console.log('[updateChannelSelector] Hiding channel selector (single channel)');
-  }
+  // Always show channel selector
+  container.classList.remove('hidden');
+  console.log('[updateEditChannelSelector] Showing channel selector');
   
   // Sort channels: default first, then alphabetically
   const sortedChannels = [...channels].sort((a, b) => {
@@ -963,6 +985,62 @@ function updateChannelSelector(channels, hasMultipleChannels) {
     if (!a.isDefault && b.isDefault) return 1;
     return a.title.localeCompare(b.title);
   });
+  
+  // Populate dropdown
+  selector.innerHTML = sortedChannels.map(channel => `
+    <option value="${channel.id}" ${channel.id === currentChannelId ? 'selected' : ''} style="background-color: #374151 !important; color: white !important;">
+      ${channel.isDefault ? '⭐ ' : ''}${channel.title}${channel.isDefault ? ' (Default)' : ''} 
+      ${channel.subscriberCount ? `• ${formatSubscriberCount(channel.subscriberCount)} subs` : ''}
+    </option>
+  `).join('');
+  
+  // Select current channel or default
+  if (currentChannelId) {
+    selector.value = currentChannelId;
+    console.log('[updateEditChannelSelector] Selected current channel:', currentChannelId);
+  } else {
+    const defaultChannel = channels.find(ch => ch.isDefault);
+    if (defaultChannel) {
+      selector.value = defaultChannel.id;
+      console.log('[updateEditChannelSelector] Selected default channel:', defaultChannel.title);
+    }
+  }
+  
+  // ⚠️ UNLOCK channel selector - allow manual correction if wrong channel detected
+  selector.disabled = false;
+  selector.style.cursor = 'pointer';
+  selector.style.opacity = '1';
+  console.log('[updateEditChannelSelector] Channel selector UNLOCKED - user can change if needed');
+}
+
+// Update channel selector dropdown
+function updateChannelSelector(channels, hasMultipleChannels) {
+  const selector = document.getElementById('youtubeChannelSelect');
+  const container = document.getElementById('youtubeChannelSelector');
+  
+  console.log('[updateChannelSelector] 🔍 DEBUG:');
+  console.log('  selector element:', selector);
+  console.log('  container element:', container);
+  console.log('  channels:', channels);
+  console.log('  hasMultipleChannels:', hasMultipleChannels);
+  
+  if (!selector || !container) {
+    console.warn('[updateChannelSelector] ❌ Channel selector elements not found');
+    return;
+  }
+  
+  // Always show channel selector so user knows which channel is being used
+  container.classList.remove('hidden');
+  console.log('[updateChannelSelector] ✅ Showing channel selector');
+  
+  // Sort channels: default first, then alphabetically
+  const sortedChannels = [...channels].sort((a, b) => {
+    if (a.isDefault && !b.isDefault) return -1;
+    if (!a.isDefault && b.isDefault) return 1;
+    return a.title.localeCompare(b.title);
+  });
+  
+  console.log('[updateChannelSelector] Sorted channels:', sortedChannels.map(ch => `${ch.isDefault ? '⭐' : ''} ${ch.title} (${ch.id})`));
   
   // Populate dropdown with clear default indication
   selector.innerHTML = sortedChannels.map(channel => `
@@ -972,17 +1050,28 @@ function updateChannelSelector(channels, hasMultipleChannels) {
     </option>
   `).join('');
   
+  console.log('[updateChannelSelector] ✅ Populated selector with', sortedChannels.length, 'options');
+  console.log('[updateChannelSelector] Current selector.value:', selector.value);
+  
   // Add event listener for channel selection
   selector.removeEventListener('change', handleChannelSelection);
   selector.addEventListener('change', handleChannelSelection);
   
-  // Auto-select default channel
-  const defaultChannel = channels.find(ch => ch.isDefault);
-  if (defaultChannel) {
-    selector.value = defaultChannel.id;
-    selectedChannelId = defaultChannel.id;
-    console.log('[updateChannelSelector] Auto-selected default channel:', defaultChannel.title);
+  // ⭐ FIX: Only auto-select default if no value is already set (e.g., from template)
+  if (!selector.value || selector.value === '') {
+    const defaultChannel = channels.find(ch => ch.isDefault);
+    if (defaultChannel) {
+      selector.value = defaultChannel.id;
+      selectedChannelId = defaultChannel.id;
+      console.log('[updateChannelSelector] ✅ Auto-selected default channel:', defaultChannel.title, '(', defaultChannel.id, ')');
+    }
+  } else {
+    console.log('[updateChannelSelector] ℹ️ Channel already set, keeping current value:', selector.value);
+    selectedChannelId = selector.value;
   }
+  
+  console.log('[updateChannelSelector] Final selector.value:', selector.value);
+  console.log('[updateChannelSelector] Final selectedChannelId:', selectedChannelId);
 }
 
 // Handle channel selection change
@@ -1082,6 +1171,7 @@ function switchStreamTab(tab) {
   console.log('[switchStreamTab] ========== START ==========');
   console.log('[switchStreamTab] Switching to tab:', tab);
   currentStreamTab = tab;
+  window.currentStreamTab = tab; // ⭐ Set global variable for dashboard.ejs
   window.currentStreamTab = tab; // Update global reference
   
   // Auto-detect which modal is open (New Stream or Edit Stream)
@@ -1208,14 +1298,28 @@ console.log('[stream-modal.js] switchStreamTab function defined and exposed glob
 // Load YouTube stream keys from OAuth (with caching)
 async function loadYouTubeStreamKeys(forceRefresh = false) {
   try {
+    // Read channel ID from dropdown directly
+    const channelSelect = document.getElementById('youtubeChannelSelect');
+    const channelIdFromDropdown = channelSelect?.value;
+    
+    console.log('[loadYouTubeStreamKeys] Channel from dropdown:', channelIdFromDropdown);
+    console.log('[loadYouTubeStreamKeys] selectedChannelId variable:', selectedChannelId);
+    
+    // Use dropdown value if available, otherwise use selectedChannelId variable
+    const channelToUse = channelIdFromDropdown || selectedChannelId;
+    
     // Check if a channel is selected, if not try to load channels first
-    if (!selectedChannelId) {
+    if (!channelToUse) {
       console.warn('[loadYouTubeStreamKeys] No channel selected, loading channels first...');
       const channelData = await loadYouTubeChannels();
       if (!channelData || !selectedChannelId) {
         // For single channel users, try without channelId parameter (backward compatibility)
         console.log('[loadYouTubeStreamKeys] Trying without channelId for backward compatibility...');
       }
+    } else {
+      // Update selectedChannelId to match dropdown
+      selectedChannelId = channelToUse;
+      console.log('[loadYouTubeStreamKeys] Using channel:', selectedChannelId);
     }
     
     // Check cache first (unless force refresh)
@@ -2889,6 +2993,9 @@ function populateEditYouTubeAPIFields(stream) {
   console.log('[populateEditYouTubeAPIFields] Populating fields with:', stream);
   
   try {
+    // Load YouTube channels for edit modal
+    loadEditYouTubeChannels(stream.youtube_channel_id);
+    
     // Helper function to safely set element value
     const safeSetValue = (id, value) => {
       const el = document.getElementById(id);
@@ -2980,19 +3087,25 @@ function populateEditYouTubeAPIFields(stream) {
     safeSetChecked('editYoutubeAutoEnd', stream.youtube_auto_end === 1 || stream.youtube_auto_end === true);
     
     // Load existing thumbnail if exists
-    if (stream.youtube_thumbnail_path) {
+    // Try stream thumbnail first, fallback to video thumbnail
+    const thumbnailPath = stream.youtube_thumbnail_path || stream.video_thumbnail;
+    
+    if (thumbnailPath) {
       const thumbnailPreview = document.getElementById('editYoutubeThumbnailPreview');
       const thumbnailImg = document.getElementById('editYoutubeThumbnailImg');
       const thumbnailInfo = document.getElementById('editYoutubeThumbnailInfo');
       
       if (thumbnailPreview && thumbnailImg) {
-        thumbnailImg.src = stream.youtube_thumbnail_path;
+        thumbnailImg.src = thumbnailPath;
         thumbnailPreview.classList.remove('hidden');
         if (thumbnailInfo) {
-          thumbnailInfo.innerHTML = '<span class="text-green-400">Current thumbnail loaded</span>';
+          const source = stream.youtube_thumbnail_path ? 'stream' : 'video';
+          thumbnailInfo.innerHTML = `<span class="text-green-400">Current thumbnail loaded (from ${source})</span>`;
         }
-        console.log('[populateEditYouTubeAPIFields] Loaded existing thumbnail');
+        console.log('[populateEditYouTubeAPIFields] Loaded existing thumbnail:', thumbnailPath);
       }
+    } else {
+      console.log('[populateEditYouTubeAPIFields] No thumbnail available');
     }
     
     console.log('[populateEditYouTubeAPIFields] ✅ All fields populated successfully');
@@ -3084,3 +3197,144 @@ window.clearEditYoutubeThumbnail = clearEditYoutubeThumbnail;
 window.toggleEditYouTubeAdditionalSettings = toggleEditYouTubeAdditionalSettings;
 
 console.log('[stream-modal.js] Edit modal thumbnail and settings functions loaded');
+
+
+// ⚠️ REMOVED: Duplicate loadYouTubeChannels() function
+// The correct implementation is at line ~911 which properly handles channel selection
+// This duplicate was causing channel selection to reset to default
+
+
+
+// ========================================
+// EDIT MODAL - VIDEO SELECTOR FUNCTIONS
+// ========================================
+
+function toggleEditVideoSelector() {
+  const dropdown = document.getElementById('editVideoSelectorDropdown');
+  if (!dropdown) {
+    console.error('Edit video selector dropdown not found');
+    return;
+  }
+  
+  if (dropdown.classList.contains('hidden')) {
+    dropdown.classList.remove('hidden');
+    if (!dropdown.dataset.loaded) {
+      loadEditGalleryVideos();
+      dropdown.dataset.loaded = 'true';
+    }
+    const searchInput = document.getElementById('editVideoSearchInput');
+    if (searchInput) {
+      setTimeout(() => searchInput.focus(), 10);
+    }
+  } else {
+    dropdown.classList.add('hidden');
+    const searchInput = document.getElementById('editVideoSearchInput');
+    if (searchInput) {
+      searchInput.value = '';
+    }
+  }
+}
+
+function selectEditVideo(video) {
+  console.log('[Edit Modal] Selecting video:', video);
+  
+  const displayText = video.type === 'playlist' ? `[Playlist] ${video.name}` : video.name;
+  const selectedVideoEl = document.getElementById('editSelectedVideo');
+  if (selectedVideoEl) {
+    selectedVideoEl.textContent = displayText;
+  }
+  
+  const hiddenVideoInput = document.getElementById('editSelectedVideoId');
+  if (hiddenVideoInput) {
+    hiddenVideoInput.value = video.id;
+  }
+  
+  const dropdown = document.getElementById('editVideoSelectorDropdown');
+  if (dropdown) {
+    dropdown.classList.add('hidden');
+  }
+  
+  console.log('[Edit Modal] Video selected successfully:', video.id);
+}
+
+async function loadEditGalleryVideos() {
+  try {
+    const container = document.getElementById('editVideoListContainer');
+    if (!container) {
+      console.error("Edit video list container not found");
+      return;
+    }
+    
+    container.innerHTML = '<div class="text-center py-3"><i class="ti ti-loader animate-spin mr-2"></i>Loading content...</div>';
+    
+    const response = await fetch('/api/stream/content');
+    const content = await response.json();
+    
+    window.allEditStreamVideos = content;
+    displayEditFilteredVideos(content);
+    
+    const searchInput = document.getElementById('editVideoSearchInput');
+    if (searchInput) {
+      searchInput.removeEventListener('input', handleEditVideoSearch);
+      searchInput.addEventListener('input', handleEditVideoSearch);
+      setTimeout(() => searchInput.focus(), 10);
+    }
+  } catch (error) {
+    console.error('Error loading gallery content for edit modal:', error);
+    const container = document.getElementById('editVideoListContainer');
+    if (container) {
+      container.innerHTML = `
+        <div class="text-center py-5 text-red-400">
+          <i class="ti ti-alert-circle text-2xl mb-2"></i>
+          <p>Failed to load content</p>
+          <p class="text-xs text-gray-500 mt-1">Please try again</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function displayEditFilteredVideos(content) {
+  const container = document.getElementById('editVideoListContainer');
+  if (!container) return;
+  
+  if (!content || content.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-5 text-gray-400">
+        <i class="ti ti-video-off text-2xl mb-2"></i>
+        <p>No content available</p>
+        <p class="text-xs text-gray-500 mt-1">Upload videos or create playlists first</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = content.map(item => {
+    const isPlaylist = item.type === 'playlist';
+    const icon = isPlaylist ? 'ti-playlist' : 'ti-video';
+    const iconColor = isPlaylist ? 'text-blue-400' : 'text-green-400';
+    const typeLabel = isPlaylist ? 'Playlist' : 'Video';
+    const duration = item.duration || 'Unknown';
+    
+    return `
+      <button type="button" onclick='selectEditVideo(${JSON.stringify(item).replace(/'/g, "\\'")})'
+        class="w-full flex items-center gap-3 p-2 hover:bg-dark-600 rounded transition-colors text-left">
+        <div class="flex-shrink-0 w-10 h-10 bg-dark-600 rounded flex items-center justify-center">
+          <i class="ti ${icon} ${iconColor} text-lg"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm text-white truncate">${item.name}</p>
+          <p class="text-xs text-gray-400">${typeLabel} • ${duration}</p>
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
+function handleEditVideoSearch(event) {
+  const searchTerm = event.target.value.toLowerCase();
+  const filtered = window.allEditStreamVideos.filter(item => 
+    item.name.toLowerCase().includes(searchTerm)
+  );
+  displayEditFilteredVideos(filtered);
+}

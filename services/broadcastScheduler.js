@@ -88,6 +88,7 @@ class BroadcastScheduler {
           s.youtube_category_id,
           s.youtube_language,
           s.video_thumbnail,
+          s.youtube_thumbnail_path,
           s.user_id
         FROM stream_schedules ss
         JOIN streams s ON ss.stream_id = s.id
@@ -173,20 +174,30 @@ class BroadcastScheduler {
       console.log(`[BroadcastScheduler] - Scheduled: ${schedule.schedule_time}`);
       console.log(`[BroadcastScheduler] - Recurring: ${schedule.is_recurring ? 'Yes' : 'No'}`);
 
-      // ⭐ Check if broadcast already exists to prevent duplicates
+      // ⭐ CRITICAL FIX: Check if broadcast already exists for THIS schedule
       if (schedule.youtube_broadcast_id) {
         console.log(`[BroadcastScheduler] ⚠️ Broadcast already exists for schedule ${schedule.id}: ${schedule.youtube_broadcast_id}`);
         return;
       }
 
+      // ⭐ NEW: Check if stream already has an active broadcast from another schedule
+      // This prevents creating duplicate broadcasts for the same stream
+      const existingBroadcast = await this.checkExistingBroadcastForStream(schedule.stream_id);
+      
+      if (existingBroadcast) {
+        console.log(`[BroadcastScheduler] ✓ Found existing broadcast for stream ${schedule.stream_id}: ${existingBroadcast.youtube_broadcast_id}`);
+        console.log(`[BroadcastScheduler] ✓ Reusing broadcast from schedule ${existingBroadcast.schedule_id}`);
+        console.log(`[BroadcastScheduler] ✓ Broadcast status: ${existingBroadcast.broadcast_status}`);
+        
+        // Reuse the existing broadcast ID for this schedule
+        await this.updateScheduleBroadcast(schedule.id, existingBroadcast.youtube_broadcast_id, 'ready');
+        
+        console.log(`[BroadcastScheduler] ✅ Schedule ${schedule.id} linked to existing broadcast ${existingBroadcast.youtube_broadcast_id}`);
+        return existingBroadcast.youtube_broadcast_id;
+      }
+
       // Mark as creating to prevent duplicate attempts
       await this.updateScheduleBroadcastStatus(schedule.id, 'creating');
-
-      // Get user's YouTube tokens
-      const tokens = await getTokensForUser(schedule.user_id);
-      if (!tokens || !tokens.access_token) {
-        throw new Error('YouTube tokens not found for user');
-      }
 
       // Calculate scheduled start time
       let scheduledStartTime;
@@ -220,11 +231,30 @@ class BroadcastScheduler {
         }
       }
 
-      // Get thumbnail path - use saved thumbnail or get from video
-      let thumbnailPath = schedule.video_thumbnail;
+      // Get thumbnail path - check youtube_thumbnail_path first, then video_thumbnail, then video's thumbnail
+      let thumbnailPath = schedule.youtube_thumbnail_path || schedule.video_thumbnail;
       
-      // If no thumbnail saved, try to get from video
-      if (!thumbnailPath || !require('fs').existsSync(thumbnailPath)) {
+      // If thumbnail path exists, convert to full path
+      if (thumbnailPath) {
+        const path = require('path');
+        const fs = require('fs');
+        
+        // If path starts with /, it's relative to public folder
+        if (thumbnailPath.startsWith('/')) {
+          thumbnailPath = path.join(__dirname, '..', 'public', thumbnailPath);
+        }
+        
+        // Check if file exists
+        if (fs.existsSync(thumbnailPath)) {
+          console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
+        } else {
+          console.warn(`[BroadcastScheduler] Saved thumbnail not found: ${thumbnailPath}, checking video...`);
+          thumbnailPath = null;
+        }
+      }
+      
+      // If no thumbnail or file doesn't exist, try to get from video
+      if (!thumbnailPath) {
         console.log(`[BroadcastScheduler] No saved thumbnail, checking video...`);
         
         // Get video info from database
@@ -256,14 +286,12 @@ class BroadcastScheduler {
           console.warn(`[BroadcastScheduler] No thumbnail available for this stream`);
           thumbnailPath = null;
         }
-      } else {
-        console.log(`[BroadcastScheduler] Using saved thumbnail: ${thumbnailPath}`);
       }
 
-      // ⭐ Get stream_key from database (youtube_stream_id is no longer used)
+      // ⭐ Get stream_key and youtube_channel_id from database
       const streamData = await new Promise((resolve, reject) => {
         db.get(
-          'SELECT stream_key FROM streams WHERE id = ?',
+          'SELECT stream_key, youtube_channel_id FROM streams WHERE id = ?',
           [schedule.stream_id],
           (err, row) => {
             if (err) reject(err);
@@ -276,9 +304,17 @@ class BroadcastScheduler {
         throw new Error('Stream not found in database');
       }
 
-      console.log(`[BroadcastScheduler] Stream config: stream_key=${streamData.stream_key ? streamData.stream_key.substring(0, 8) + '...' : 'none'}`);
+      const channelId = streamData.youtube_channel_id || null;
+      console.log(`[BroadcastScheduler] Stream config: stream_key=${streamData.stream_key ? streamData.stream_key.substring(0, 8) + '...' : 'none'}, channel_id=${channelId || 'default'}`);
 
-      // Determine which to use: streamId (from dropdown) or streamKey (manual input)
+      // ⭐ MULTI-CHANNEL: Get user's YouTube tokens for specific channel
+      const tokens = await getTokensForUser(schedule.user_id, channelId);
+      if (!tokens || !tokens.access_token) {
+        throw new Error(`YouTube tokens not found for user ${schedule.user_id}, channel ${channelId || 'default'}`);
+      }
+      console.log(`[BroadcastScheduler] ✓ Got tokens for channel: ${channelId || 'default'}`);
+
+      // Prepare broadcast options
       let broadcastOptions = {
         title: schedule.title,
         description: schedule.youtube_description || '',
@@ -313,6 +349,7 @@ class BroadcastScheduler {
 
         console.log(`[BroadcastScheduler] ✅ Broadcast created: ${broadcastId}`);
         console.log(`[BroadcastScheduler] - Schedule: ${schedule.id}`);
+        console.log(`[BroadcastScheduler] - Channel: ${channelId || 'default'}`);
         console.log(`[BroadcastScheduler] - Using user's stream key: ${streamData.stream_key}`);
         console.log(`[BroadcastScheduler] - Start Time: ${scheduledStartTime.toISOString()}`);
         console.log(`[BroadcastScheduler] - Thumbnail: ${thumbnailPath ? 'Uploaded' : 'Not provided'}`);
@@ -358,6 +395,44 @@ class BroadcastScheduler {
       
       return null;
     }
+  }
+
+  /**
+   * Check if stream already has an active broadcast from another schedule
+   * Returns the broadcast info if found, null otherwise
+   */
+  checkExistingBroadcastForStream(streamId) {
+    return new Promise((resolve, reject) => {
+      // Look for any schedule of this stream that already has a broadcast
+      // Only consider broadcasts that are still active (not completed)
+      const query = `
+        SELECT 
+          id as schedule_id,
+          youtube_broadcast_id,
+          broadcast_status
+        FROM stream_schedules
+        WHERE stream_id = ?
+          AND youtube_broadcast_id IS NOT NULL
+          AND broadcast_status IN ('ready', 'creating', 'live')
+        ORDER BY 
+          CASE 
+            WHEN broadcast_status = 'live' THEN 1
+            WHEN broadcast_status = 'ready' THEN 2
+            WHEN broadcast_status = 'creating' THEN 3
+            ELSE 4
+          END
+        LIMIT 1
+      `;
+      
+      db.get(query, [streamId], (err, row) => {
+        if (err) {
+          console.error('[BroadcastScheduler] Error checking existing broadcast:', err);
+          reject(err);
+        } else {
+          resolve(row || null);
+        }
+      });
+    });
   }
 
   /**

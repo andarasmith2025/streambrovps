@@ -76,6 +76,7 @@ router.post('/', (req, res) => {
     use_advanced_settings,
     advanced_settings,
     use_youtube_api,
+    youtube_channel_id,
     youtube_description,
     youtube_privacy,
     youtube_made_for_kids,
@@ -99,10 +100,10 @@ router.post('/', (req, res) => {
     `INSERT INTO stream_templates 
      (id, name, description, video_id, video_name, stream_title, rtmp_url, stream_key, 
       platform, loop_video, schedules, use_advanced_settings, advanced_settings, 
-      use_youtube_api, youtube_description, youtube_privacy, youtube_made_for_kids, 
+      use_youtube_api, youtube_channel_id, youtube_description, youtube_privacy, youtube_made_for_kids, 
       youtube_age_restricted, youtube_synthetic_content, youtube_auto_start, youtube_auto_end, 
       youtube_tags, youtube_thumbnail_path, user_id) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       templateId,
       name,
@@ -119,6 +120,7 @@ router.post('/', (req, res) => {
       advancedSettingsJson,
       // YouTube API fields - only save if use_youtube_api is true
       use_youtube_api ? 1 : 0,
+      use_youtube_api ? (youtube_channel_id || null) : null,
       use_youtube_api ? (youtube_description || '') : null,
       use_youtube_api ? (youtube_privacy || 'unlisted') : null,
       use_youtube_api ? (youtube_made_for_kids ? 1 : 0) : 0,

@@ -28,12 +28,14 @@ async function generateTitleWithGemini(titleFieldId = 'streamTitle') {
   
   // Warn if title is already long (might be a full title, not keywords)
   if (keywords.length > 50) {
-    const confirmed = confirm(
-      'The current title seems complete. Do you want to regenerate it?\n\n' +
-      'Current: ' + keywords.substring(0, 60) + (keywords.length > 60 ? '...' : '') + '\n\n' +
-      'Click OK to generate a new title, or Cancel to keep the current one.'
+    const shouldRegenerate = await showCustomConfirm(
+      'Regenerate Title?',
+      `The current title seems complete. Do you want to regenerate it?<br><br><strong>Current:</strong> ${keywords.substring(0, 80)}${keywords.length > 80 ? '...' : ''}<br><br>Click <strong>OK</strong> to generate a new title, or <strong>Cancel</strong> to keep the current one.`,
+      'OK',
+      'Cancel'
     );
-    if (!confirmed) {
+    
+    if (!shouldRegenerate) {
       return;
     }
   }

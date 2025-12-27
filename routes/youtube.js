@@ -971,15 +971,25 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
 
 // ⭐ Helper function menggunakan Token Manager dengan Event Listener
 // Token akan otomatis di-refresh dan disimpan ke database
-async function getTokensForUser(userId) {
+// ⭐ MULTI-CHANNEL: Now accepts optional channelId parameter
+async function getTokensForUser(userId, channelId = null) {
   if (!userId) return null;
+  
+  // ⭐ DEBUG: Log parameter yang diterima
+  console.log(`[getTokensForUser] ========== DEBUG ==========`);
+  console.log(`[getTokensForUser] userId:`, userId);
+  console.log(`[getTokensForUser] channelId (raw):`, channelId);
+  console.log(`[getTokensForUser] channelId type:`, typeof channelId);
+  console.log(`[getTokensForUser] channelId || 'default':`, channelId || 'default');
+  console.log(`[getTokensForUser] =====================================`);
   
   try {
     // Use the new token manager with event listener
-    const oauth2Client = await tokenManager.getAuthenticatedClient(userId);
+    // Pass channelId to get tokens for specific channel
+    const oauth2Client = await tokenManager.getAuthenticatedClient(userId, channelId);
     
     if (!oauth2Client) {
-      console.log(`[getTokensForUser] No authenticated client for user ${userId}`);
+      console.log(`[getTokensForUser] No authenticated client for user ${userId}, channel ${channelId || 'default'}`);
       return null;
     }
     

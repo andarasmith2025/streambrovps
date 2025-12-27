@@ -2,10 +2,12 @@ const tokenManager = require('./youtubeTokenManager'); // ⭐ Auto-refresh denga
 const fs = require('fs');
 
 // ⭐ Helper untuk mendapatkan YouTube client dari tokens atau userId
-async function getYouTubeClientFromTokensOrUserId(tokensOrUserId) {
-  // Jika parameter adalah string (userId), gunakan token manager
+// ⭐ MULTI-CHANNEL: Tambahkan parameter channelId
+async function getYouTubeClientFromTokensOrUserId(tokensOrUserId, channelId = null) {
+  // Jika parameter adalah string (userId), gunakan token manager dengan channelId
   if (typeof tokensOrUserId === 'string') {
-    return await tokenManager.getYouTubeClient(tokensOrUserId);
+    console.log(`[YouTubeService] Getting client for userId: ${tokensOrUserId}, channelId: ${channelId || 'default'}`);
+    return await tokenManager.getAuthenticatedClient(tokensOrUserId, channelId);
   }
   
   // Jika parameter adalah object (tokens), gunakan cara lama untuk backward compatibility
@@ -13,10 +15,12 @@ async function getYouTubeClientFromTokensOrUserId(tokensOrUserId) {
   return getYouTubeClient(tokensOrUserId);
 }
 
-async function scheduleLive(tokensOrUserId, { title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, streamKey: manualStreamKey, enableAutoStart = false, enableAutoStop = false, tags = null, category = null, language = null, thumbnailPath = null }) {
-  const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
+async function scheduleLive(tokensOrUserId, { channelId = null, title, description, privacyStatus, scheduledStartTime, streamId: existingStreamId, streamKey: manualStreamKey, enableAutoStart = false, enableAutoStop = false, tags = null, category = null, language = null, thumbnailPath = null }) {
+  // ⭐ MULTI-CHANNEL: Pass channelId to get correct channel client
+  const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId, channelId);
   
   console.log(`[YouTubeService.scheduleLive] Called with:`);
+  console.log(`[YouTubeService.scheduleLive] - Channel ID: ${channelId || 'default'}`);
   console.log(`[YouTubeService.scheduleLive] - Title: ${title}`);
   console.log(`[YouTubeService.scheduleLive] - Existing Stream ID: ${existingStreamId || 'NOT PROVIDED'}`);
   console.log(`[YouTubeService.scheduleLive] - Manual Stream Key: ${manualStreamKey ? manualStreamKey.substring(0, 8) + '...' : 'NOT PROVIDED'}`);
@@ -32,7 +36,7 @@ async function scheduleLive(tokensOrUserId, { title, description, privacyStatus,
     console.log(`[YouTubeService.scheduleLive] 🔍 Manual stream key provided, finding stream ID...`);
     
     try {
-      finalStreamId = await module.exports.findStreamIdByStreamKey(tokensOrUserId, { streamKey: manualStreamKey });
+      finalStreamId = await module.exports.findStreamIdByStreamKey(tokensOrUserId, { streamKey: manualStreamKey, channelId });
       
       if (!finalStreamId) {
         throw new Error(`Stream key not found in your YouTube channel. Please check the stream key or create it in YouTube Studio first.`);
@@ -270,11 +274,12 @@ module.exports = {
    * Find stream ID by stream key
    * Returns the stream ID for a given stream key
    */
-  async findStreamIdByStreamKey(tokensOrUserId, { streamKey }) {
-    console.log(`[YouTubeService.findStreamIdByStreamKey] Searching for stream ID with key: ${streamKey.substring(0, 8)}...`);
+  async findStreamIdByStreamKey(tokensOrUserId, { streamKey, channelId = null }) {
+    console.log(`[YouTubeService.findStreamIdByStreamKey] Searching for stream ID with key: ${streamKey.substring(0, 8)}... in channel: ${channelId || 'default'}`);
     
     try {
-      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50 });
+      // ⭐ MULTI-CHANNEL: Pass channelId to listStreams
+      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50, channelId });
       const matchingStream = streams.find(stream => {
         const ingestionInfo = stream.cdn?.ingestionInfo;
         const streamName = ingestionInfo?.streamName;
@@ -282,7 +287,7 @@ module.exports = {
       });
       
       if (!matchingStream) {
-        console.log(`[YouTubeService.findStreamIdByStreamKey] ❌ No stream found with key: ${streamKey.substring(0, 8)}...`);
+        console.log(`[YouTubeService.findStreamIdByStreamKey] ❌ No stream found with key: ${streamKey.substring(0, 8)}... in channel: ${channelId || 'default'}`);
         return null;
       }
       
@@ -312,8 +317,9 @@ module.exports = {
     });
     return out;
   },
-  async listStreams(tokensOrUserId, { maxResults = 50 } = {}) {
-    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
+  async listStreams(tokensOrUserId, { maxResults = 50, channelId = null } = {}) {
+    // ⭐ MULTI-CHANNEL: Pass channelId to get correct channel client
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId, channelId);
     const res = await yt.liveStreams.list({
       part: 'id,snippet,cdn,contentDetails,status',
       mine: true,
@@ -467,21 +473,22 @@ module.exports = {
    * Find stream ID by stream key (streamName)
    * Returns stream ID if found, null if not found
    */
-  async findStreamIdByStreamKey(tokensOrUserId, { streamKey }) {
+  async findStreamIdByStreamKey(tokensOrUserId, { streamKey, channelId = null }) {
     try {
-      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50 });
+      // ⭐ MULTI-CHANNEL: Pass channelId to listStreams
+      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50, channelId });
       
       for (const stream of streams) {
         const ingestionInfo = stream.cdn?.ingestionInfo || {};
         const streamName = ingestionInfo.streamName || '';
         
         if (streamName === streamKey) {
-          console.log(`[YouTubeService] ✓ Found stream ID ${stream.id} for stream key ${streamKey.substring(0, 8)}...`);
+          console.log(`[YouTubeService] ✓ Found stream ID ${stream.id} for stream key ${streamKey.substring(0, 8)}... in channel ${channelId || 'default'}`);
           return stream.id;
         }
       }
       
-      console.log(`[YouTubeService] ✗ Stream key ${streamKey.substring(0, 8)}... not found in user's streams`);
+      console.log(`[YouTubeService] ✗ Stream key ${streamKey.substring(0, 8)}... not found in channel ${channelId || 'default'}`);
       return null;
     } catch (err) {
       console.error(`[YouTubeService] Error finding stream by key:`, err.message);

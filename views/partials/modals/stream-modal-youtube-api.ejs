@@ -2,7 +2,7 @@
 <div id="youtubeApiFields" class="hidden space-y-3">
   
   <!-- YouTube Channel Selector -->
-  <div id="youtubeChannelSelector" class="hidden">
+  <div id="youtubeChannelSelector">
     <label class="text-sm font-medium text-white block mb-2">
       <i class="ti ti-brand-youtube text-red-500 mr-1"></i>
       YouTube Channel
@@ -273,13 +273,14 @@
           <p class="text-xs text-gray-500 mt-1 ml-6">Automatically transition broadcast to "live" when stream starts</p>
         </div>
         
-        <div>
-          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-            <input type="checkbox" name="youtubeAutoEnd" id="youtubeAutoEnd" class="w-4 h-4 rounded">
-            <span>Auto End Broadcast (via API)</span>
-          </label>
-          <p class="text-xs text-gray-500 mt-1 ml-6">Automatically complete broadcast when stream ends</p>
-        </div>
+                  <!-- Auto End -->
+                  <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" name="youtubeAutoEnd" id="youtubeAutoEnd" class="w-4 h-4 rounded" checked>
+                      <span>Auto End Broadcast (via API)</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">Automatically complete broadcast when stream ends (Recommended)</p>
+                  </div>
       </div>
     </div>
   </div>

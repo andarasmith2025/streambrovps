@@ -15,14 +15,22 @@ function initTitleAutocomplete(inputId, dropdownId) {
   const input = document.getElementById(inputId);
   const dropdown = document.getElementById(dropdownId);
   
+  console.log(`[TitleAutocomplete] Initializing for ${inputId}, ${dropdownId}`);
+  console.log(`[TitleAutocomplete] Input found:`, !!input);
+  console.log(`[TitleAutocomplete] Dropdown found:`, !!dropdown);
+  
   if (!input || !dropdown) {
     console.warn(`[TitleAutocomplete] Elements not found: ${inputId}, ${dropdownId}`);
     return;
   }
   
+  console.log(`[TitleAutocomplete] ✓ Successfully initialized for ${inputId}`);
+  
   // Listen for input changes
   input.addEventListener('input', (e) => {
     const query = e.target.value.trim();
+    
+    console.log(`[TitleAutocomplete] Input event: "${query}"`);
     
     // Clear previous timeout
     if (titleAutocompleteTimeout) {
@@ -32,8 +40,11 @@ function initTitleAutocomplete(inputId, dropdownId) {
     // Hide dropdown if query is too short
     if (query.length < 2) {
       dropdown.classList.add('hidden');
+      console.log(`[TitleAutocomplete] Query too short, hiding dropdown`);
       return;
     }
+    
+    console.log(`[TitleAutocomplete] Will fetch suggestions in 300ms...`);
     
     // Debounce: wait 300ms after user stops typing
     titleAutocompleteTimeout = setTimeout(() => {
@@ -83,6 +94,8 @@ async function fetchTitleSuggestions(query, inputId, dropdownId) {
   const dropdown = document.getElementById(dropdownId);
   if (!dropdown) return;
   
+  console.log(`[TitleAutocomplete] Fetching suggestions for: "${query}"`);
+  
   try {
     // Show loading state
     dropdown.innerHTML = `
@@ -93,20 +106,27 @@ async function fetchTitleSuggestions(query, inputId, dropdownId) {
     `;
     dropdown.classList.remove('hidden');
     
+    const url = `/api/youtube-suggestions?q=${encodeURIComponent(query)}`;
+    console.log(`[TitleAutocomplete] Fetching from: ${url}`);
+    
     // Use backend proxy to avoid CORS issues
-    const response = await fetch(`/api/youtube-suggestions?q=${encodeURIComponent(query)}`);
+    const response = await fetch(url);
+    
+    console.log(`[TitleAutocomplete] Response status: ${response.status}`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch suggestions');
     }
     
     const data = await response.json();
+    console.log(`[TitleAutocomplete] Response data:`, data);
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to fetch suggestions');
     }
     
     currentTitleSuggestions = data.suggestions || [];
+    console.log(`[TitleAutocomplete] Got ${currentTitleSuggestions.length} suggestions`);
     
     if (currentTitleSuggestions.length === 0) {
       dropdown.innerHTML = `
@@ -146,11 +166,14 @@ function displayTitleSuggestions(suggestions, inputId, dropdownId) {
   const html = suggestions.map((suggestion, index) => `
     <button
       type="button"
-      class="title-suggestion-item w-full text-left px-4 py-2.5 hover:bg-dark-600 transition-colors flex items-start gap-2 ${index === 0 ? 'active bg-dark-600' : ''}"
+      class="title-suggestion-item w-full text-left px-4 py-3 hover:bg-dark-600 transition-all duration-150 flex items-center gap-3 border-b border-gray-700/30 last:border-b-0 group"
       onclick="selectTitleSuggestion('${inputId}', '${dropdownId}', ${index})"
     >
-      <i class="ti ti-search text-gray-400 text-sm mt-0.5"></i>
-      <span class="text-sm text-gray-200 flex-1">${escapeHtml(suggestion)}</span>
+      <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+        <i class="ti ti-search text-gray-400 text-sm group-hover:text-primary transition-colors"></i>
+      </div>
+      <span class="text-sm text-gray-200 flex-1 group-hover:text-white transition-colors leading-relaxed">${escapeHtml(suggestion)}</span>
+      <i class="ti ti-arrow-up-left text-gray-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
     </button>
   `).join('');
   

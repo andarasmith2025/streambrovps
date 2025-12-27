@@ -104,7 +104,7 @@ async function loadTemplate(templateId) {
     }, 300);
     
     // Wait for modal to open before populating
-    setTimeout(() => {
+    setTimeout(async () => {
       // Switch to correct tab first
       const isYouTubeMode = template.use_youtube_api === true || template.use_youtube_api === 1;
       console.log('[loadTemplate] Template data:', {
@@ -122,13 +122,38 @@ async function loadTemplate(templateId) {
         switchStreamTab('manual');
       }
       
+      // ⭐ FIX: Load gallery videos first before trying to select video
+      if (!window.allStreamVideos || window.allStreamVideos.length === 0) {
+        console.log('[loadTemplate] Loading gallery videos...');
+        await loadGalleryVideos();
+        console.log('[loadTemplate] Gallery videos loaded:', window.allStreamVideos?.length);
+      }
+      
       // Populate form fields
       if (template.video_id) {
+        console.log('[loadTemplate] 🎬 Loading video:', {
+          video_id: template.video_id,
+          video_name: template.video_name,
+          available_videos: window.allStreamVideos?.length
+        });
+        
         // Find and select video
         const video = window.allStreamVideos?.find(v => v.id === template.video_id);
         if (video) {
           selectVideo(video);
+          console.log('[loadTemplate] ✅ Video selected:', video.name);
+        } else {
+          console.error('[loadTemplate] ❌ Video not found in gallery!');
+          console.error('[loadTemplate] Looking for video_id:', template.video_id);
+          console.error('[loadTemplate] Available video IDs:', window.allStreamVideos?.map(v => v.id));
+          
+          // Show error to user
+          if (typeof showNotification === 'function') {
+            showNotification('Warning', `Video "${template.video_name}" not found in gallery. Please select a video manually.`, 'warning');
+          }
         }
+      } else {
+        console.warn('[loadTemplate] ⚠️ Template has no video_id');
       }
       
       // Set stream title
@@ -139,6 +164,71 @@ async function loadTemplate(templateId) {
       // Set RTMP URL and Stream Key based on mode
       if (isYouTubeMode) {
         // YouTube API mode
+        
+        // Set YouTube channel if saved in template
+        if (template.youtube_channel_id) {
+          console.log('[loadTemplate] 📺 Template has YouTube channel ID:', template.youtube_channel_id);
+          console.log('[loadTemplate] Waiting for YouTube channels to load...');
+          
+          let attempts = 0;
+          const maxAttempts = 50; // 5 seconds total
+          
+          // Wait for YouTube channels to be loaded
+          const waitForChannels = setInterval(() => {
+            attempts++;
+            const youtubeChannelSelect = document.getElementById('youtubeChannelSelect');
+            
+            if (youtubeChannelSelect && youtubeChannelSelect.options.length > 1) {
+              // Channels are loaded (more than just "Loading..." option)
+              clearInterval(waitForChannels);
+              
+              console.log('[loadTemplate] ✅ Channels loaded! Available options:', youtubeChannelSelect.options.length);
+              
+              // Log all available channel IDs
+              console.log('[loadTemplate] Available channels:');
+              for (let i = 0; i < youtubeChannelSelect.options.length; i++) {
+                console.log(`  [${i}] value="${youtubeChannelSelect.options[i].value}" text="${youtubeChannelSelect.options[i].text}"`);
+              }
+              
+              // Set the channel value
+              console.log('[loadTemplate] Setting channel to:', template.youtube_channel_id);
+              youtubeChannelSelect.value = template.youtube_channel_id;
+              console.log('[loadTemplate] Current selected value after set:', youtubeChannelSelect.value);
+              
+              // Verify it was set correctly
+              if (youtubeChannelSelect.value !== template.youtube_channel_id) {
+                console.error('[loadTemplate] ❌ Channel ID not found in dropdown options!');
+                console.error('[loadTemplate] Template channel_id:', template.youtube_channel_id);
+                console.error('[loadTemplate] Available channel IDs:', Array.from(youtubeChannelSelect.options).map(o => `"${o.value}"`));
+                
+                // Show error to user
+                if (typeof showNotification === 'function') {
+                  showNotification('Warning', 'YouTube channel from template not found. Please select a channel manually.', 'warning');
+                }
+              } else {
+                console.log('[loadTemplate] ✅ Channel successfully set to:', youtubeChannelSelect.options[youtubeChannelSelect.selectedIndex].text);
+                
+                // Update global selectedChannelId to prevent updateChannelSelector from overwriting
+                if (typeof window.selectedChannelId !== 'undefined') {
+                  window.selectedChannelId = template.youtube_channel_id;
+                  console.log('[loadTemplate] ✅ Updated window.selectedChannelId to:', window.selectedChannelId);
+                }
+              }
+            } else if (attempts >= maxAttempts) {
+              clearInterval(waitForChannels);
+              console.error('[loadTemplate] ❌ Timeout waiting for YouTube channels to load');
+              
+              if (typeof showNotification === 'function') {
+                showNotification('Error', 'Failed to load YouTube channels. Please try again.', 'error');
+              }
+            } else {
+              console.log(`[loadTemplate] Waiting for channels... attempt ${attempts}/${maxAttempts}`);
+            }
+          }, 100); // Check every 100ms
+        } else {
+          console.warn('[loadTemplate] ⚠️ Template has no youtube_channel_id');
+        }
+        
         if (template.rtmp_url) {
           const youtubeRtmpUrl = document.getElementById('youtubeRtmpUrl');
           if (youtubeRtmpUrl) youtubeRtmpUrl.value = template.rtmp_url;
@@ -275,26 +365,32 @@ async function saveAsTemplate() {
   const loopVideo = document.getElementById('loopVideo')?.checked;
   
   // Get RTMP URL and Stream Key based on mode
-  let rtmpUrl, streamKey, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd;
+  let rtmpUrl, streamKey, youtubeChannelId, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd, youtubeTags, youtubeSyntheticContent, youtubeThumbnailPath;
   
   if (isYouTubeMode) {
     rtmpUrl = document.getElementById('youtubeRtmpUrl')?.value;
     streamKey = document.getElementById('youtubeStreamKey')?.value;
+    
+    // Get YouTube channel ID from selector
+    const youtubeChannelSelect = document.getElementById('youtubeChannelSelect');
+    youtubeChannelId = youtubeChannelSelect?.value || null;
+    console.log('[saveAsTemplate] YouTube Channel ID:', youtubeChannelId);
+    
     youtubeDescription = document.getElementById('youtubeDescription')?.value;
     youtubePrivacy = document.getElementById('youtubePrivacy')?.value;
     youtubeMadeForKids = document.querySelector('input[name="youtubeMadeForKids"]:checked')?.value === 'yes';
     youtubeAgeRestricted = document.getElementById('youtubeAgeRestricted')?.checked;
-    const youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked;
+    youtubeSyntheticContent = document.getElementById('youtubeSyntheticContent')?.checked;
     youtubeAutoStart = document.getElementById('youtubeAutoStart')?.checked;
     youtubeAutoEnd = document.getElementById('youtubeAutoEnd')?.checked;
     
     // Get tags from hidden input
     const youtubeTagsInput = document.getElementById('youtubeTags');
-    const youtubeTags = youtubeTagsInput?.value || '[]';
+    youtubeTags = youtubeTagsInput?.value || '[]';
     
     // Get thumbnail path (if file was selected, it will be in the form data)
     // Note: Thumbnail file itself cannot be saved in template, only the path reference
-    const youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
+    youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
   } else {
     rtmpUrl = document.getElementById('rtmpUrl')?.value;
     streamKey = document.getElementById('streamKey')?.value;
@@ -366,6 +462,7 @@ async function saveAsTemplate() {
     loop_video: loopVideo,
     schedules: schedules,
     use_youtube_api: isYouTubeMode,
+    youtube_channel_id: youtubeChannelId || null,
     youtube_description: youtubeDescription || '',
     youtube_privacy: youtubePrivacy || 'unlisted',
     youtube_made_for_kids: youtubeMadeForKids || false,
@@ -395,11 +492,27 @@ async function confirmSaveTemplate() {
     return;
   }
   
+  // Support both new stream and edit stream template data
+  const sourceData = window._editTemplateData || window._templateData;
+  
+  if (!sourceData) {
+    showNotification('Error', 'Template data not found', 'error');
+    return;
+  }
+  
   const templateData = {
-    ...window._templateData,
+    ...sourceData,
     name,
     description
   };
+  
+  console.log('[confirmSaveTemplate] 📤 Sending template to backend:', {
+    name: templateData.name,
+    video_id: templateData.video_id,
+    video_name: templateData.video_name,
+    youtube_channel_id: templateData.youtube_channel_id,
+    use_youtube_api: templateData.use_youtube_api
+  });
   
   try {
     const response = await fetch('/api/templates', {
@@ -412,11 +525,19 @@ async function confirmSaveTemplate() {
     
     const result = await response.json();
     
+    console.log('[confirmSaveTemplate] ✅ Template saved successfully:', result);
+    
     closeSaveTemplateModal();
     showNotification('Template Saved', `"${name}" has been saved successfully`, 'success');
     
+    // Reload templates list
+    if (typeof loadTemplates === 'function') {
+      loadTemplates();
+    }
+    
     // Clear temporary data
     delete window._templateData;
+    delete window._editTemplateData;
   } catch (error) {
     console.error('Error saving template:', error);
     showNotification('Error', 'Failed to save template', 'error');
@@ -442,6 +563,7 @@ function closeSaveTemplateModal() {
     
     // Clear temporary data
     window._templateData = null;
+    window._editTemplateData = null;
   }, 200);
 }
 
@@ -744,31 +866,49 @@ async function saveEditAsTemplate() {
   
   // Get current form data from edit modal
   const videoId = document.getElementById('editSelectedVideoId')?.value;
-  const videoName = document.getElementById('editSelectedVideo')?.textContent;
+  const videoNameElement = document.getElementById('editSelectedVideo');
+  const videoName = videoNameElement?.textContent?.trim();
   const streamTitle = document.getElementById('editStreamTitle')?.value;
   const loopVideo = document.getElementById('editLoopVideo')?.checked;
   
+  console.log('[saveEditAsTemplate] 📋 Form data captured:', {
+    videoId: videoId,
+    videoName: videoName,
+    videoNameRaw: videoNameElement?.textContent,
+    streamTitle: streamTitle,
+    loopVideo: loopVideo
+  });
+  
   // Get RTMP URL and Stream Key based on mode
-  let rtmpUrl, streamKey, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd;
+  let rtmpUrl, streamKey, youtubeChannelId, youtubeDescription, youtubePrivacy, youtubeMadeForKids, youtubeAgeRestricted, youtubeAutoStart, youtubeAutoEnd, youtubeTags, youtubeSyntheticContent, youtubeThumbnailPath;
   
   if (isYouTubeMode) {
     rtmpUrl = document.getElementById('editYoutubeRtmpUrl')?.value;
     streamKey = document.getElementById('editYoutubeStreamKey')?.value;
+    
+    // ⭐ FIX: Get YouTube channel ID from edit modal selector
+    const youtubeChannelSelect = document.getElementById('editYoutubeChannelSelect');
+    youtubeChannelId = youtubeChannelSelect?.value || null;
+    console.log('[saveEditAsTemplate] 📺 YouTube Channel captured:', {
+      channelId: youtubeChannelId,
+      channelText: youtubeChannelSelect?.options[youtubeChannelSelect?.selectedIndex]?.text
+    });
+    
     youtubeDescription = document.getElementById('editYoutubeDescription')?.value;
     youtubePrivacy = document.getElementById('editYoutubePrivacy')?.value;
     youtubeMadeForKids = document.querySelector('input[name="editYoutubeMadeForKids"]:checked')?.value === 'yes';
     youtubeAgeRestricted = document.getElementById('editYoutubeAgeRestricted')?.checked;
-    const youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked;
+    youtubeSyntheticContent = document.getElementById('editYoutubeSyntheticContent')?.checked;
     youtubeAutoStart = document.getElementById('editYoutubeAutoStart')?.checked;
     youtubeAutoEnd = document.getElementById('editYoutubeAutoEnd')?.checked;
     
     // Get tags from hidden input
     const youtubeTagsInput = document.getElementById('editYoutubeTags');
-    const youtubeTags = youtubeTagsInput?.value || '[]';
+    youtubeTags = youtubeTagsInput?.value || '[]';
     
     // Get thumbnail path (if file was selected, it will be in the form data)
     // Note: Thumbnail file itself cannot be saved in template, only the path reference
-    const youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
+    youtubeThumbnailPath = null; // Templates don't store actual thumbnail files
   } else {
     rtmpUrl = document.getElementById('editRtmpUrl')?.value;
     streamKey = document.getElementById('editStreamKey')?.value;
@@ -821,22 +961,33 @@ async function saveEditAsTemplate() {
     return;
   }
   
-  // Ask for template name
-  const templateName = prompt('Enter template name:', streamTitle);
-  if (!templateName) return;
+  // Open save template modal instead of using prompt
+  const modal = document.getElementById('saveTemplateModal');
+  if (!modal) {
+    console.error('[saveEditAsTemplate] Save template modal not found');
+    return;
+  }
   
-  // Prepare template data
-  const templateData = {
-    name: templateName,
-    video_id: videoId,
-    video_name: videoName,
-    stream_title: streamTitle,
-    rtmp_url: rtmpUrl,
-    stream_key: streamKey,
+  // Pre-fill with stream title
+  const templateNameInput = document.getElementById('templateName');
+  const templateDescInput = document.getElementById('templateDescription');
+  
+  if (streamTitle) {
+    templateNameInput.value = streamTitle + ' Template';
+  }
+  
+  // Store template data temporarily
+  window._editTemplateData = {
+    video_id: videoId || null,
+    video_name: (videoName && videoName !== 'Choose a video...') ? videoName : '',
+    stream_title: streamTitle || '',
+    rtmp_url: rtmpUrl || '',
+    stream_key: streamKey || '',
     loop_video: loopVideo ? 1 : 0,
     use_youtube_api: isYouTubeMode ? 1 : 0,
-    youtube_description: youtubeDescription,
-    youtube_privacy: youtubePrivacy,
+    youtube_channel_id: youtubeChannelId || null,
+    youtube_description: youtubeDescription || '',
+    youtube_privacy: youtubePrivacy || 'unlisted',
     youtube_made_for_kids: youtubeMadeForKids ? 1 : 0,
     youtube_age_restricted: youtubeAgeRestricted ? 1 : 0,
     youtube_synthetic_content: youtubeSyntheticContent ? 1 : 0,
@@ -847,35 +998,16 @@ async function saveEditAsTemplate() {
     schedules: schedules
   };
   
-  console.log('[saveEditAsTemplate] Saving template:', templateData);
+  console.log('[saveEditAsTemplate] ✅ Template data prepared:', {
+    video_id: window._editTemplateData.video_id,
+    video_name: window._editTemplateData.video_name,
+    youtube_channel_id: window._editTemplateData.youtube_channel_id,
+    use_youtube_api: window._editTemplateData.use_youtube_api,
+    schedules_count: schedules.length
+  });
   
-  try {
-    const response = await fetch('/api/templates', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(templateData)
-    });
-    
-    const result = await response.json();
-    
-    if (result.success) {
-      if (typeof showToast === 'function') {
-        showToast('success', 'Template saved successfully!');
-      }
-      
-      // Reload templates list if function exists
-      if (typeof loadTemplates === 'function') {
-        loadTemplates();
-      }
-    } else {
-      throw new Error(result.error || 'Failed to save template');
-    }
-  } catch (error) {
-    console.error('[saveEditAsTemplate] Error:', error);
-    if (typeof showToast === 'function') {
-      showToast('error', error.message || 'Failed to save template');
-    }
-  }
+  // Show modal
+  document.body.style.overflow = 'hidden';
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => modal.classList.add('active'));
 }

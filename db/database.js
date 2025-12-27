@@ -526,6 +526,27 @@ function createTables() {
       console.error('Error adding youtube_auto_end column:', err.message);
     }
   });
+  
+  // Add youtube_channel_id column to stream_templates
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_channel_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_channel_id column:', err.message);
+    }
+  });
+  
+  // Add youtube_tags column to stream_templates
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_tags TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_tags column:', err.message);
+    }
+  });
+  
+  // Add youtube_thumbnail_path column to stream_templates
+  db.run(`ALTER TABLE stream_templates ADD COLUMN youtube_thumbnail_path TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Error adding youtube_thumbnail_path column:', err.message);
+    }
+  });
 
   // ========================================
   // Gemini AI & YouTube Metadata Migrations
@@ -571,6 +592,15 @@ function createTables() {
       console.error('Error adding youtube_thumbnail_path column:', err.message);
     } else if (!err) {
       console.log('✅ Added youtube_thumbnail_path column to streams table');
+    }
+  });
+
+  // Add youtube_channel_id column for multi-channel support
+  db.run(`ALTER TABLE streams ADD COLUMN youtube_channel_id TEXT`, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding youtube_channel_id column:', err.message);
+    } else if (!err) {
+      console.log('✅ Added youtube_channel_id column to streams table');
     }
   });
 

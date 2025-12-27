@@ -357,12 +357,19 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
   console.log(`[StreamingService] Creating NEW YouTube broadcast for stream ${streamId}...`);
   console.log(`[StreamingService] Using stream data: title="${stream.title}", description="${stream.youtube_description || stream.description || ''}", privacy="${stream.youtube_privacy}"`);
   
+  // ⭐ FIX: For "Stream Now", use past time so YouTube sets status to "ready" not "upcoming"
+  // If scheduledStartTime is in the future, YouTube creates "upcoming" broadcast
+  // If scheduledStartTime is in the past (or very recent), YouTube creates "ready" broadcast
+  const now = new Date();
+  const startTime = new Date(now.getTime() - 60000); // 1 minute ago
+  
   // Prepare broadcast options with ALL stream metadata
   const broadcastOptions = {
+    channelId: stream.youtube_channel_id, // ⭐ MULTI-CHANNEL: Pass channel ID
     title: stream.title || 'Live Stream',
     description: stream.youtube_description || stream.description || '',
     privacyStatus: stream.youtube_privacy || 'unlisted',
-    scheduledStartTime: new Date().toISOString(),
+    scheduledStartTime: startTime.toISOString(), // ⭐ Use past time for immediate "ready" status
     streamKey: stream.stream_key, // ⚠️ Use stream_key (not streamId)
     // ⭐ IMPORTANT: Auto Start/Stop settings
     // enableAutoStart: true = YouTube auto-transitions to live when stream data arrives (RECOMMENDED)
@@ -376,12 +383,15 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
     syntheticContent: stream.youtube_synthetic_content ? true : false
   };
   
-  console.log(`[StreamingService] Broadcast settings: autoStart=${broadcastOptions.enableAutoStart}, autoStop=${broadcastOptions.enableAutoStop}`);
+  console.log(`[StreamingService] Broadcast settings: channelId=${broadcastOptions.channelId || 'default'}, scheduledStartTime=${broadcastOptions.scheduledStartTime} (past time for immediate ready status), autoStart=${broadcastOptions.enableAutoStart}, autoStop=${broadcastOptions.enableAutoStop}`);
   
-  // Add thumbnail if available
-  if (stream.video_thumbnail) {
-    broadcastOptions.thumbnailPath = stream.video_thumbnail;
-    console.log(`[StreamingService] Using thumbnail: ${stream.video_thumbnail}`);
+  // Add thumbnail if available (check both video_thumbnail and youtube_thumbnail_path)
+  const thumbnailPath = stream.youtube_thumbnail_path || stream.video_thumbnail;
+  if (thumbnailPath) {
+    broadcastOptions.thumbnailPath = thumbnailPath;
+    console.log(`[StreamingService] Using thumbnail: ${thumbnailPath}`);
+  } else {
+    console.log(`[StreamingService] ⚠️ No thumbnail set for this stream`);
   }
   
   // Create new broadcast with all metadata
@@ -436,6 +446,7 @@ async function startStream(streamId, options = {}) {
     }
     const startTimeIso = new Date().toISOString();
     const streamStartTime = new Date(startTimeIso);
+    
     const ffmpegArgs = await buildFFmpegArgs(stream);
     const fullCommand = `${ffmpegPath} ${ffmpegArgs.join(' ')}`;
     addStreamLog(streamId, `Starting stream with command: ${fullCommand}`);
@@ -460,7 +471,9 @@ async function startStream(streamId, options = {}) {
         const { getTokensForUser } = require('../routes/youtube');
         const youtubeService = require('./youtubeService');
         
-        const tokens = await getTokensForUser(stream.user_id);
+        // ⭐ MULTI-CHANNEL: Pass youtube_channel_id to get correct channel tokens
+        console.log(`[StreamingService] Getting tokens for user ${stream.user_id}, channel: ${stream.youtube_channel_id || 'default'}`);
+        const tokens = await getTokensForUser(stream.user_id, stream.youtube_channel_id);
         if (tokens && tokens.access_token) {
           
           // Check if this is a scheduled stream with existing broadcast
@@ -523,16 +536,33 @@ async function startStream(streamId, options = {}) {
           const { getTokensForUser } = require('../routes/youtube');
           const youtubeService = require('./youtubeService');
           
-          const tokens = await getTokensForUser(stream.user_id);
+          // ⭐ MULTI-CHANNEL: Pass youtube_channel_id to get correct channel tokens
+          console.log(`[StreamingService] Getting tokens for transition, user ${stream.user_id}, channel: ${stream.youtube_channel_id || 'default'}`);
+          const tokens = await getTokensForUser(stream.user_id, stream.youtube_channel_id);
           if (tokens && tokens.access_token) {
             console.log(`[StreamingService] Starting smart transition for broadcast ${stream.youtube_broadcast_id}...`);
             
             try {
+              // ⭐ FIX: Get streamId from stream_key instead of using youtube_stream_id
+              // First, get broadcast details to find the bound stream
+              const { google } = require('googleapis');
+              const oauth2Client = new google.auth.OAuth2();
+              oauth2Client.setCredentials(tokens);
+              const yt = google.youtube({ version: 'v3', auth: oauth2Client });
+              
+              const broadcastDetails = await yt.liveBroadcasts.list({
+                part: 'contentDetails',
+                id: stream.youtube_broadcast_id
+              });
+              
+              const boundStreamId = broadcastDetails.data?.items?.[0]?.contentDetails?.boundStreamId;
+              console.log(`[StreamingService] Bound stream ID from broadcast: ${boundStreamId || 'none'}`);
+              
               // Use the new smart transition function
               // It will wait for stream to be active before transitioning
               await youtubeService.transitionBroadcastSmart(tokens, {
                 broadcastId: stream.youtube_broadcast_id,
-                streamId: stream.youtube_stream_id, // Pass stream ID for status checking
+                streamId: boundStreamId, // Use the bound stream ID from broadcast
                 targetStatus: 'live'
               });
               
@@ -820,13 +850,43 @@ async function stopStream(streamId, options = {}) {
     
     if (!isActive) {
       const stream = await Stream.findById(streamId);
-      if (stream && stream.status === 'live') {
-        console.log(`[StreamingService] Stream ${streamId} not active in memory but status is 'live' in DB. Fixing status.`);
-        await Stream.updateStatus(streamId, 'offline', stream.user_id);
-        if (typeof schedulerService !== 'undefined' && schedulerService.cancelStreamTermination) {
-          schedulerService.handleStreamStopped(streamId);
+      if (stream) {
+        console.log(`[StreamingService] Stream ${streamId} not active in memory. Current status: ${stream.status}`);
+        
+        // ⭐ CRITICAL FIX: Always try to transition YouTube broadcast, even if status is already offline
+        // This handles cases where FFmpeg crashed but YouTube broadcast is still live
+        if (stream.use_youtube_api && stream.youtube_broadcast_id) {
+          console.log(`[StreamingService] Attempting to transition YouTube broadcast ${stream.youtube_broadcast_id} to complete`);
+          try {
+            const youtubeService = require('./youtubeService');
+            await youtubeService.transitionBroadcast(stream.user_id, stream.youtube_broadcast_id, 'complete');
+            console.log(`[StreamingService] ✅ YouTube broadcast transitioned to complete`);
+          } catch (ytError) {
+            console.error(`[StreamingService] Failed to transition YouTube broadcast: ${ytError.message}`);
+            // Continue anyway to update database status
+          }
         }
-        return { success: true, message: 'Stream status fixed (was not active but marked as live)' };
+        
+        // Force fix any stream that's not offline (live, scheduled, etc)
+        if (stream.status !== 'offline') {
+          console.log(`[StreamingService] Forcing stream ${streamId} to offline (current: ${stream.status})`);
+          
+          await Stream.updateStatus(streamId, 'offline', stream.user_id);
+          
+          // Clear active_schedule_id to prevent broadcast scheduler from creating new broadcasts
+          await Stream.update(streamId, { active_schedule_id: null });
+          console.log(`[StreamingService] ✅ Cleared active_schedule_id for stream ${streamId}`);
+          
+          if (typeof schedulerService !== 'undefined' && schedulerService.handleStreamStopped) {
+            schedulerService.handleStreamStopped(streamId);
+          }
+          
+          return { success: true, message: `Stream status fixed (was ${stream.status}, now offline)` };
+        } else {
+          // Status already offline, but we tried to transition YouTube broadcast anyway
+          console.log(`[StreamingService] Stream ${streamId} already offline, YouTube broadcast transition attempted`);
+          return { success: true, message: 'Stream already offline, YouTube broadcast transition attempted' };
+        }
       }
       return { success: false, error: 'Stream is not active' };
     }
@@ -1003,7 +1063,10 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       const { getTokensForUser } = require('../routes/youtube');
       const youtubeService = require('./youtubeService');
       
-      const tokens = await getTokensForUser(userId);
+      // ⭐ MULTI-CHANNEL: Get channel ID from stream data
+      const channelId = streamData?.youtube_channel_id || null;
+      console.log(`[YouTube VOD] Getting tokens for user ${userId}, channel: ${channelId || 'default'}`);
+      const tokens = await getTokensForUser(userId, channelId);
       if (!tokens || !tokens.access_token) {
         console.warn('[YouTube VOD] ⚠️ No valid tokens for VOD optimization');
         return;

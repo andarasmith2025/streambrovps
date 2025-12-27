@@ -85,6 +85,104 @@ function closeNotification() {
   }, 200);
 }
 
+// Custom Confirm Dialog (styled, returns Promise)
+function showCustomConfirm(title, message, confirmText = 'OK', cancelText = 'Cancel') {
+  return new Promise((resolve) => {
+    // Create modal HTML if not exists
+    let modal = document.getElementById('customConfirmModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'customConfirmModal';
+      modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] hidden';
+      modal.innerHTML = `
+        <div id="customConfirmContent" class="bg-dark-800 rounded-xl shadow-2xl border border-gray-700 max-w-md w-full mx-4 transform transition-all duration-200 scale-95 opacity-0">
+          <div class="p-6">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-blue-500/20 border-2 border-blue-500">
+                <i class="ti ti-help text-2xl text-blue-400"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 id="customConfirmTitle" class="text-lg font-semibold text-white mb-2"></h3>
+                <div id="customConfirmMessage" class="text-gray-300 text-sm leading-relaxed"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-3 px-6 py-4 bg-dark-700/50 rounded-b-xl border-t border-gray-700">
+            <button id="customConfirmCancel" class="px-4 py-2 rounded-lg text-gray-300 hover:bg-dark-600 transition-colors">
+              Cancel
+            </button>
+            <button id="customConfirmOk" class="px-4 py-2 rounded-lg bg-primary hover:bg-blue-600 text-white font-medium transition-colors">
+              OK
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+    
+    // Set content
+    document.getElementById('customConfirmTitle').textContent = title;
+    document.getElementById('customConfirmMessage').innerHTML = message;
+    document.getElementById('customConfirmOk').textContent = confirmText;
+    document.getElementById('customConfirmCancel').textContent = cancelText;
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      document.getElementById('customConfirmContent').classList.remove('scale-95', 'opacity-0');
+      document.getElementById('customConfirmContent').classList.add('scale-100', 'opacity-100');
+    });
+    
+    // Handle buttons
+    const handleOk = () => {
+      closeCustomConfirm();
+      resolve(true);
+    };
+    
+    const handleCancel = () => {
+      closeCustomConfirm();
+      resolve(false);
+    };
+    
+    const closeCustomConfirm = () => {
+      const content = document.getElementById('customConfirmContent');
+      content.classList.remove('scale-100', 'opacity-100');
+      content.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 200);
+    };
+    
+    // Remove old listeners
+    const okBtn = document.getElementById('customConfirmOk');
+    const cancelBtn = document.getElementById('customConfirmCancel');
+    const newOkBtn = okBtn.cloneNode(true);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    
+    // Add new listeners
+    newOkBtn.addEventListener('click', handleOk);
+    newCancelBtn.addEventListener('click', handleCancel);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    });
+    
+    // Close on Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        handleCancel();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+  });
+}
+
 function openTipsStreaming() {
   const tipsModal = document.getElementById('tipsStreamingModal');
   const newModal = document.getElementById('newStreamModal');
