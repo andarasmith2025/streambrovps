@@ -366,14 +366,15 @@ router.post('/broadcasts/:id/transition', async (req, res) => {
           });
         }
         
-        // For going live, check if stream is active
+        // For going live, check if stream is active (soft check - warning only)
         try {
           const streamActive = await youtubeService.isStreamActive(tokens, { streamId: boundStreamId });
           if (!streamActive) {
-            return res.status(400).json({ 
-              error: 'Stream not active',
-              details: 'The stream must be actively sending data before going live. Please start your streaming software first.'
-            });
+            console.warn(`[YouTube] ⚠️ Stream may not be active yet, but allowing transition (YouTube will handle it)`);
+            // Don't block - YouTube Studio allows this with warning
+            // Just log and continue
+          } else {
+            console.log(`[YouTube] ✓ Stream is active`);
           }
         } catch (streamErr) {
           console.warn(`[YouTube] Could not check stream status: ${streamErr.message}`);
@@ -835,6 +836,10 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     // Get bound stream ID from source broadcast
     const boundStreamId = src.contentDetails?.boundStreamId || null;
     
+    // ⭐ SMART DUPLICATE: Check if source broadcast is currently active (live/testing)
+    const sourceStatus = src.status?.lifeCycleStatus; // ready, testing, live, complete, revoked
+    const sourceIsActive = sourceStatus === 'live' || sourceStatus === 'testing';
+    
     console.log(`[YouTube] ========================================`);
     console.log(`[YouTube] DUPLICATING BROADCAST: ${req.params.id}`);
     console.log(`[YouTube] ========================================`);
@@ -842,6 +847,7 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     console.log(`[YouTube] - Title: ${src.snippet?.title}`);
     console.log(`[YouTube] - Description: ${src.snippet?.description?.substring(0, 50)}...`);
     console.log(`[YouTube] - Privacy: ${src.status?.privacyStatus}`);
+    console.log(`[YouTube] - Status: ${sourceStatus} ${sourceIsActive ? '🔴 ACTIVE' : '⚪ INACTIVE'}`);
     console.log(`[YouTube] - Bound Stream ID: ${boundStreamId || 'NONE (will create new)'}`);
     console.log(`[YouTube] - contentDetails:`, JSON.stringify(src.contentDetails, null, 2));
     console.log(`[YouTube] - Auto Start: ${src.contentDetails?.enableAutoStart}`);
@@ -872,6 +878,17 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     }
 
     // Copy ALL metadata including additional settings
+    // ⭐ SMART DUPLICATE: If source is active, disable auto-start to prevent conflict
+    let autoStartOverride = src.contentDetails?.enableAutoStart !== undefined ? src.contentDetails.enableAutoStart : true;
+    let warningMessage = null;
+    
+    if (sourceIsActive && boundStreamId) {
+      // Source is live/testing and using same stream key → disable auto-start
+      autoStartOverride = false;
+      warningMessage = `⚠️ Master broadcast is ${sourceStatus.toUpperCase()}. Auto-start disabled to prevent conflict. Stop master broadcast before starting this duplicate.`;
+      console.log(`[YouTube] ⚠️ SMART DUPLICATE: Source is ${sourceStatus}, disabling auto-start for duplicate`);
+    }
+    
     const payload = {
       title: src.snippet?.title || 'Untitled',
       description: src.snippet?.description || '',
@@ -879,7 +896,7 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
       scheduledStartTime,
       streamId: boundStreamId, // ✅ REUSE STREAM KEY
       // Copy additional settings
-      enableAutoStart: src.contentDetails?.enableAutoStart !== undefined ? src.contentDetails.enableAutoStart : true,
+      enableAutoStart: autoStartOverride, // ⭐ Smart override if source is active
       enableAutoStop: src.contentDetails?.enableAutoStop !== undefined ? src.contentDetails.enableAutoStop : true,
     };
     
@@ -948,8 +965,12 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
     console.log(`[YouTube] DUPLICATE SUMMARY:`);
     console.log(`[YouTube] - New Broadcast ID: ${newId}`);
     console.log(`[YouTube] - Stream Key: ${boundStreamId ? 'REUSED ✓' : 'NEW ✗'}`);
+    console.log(`[YouTube] - Auto Start: ${autoStartOverride ? 'ENABLED ✓' : 'DISABLED ✗'}`);
     console.log(`[YouTube] - Thumbnail: ${thumbnailCopied ? 'COPIED ✓' : 'FAILED ✗'}`);
     console.log(`[YouTube] - Audience Settings: ${audienceCopied ? 'COPIED ✓' : 'SKIPPED'}`);
+    if (warningMessage) {
+      console.log(`[YouTube] - Warning: ${warningMessage}`);
+    }
     console.log(`[YouTube] ========================================`);
 
     return res.json({ 
@@ -959,7 +980,9 @@ router.post('/broadcasts/:id/duplicate', async (req, res) => {
       thumbnailCopied,
       audienceCopied,
       streamKeyReused: !!boundStreamId,
-      message: `Duplicate created successfully`
+      autoStartDisabled: sourceIsActive && boundStreamId,
+      warning: warningMessage,
+      message: warningMessage || `Duplicate created successfully`
     });
   } catch (err) {
     const detail = err?.response?.data || null;

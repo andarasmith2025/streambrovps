@@ -1,0 +1,3 @@
+@echo off
+echo Connecting to VPS and checking Healing Earth schedules...
+ssh root@103.127.132.105 "cd /root/streambro && node check-healing-earth-schedules.js"

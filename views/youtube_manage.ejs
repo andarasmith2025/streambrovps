@@ -110,10 +110,7 @@
             </select>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="editAutoStart" type="checkbox"> Auto Start</label>
-          <label class="inline-flex items-center gap-2 text-sm text-gray-300"><input id="editAutoStop" type="checkbox"> Auto End</label>
-        </div>
+        <!-- Auto Start/Stop removed - System controlled for stability -->
         <div class="pt-2 flex justify-end gap-2">
           <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">Cancel</button>
           <button type="submit" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded">Save</button>
@@ -342,7 +339,7 @@
     el.innerHTML = `
       <div class="flex items-center gap-3 sm:gap-4 w-full">
         <label class="self-start mt-1"><input type="checkbox" class="yt-select-item" value="${item.id}"></label>
-        ${thumb ? `<img src="${thumb}" class="w-36 h-20 object-cover rounded border border-gray-700 flex-shrink-0"/>` : ''}
+        ${thumb ? `<img src="${thumb}" class="w-48 h-27 object-contain rounded border border-gray-700 flex-shrink-0" style="background: #1a1a1a;"/>` : ''}
         <div class="min-w-0 flex-1">
           <div class="font-medium truncate">${title}</div>
           <div class="text-xs text-gray-400 mt-1 flex gap-3 flex-wrap">

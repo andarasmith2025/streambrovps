@@ -7,17 +7,38 @@ let initialized = false;
 let scheduleIntervalId = null;
 let durationIntervalId = null;
 function init(streamingServiceInstance) {
+  console.log('[SchedulerService] init() called');
+  
   if (initialized) {
-    console.log('Stream scheduler already initialized');
+    console.log('[SchedulerService] ⚠️  Already initialized, skipping');
     return;
   }
+  
+  if (!streamingServiceInstance) {
+    console.error('[SchedulerService] ❌ streamingServiceInstance is null/undefined!');
+    return;
+  }
+  
   streamingService = streamingServiceInstance;
   initialized = true;
-  console.log('Stream scheduler initialized');
+  console.log('[SchedulerService] ✅ Stream scheduler initialized');
+  
+  // Start interval for checking scheduled streams
+  console.log('[SchedulerService] Starting checkScheduledStreams interval (every 60s)...');
   scheduleIntervalId = setInterval(checkScheduledStreams, 60 * 1000);
+  
+  // Start interval for checking stream durations
+  console.log('[SchedulerService] Starting checkStreamDurations interval (every 60s)...');
   durationIntervalId = setInterval(checkStreamDurations, 60 * 1000);
+  
+  // Run immediately on startup
+  console.log('[SchedulerService] Running initial checkScheduledStreams...');
   checkScheduledStreams();
+  
+  console.log('[SchedulerService] Running initial checkStreamDurations...');
   checkStreamDurations();
+  
+  console.log('[SchedulerService] ✅ Initialization complete');
 }
 async function checkScheduledStreams() {
   try {
@@ -100,19 +121,53 @@ async function checkScheduledStreams() {
             const nowTimeInMinutes = nowHour * 60 + nowMinute;
             const timeDiff = nowTimeInMinutes - scheduleTimeInMinutes;
             
-            // Only start if current time is AT or AFTER schedule time (within 1 minute window)
-            // This prevents starting before the scheduled time
-            if (scheduleHour === nowHour && timeDiff >= 0 && timeDiff <= 1) {
+            // ⭐ YOUTUBE API OPTIMIZATION: Start FFmpeg 2 minutes BEFORE schedule time
+            // This allows ingestion to stabilize before going live
+            // For YouTube API streams: start at schedule_time - 2 minutes
+            // For regular streams: start at schedule_time (as before)
+            
+            const stream = await Stream.findById(schedule.stream_id);
+            if (!stream) {
+              console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} not found`);
+              continue;
+            }
+            
+            let startWindow = { min: 0, max: 1 }; // Default: start at schedule time (0-1 min window)
+            
+            if (stream.use_youtube_api) {
+              // YouTube API: Start 2 minutes early, allow up to 10 minutes late (for restart tolerance)
+              startWindow = { min: -2, max: 10 }; // Start 2 min before to 10 min after
+              console.log(`[Scheduler] YouTube API stream: will start 2 minutes early for ingestion warmup`);
+            }
+            
+            // Check if current time is within the start window
+            if (timeDiff >= startWindow.min && timeDiff <= startWindow.max) {
+              // ⭐ CRITICAL FIX: Check if stream has stale active_schedule_id
+              // This happens when stream was stopped manually or crashed without cleanup
+              if (stream.active_schedule_id && stream.active_schedule_id !== schedule.id) {
+                console.log(`[Scheduler] ⚠️ Stream ${schedule.stream_id} has stale active_schedule_id: ${stream.active_schedule_id}`);
+                console.log(`[Scheduler] 🔧 Clearing stale active_schedule_id to allow new schedule to start`);
+                await Stream.update(schedule.stream_id, { 
+                  active_schedule_id: null, 
+                  scheduled_end_time: null 
+                });
+                // Reload stream data
+                const updatedStream = await Stream.findById(schedule.stream_id);
+                if (updatedStream) {
+                  stream.status = updatedStream.status;
+                  stream.active_schedule_id = updatedStream.active_schedule_id;
+                }
+              }
+              
               // Check if stream is not already live
-              const stream = await Stream.findById(schedule.stream_id);
-              if (stream && stream.status !== 'live') {
+              if (stream.status !== 'live') {
                 schedulesToStart.push(schedule);
-                console.log(`[Scheduler] ✓ Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime} (diff: ${timeDiff}m)`);
+                console.log(`[Scheduler] ✓ Recurring schedule matched: ${schedule.stream_id} on ${getDayName(currentDay)} at ${currentTime} (diff: ${timeDiff}m, window: ${startWindow.min} to ${startWindow.max})`);
               } else {
-                console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live or not found`);
+                console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live`);
               }
             } else {
-              console.log(`[Scheduler] ✗ Time does not match (difference: ${Math.abs(timeDiff)} minutes, too ${timeDiff < 0 ? 'early' : 'late'})`);
+              console.log(`[Scheduler] ✗ Time does not match (difference: ${timeDiff} minutes, window: ${startWindow.min} to ${startWindow.max})`);
             }
           } else {
             console.log(`[Scheduler] ✗ Today (${currentDay}) is not in allowed days`);
@@ -130,20 +185,49 @@ async function checkScheduledStreams() {
           continue;
         }
         
+        // ⭐ YOUTUBE API OPTIMIZATION: Start FFmpeg 2 minutes BEFORE schedule time
+        const stream = await Stream.findById(schedule.stream_id);
+        if (!stream) {
+          console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} not found`);
+          continue;
+        }
+        
+        let earlyStartMs = 0; // Default: no early start
+        if (stream.use_youtube_api) {
+          earlyStartMs = 2 * 60 * 1000; // 2 minutes early for YouTube API
+          console.log(`[Scheduler] YouTube API stream: will start 2 minutes early for ingestion warmup`);
+        }
+        
+        const adjustedScheduleTime = new Date(scheduleTime.getTime() - earlyStartMs);
         const lookAheadTime = new Date(now.getTime() + SCHEDULE_LOOKAHEAD_SECONDS * 1000);
         
-        console.log(`[Scheduler] One-time schedule check: ${schedule.stream_id}, schedule=${scheduleTime.toLocaleString()}, now=${now.toLocaleString()}`);
+        console.log(`[Scheduler] One-time schedule check: ${schedule.stream_id}, schedule=${scheduleTime.toLocaleString()}, adjusted=${adjustedScheduleTime.toLocaleString()}, now=${now.toLocaleString()}`);
         
-        if (scheduleTime >= now && scheduleTime <= lookAheadTime) {
-          const stream = await Stream.findById(schedule.stream_id);
-          if (stream && stream.status !== 'live') {
+        if (adjustedScheduleTime >= now && adjustedScheduleTime <= lookAheadTime) {
+          // ⭐ CRITICAL FIX: Check if stream has stale active_schedule_id
+          if (stream.active_schedule_id && stream.active_schedule_id !== schedule.id) {
+            console.log(`[Scheduler] ⚠️ Stream ${schedule.stream_id} has stale active_schedule_id: ${stream.active_schedule_id}`);
+            console.log(`[Scheduler] 🔧 Clearing stale active_schedule_id to allow new schedule to start`);
+            await Stream.update(schedule.stream_id, { 
+              active_schedule_id: null, 
+              scheduled_end_time: null 
+            });
+            // Reload stream data
+            const updatedStream = await Stream.findById(schedule.stream_id);
+            if (updatedStream) {
+              stream.status = updatedStream.status;
+              stream.active_schedule_id = updatedStream.active_schedule_id;
+            }
+          }
+          
+          if (stream.status !== 'live') {
             schedulesToStart.push(schedule);
-            console.log(`[Scheduler] ✓ One-time schedule matched: ${schedule.stream_id} at ${scheduleTime.toLocaleString()}`);
+            console.log(`[Scheduler] ✓ One-time schedule matched: ${schedule.stream_id} at ${scheduleTime.toLocaleString()} (starting at ${adjustedScheduleTime.toLocaleString()})`);
           } else {
-            console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live or not found`);
+            console.log(`[Scheduler] ✗ Stream ${schedule.stream_id} is already live`);
           }
         } else {
-          console.log(`[Scheduler] ✗ Schedule time not in range (${Math.round((scheduleTime - now) / 1000)}s away)`);
+          console.log(`[Scheduler] ✗ Schedule time not in range (${Math.round((adjustedScheduleTime - now) / 1000)}s away)`);
         }
       }
     }
@@ -196,8 +280,21 @@ async function checkScheduledStreams() {
         // This ensures auto-stop uses the correct end time and we know which schedule is active
         console.log(`[Scheduler] Setting active_schedule_id=${schedule.id} for stream ${schedule.stream_id}`);
         
-        // Calculate end_time from schedule
-        const scheduleEndTime = schedule.end_time || new Date(new Date(schedule.schedule_time).getTime() + schedule.duration * 60 * 1000).toISOString();
+        // ⭐ CRITICAL FIX: Calculate end_time for TODAY, not from old schedule_time
+        // For recurring schedules, schedule_time might be from weeks ago
+        // We need to calculate end time based on CURRENT execution time
+        let scheduleEndTime;
+        
+        if (schedule.is_recurring) {
+          // For recurring: Use current time + duration
+          const now = new Date();
+          scheduleEndTime = new Date(now.getTime() + schedule.duration * 60 * 1000).toISOString();
+          console.log(`[Scheduler] Recurring schedule: end_time = NOW + ${schedule.duration}m = ${scheduleEndTime}`);
+        } else {
+          // For one-time: Use schedule.end_time or schedule_time + duration
+          scheduleEndTime = schedule.end_time || new Date(new Date(schedule.schedule_time).getTime() + schedule.duration * 60 * 1000).toISOString();
+          console.log(`[Scheduler] One-time schedule: end_time = ${scheduleEndTime}`);
+        }
         
         await Stream.update(schedule.stream_id, { 
           duration: schedule.duration,
@@ -290,7 +387,9 @@ async function checkStreamDurations() {
       }
       
       // Fallback 2: Calculate from start_time + duration (old method)
-      if (!endTime && stream.duration && stream.start_time) {
+      // ⚠️ WARNING: This fallback is DANGEROUS for recovery streams!
+      // Only use if stream has active_schedule_id (started by scheduler)
+      if (!endTime && stream.duration && stream.start_time && stream.active_schedule_id) {
         const start = new Date(stream.start_time);
         endTime = new Date(start.getTime() + stream.duration * 60 * 1000).toISOString();
         endTimeSource = 'start_time + duration';

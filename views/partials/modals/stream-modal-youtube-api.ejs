@@ -1,7 +1,7 @@
 <!-- YouTube API Fields Component -->
-<div id="youtubeApiFields" class="hidden space-y-3">
+<div id="youtubeApiFields" class="hidden space-y-4">
   
-  <!-- YouTube Channel Selector -->
+  <!-- 1. YouTube Channel Selector -->
   <div id="youtubeChannelSelector">
     <label class="text-sm font-medium text-white block mb-2">
       <i class="ti ti-brand-youtube text-red-500 mr-1"></i>
@@ -21,7 +21,7 @@
     </p>
   </div>
   
-  <!-- Description -->
+  <!-- 2. Description Section -->
   <div>
     <div class="flex items-center justify-between mb-2">
       <label class="text-sm font-medium text-white">Description</label>
@@ -36,11 +36,11 @@
       </button>
     </div>
     <textarea name="youtubeDescription" id="youtubeDescription" rows="3"
-      class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
+      class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-white text-sm"
       placeholder="Stream description (optional - or generate with AI)"></textarea>
   </div>
   
-  <!-- Tags Input with Gemini AI -->
+  <!-- 3. Tags Input with Gemini AI -->
   <div>
     <div class="flex items-center justify-between mb-2">
       <label class="text-sm font-medium text-white">
@@ -68,7 +68,7 @@
         type="text"
         id="tagInput"
         placeholder="Type a tag and press Enter"
-        class="flex-1 px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm"
+        class="flex-1 px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm text-white"
         onkeypress="handleTagInput(event)"
         maxlength="30"
       />
@@ -86,55 +86,58 @@
       <span id="tagCount" class="text-gray-500">0 / 30 tags</span>
       <span id="tagLength" class="text-gray-500">0 / 500 characters</span>
     </div>
-    
-    <!-- Hidden input for form submission -->
     <input type="hidden" id="youtubeTags" name="youtubeTags" value="[]" />
   </div>
   
-  <!-- Stream Configuration -->
-  <label class="text-sm font-medium text-white block mb-1.5">Stream Configuration</label>
-  <div class="space-y-2">
-    <div class="relative">
-      <input type="text" id="youtubeRtmpUrl"
-        class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary"
-        placeholder="RTMP URL">
-      <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-      <button type="button" id="youtubePlatformSelector"
-        class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-600 transition-colors"
-        aria-label="Select platform">
-        <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
-      </button>
-      <div id="youtubePlatformDropdown"
-        class="hidden absolute z-10 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
-        <div class="py-1">
-          <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" data-url="rtmps://a.rtmp.youtube.com/live2">
-            <i class="ti ti-brand-youtube text-red-500 text-base mr-2"></i>
-            <span class="text-sm">YouTube</span>
-          </button>
-          <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" data-url="rtmps://b.rtmp.youtube.com/live2?backup=1">
-            <i class="ti ti-brand-youtube text-red-400 text-base mr-2"></i>
-            <span class="text-sm">YouTube (Backup)</span>
-          </button>
-          <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" data-url="rtmps://live-api-s.facebook.com:443/rtmp">
-            <i class="ti ti-brand-facebook text-blue-500 text-base mr-2"></i>
-            <span class="text-sm">Facebook</span>
-          </button>
-          <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" data-url="rtmps://ingest.global.live.prod.tiktok.com/live">
-            <i class="ti ti-brand-tiktok text-black text-base mr-2"></i>
-            <span class="text-sm">TikTok</span>
-          </button>
+  <!-- 4. Stream Configuration -->
+  <div>
+    <label class="text-sm font-medium text-white block mb-2">Stream Configuration</label>
+    <div class="space-y-2">
+      <div class="relative">
+        <input type="text" id="youtubeRtmpUrl"
+          class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-white text-sm"
+          placeholder="RTMP URL">
+        <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        <button type="button" id="youtubePlatformSelector"
+          onclick="togglePlatformDropdown()"
+          class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-600 transition-colors"
+          aria-label="Select platform">
+          <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
+        </button>
+        
+        <!-- Platform Dropdown -->
+        <div id="youtubePlatformDropdown"
+          class="hidden absolute z-20 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-xl overflow-hidden">
+          <div class="py-1">
+            <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://a.rtmp.youtube.com/live2">
+              <i class="ti ti-brand-youtube text-red-500 text-base mr-2"></i>
+              <span class="text-sm text-gray-200">YouTube</span>
+            </button>
+            <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://b.rtmp.youtube.com/live2?backup=1">
+              <i class="ti ti-brand-youtube text-red-400 text-base mr-2"></i>
+              <span class="text-sm text-gray-200">YouTube (Backup)</span>
+            </button>
+            <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://live-api-s.facebook.com:443/rtmp">
+              <i class="ti ti-brand-facebook text-blue-500 text-base mr-2"></i>
+              <span class="text-sm text-gray-200">Facebook</span>
+            </button>
+            <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://ingest.global.live.prod.tiktok.com/live">
+              <i class="ti ti-brand-tiktok text-white text-base mr-2"></i>
+              <span class="text-sm text-gray-200">TikTok</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
   
-  <!-- Stream Key with Load Button -->
+  <!-- 5. Stream Key Section -->
   <div>
     <label class="text-sm font-medium text-white block mb-2">Stream Key</label>
     <div class="flex gap-2">
       <div class="relative flex-1">
         <input type="password" id="youtubeStreamKey"
-          class="w-full px-4 py-2.5 pl-10 pr-12 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm"
+          class="w-full px-4 py-2.5 pl-10 pr-12 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm text-white"
           placeholder="Enter stream key or load from channel">
         <input type="hidden" id="youtubeStreamId" value="">
         <i class="ti ti-key text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
@@ -151,96 +154,94 @@
     </div>
     
     <!-- Dropdown for Stream Keys -->
-    <div id="youtubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg">
+    <div id="youtubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
       <div class="p-2">
         <div class="flex items-center justify-between mb-2 px-2 pb-2 border-b border-gray-600">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-gray-300">Stream Keys</span>
+            <span class="text-xs font-medium text-gray-300">Available Stream Keys</span>
             <span id="streamKeysCount" class="text-xs text-gray-500"></span>
           </div>
           <div class="flex items-center gap-2">
-            <span id="streamKeysCacheInfo" class="text-xs text-gray-500"></span>
             <button type="button" onclick="refreshYouTubeStreamKeys()"
-              class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600" 
-              title="Refresh stream keys">
+              class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600">
               <i class="ti ti-refresh text-sm"></i>
             </button>
             <button type="button" onclick="toggleYouTubeStreamKeysDropdown()"
-              class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600"
-              title="Close">
+              class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600">
               <i class="ti ti-x text-sm"></i>
             </button>
           </div>
         </div>
-        <div class="max-h-64 overflow-y-auto">
-          <div id="youtubeStreamKeysList" class="space-y-1">
-            <div class="text-center py-4 text-gray-400">
-              <i class="ti ti-loader animate-spin text-xl mb-2"></i>
-              <p class="text-xs">Loading stream keys...</p>
-            </div>
-          </div>
-        </div>
-        <div class="mt-2 pt-2 border-t border-gray-600 px-2">
-          <div class="flex items-center gap-3 text-xs text-gray-500">
-            <span class="flex items-center gap-1"><i class="ti ti-link text-blue-400"></i> RTMP</span>
-            <span class="flex items-center gap-1"><i class="ti ti-key text-yellow-400"></i> Key</span>
-            <span class="flex items-center gap-1"><i class="ti ti-copy text-green-400"></i> Copy All</span>
+        <div id="youtubeStreamKeysList" class="max-h-64 overflow-y-auto space-y-1">
+          <div class="text-center py-4 text-gray-400">
+            <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+            <p class="text-xs">Fetching stream keys...</p>
           </div>
         </div>
       </div>
     </div>
   </div>
   
-  <!-- Additional Settings -->
+  <!-- 6. Additional Settings Toggle -->
   <div class="border-t border-gray-700 pt-3">
     <button type="button" onclick="toggleYouTubeAdditionalSettings()"
-      class="flex items-center justify-between w-full px-2 py-2 hover:bg-dark-700/30 rounded transition-colors">
-      <span class="text-sm font-medium text-white">
+      class="flex items-center justify-between w-full px-2 py-2 hover:bg-dark-700/30 rounded transition-colors group">
+      <span class="text-sm font-medium text-white group-hover:text-primary transition-colors">
         <i class="ti ti-settings mr-1.5"></i>Additional Settings (Optional)
       </span>
       <i class="ti ti-chevron-down text-gray-400 transition-transform duration-200" id="youtubeAdditionalSettingsIcon"></i>
     </button>
     
-    <div id="youtubeAdditionalSettings" class="hidden mt-3 space-y-3">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div id="youtubeAdditionalSettings" class="hidden mt-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="text-sm font-medium text-white block mb-2">Privacy</label>
           <select name="youtubePrivacy" id="youtubePrivacy"
-            class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm">
+            class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm text-white">
             <option value="public">Public</option>
             <option value="unlisted" selected>Unlisted</option>
             <option value="private">Private</option>
           </select>
         </div>
+      </div>
+      
+      <!-- Thumbnail Upload -->
+      <div class="border border-yellow-500/30 bg-yellow-500/5 rounded-lg p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <i class="ti ti-photo text-yellow-500 text-lg"></i>
+          <label class="text-sm font-medium text-white">
+            YouTube Thumbnail
+            <span class="text-yellow-500 ml-1">⭐ Recommended</span>
+          </label>
+        </div>
+        <p class="text-xs text-gray-400 mb-3 leading-relaxed">
+          <i class="ti ti-info-circle mr-1"></i>
+          Upload custom thumbnail for this stream (16:9 ratio, min 1280x720px).
+        </p>
+        <input type="file" name="youtubeThumbnail" id="youtubeThumbnail" accept="image/*" onchange="previewYoutubeThumbnail(this)"
+          class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-1.5 file:px-3 file:border-0 file:text-xs file:bg-dark-600 file:text-gray-200 file:rounded text-sm text-gray-400 cursor-pointer hover:border-primary transition-colors">
         
-        <div>
-          <label class="text-sm font-medium text-white block mb-2">Thumbnail (16:9 ratio recommended)</label>
-          <input type="file" name="youtubeThumbnail" id="youtubeThumbnail" accept="image/*" onchange="previewYoutubeThumbnail(this)"
-            class="w-full px-4 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-dark-600 file:text-gray-200 file:rounded text-sm cursor-pointer hover:border-primary transition-colors">
-          <p id="youtubeThumbnailInfo" class="text-xs text-gray-400 mt-1"></p>
-          
-          <!-- Thumbnail Preview (below file input) -->
-          <div id="youtubeThumbnailPreview" class="hidden mt-3">
-            <div class="relative inline-block">
-              <img id="youtubeThumbnailImg" src="" alt="Thumbnail preview" class="w-32 h-18 object-cover rounded border border-gray-600">
-              <button type="button" onclick="clearYoutubeThumbnail()" class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs shadow-lg">
-                <i class="ti ti-x text-xs"></i>
-              </button>
-            </div>
+        <!-- Thumbnail Preview -->
+        <div id="youtubeThumbnailPreview" class="hidden mt-4">
+          <div class="relative inline-block">
+            <img id="youtubeThumbnailImg" src="" alt="Thumbnail preview" class="w-48 aspect-video object-cover rounded border border-gray-600 shadow-lg">
+            <button type="button" onclick="clearYoutubeThumbnail()" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg transition-colors">
+              <i class="ti ti-x text-sm"></i>
+            </button>
           </div>
         </div>
       </div>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="text-sm font-medium text-white block mb-2">Made for Kids</label>
-          <div class="flex items-center gap-4 pt-2">
+          <div class="flex items-center gap-6 pt-1">
             <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="radio" name="youtubeMadeForKids" value="yes" class="w-4 h-4">
+              <input type="radio" name="youtubeMadeForKids" value="yes" class="w-4 h-4 text-primary focus:ring-primary bg-dark-700 border-gray-600">
               <span>Yes</span>
             </label>
             <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="radio" name="youtubeMadeForKids" value="no" checked class="w-4 h-4">
+              <input type="radio" name="youtubeMadeForKids" value="no" checked class="w-4 h-4 text-primary focus:ring-primary bg-dark-700 border-gray-600">
               <span>No</span>
             </label>
           </div>
@@ -248,40 +249,42 @@
         
         <div>
           <label class="text-sm font-medium text-white block mb-2">Age Restriction</label>
-          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
-            <input type="checkbox" name="youtubeAgeRestricted" id="youtubeAgeRestricted" class="w-4 h-4 rounded">
+          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-1">
+            <input type="checkbox" name="youtubeAgeRestricted" id="youtubeAgeRestricted" class="w-4 h-4 rounded text-primary focus:ring-primary bg-dark-700 border-gray-600">
             <span>Age-restricted (18+)</span>
           </label>
         </div>
         
-        <div>
-          <label class="text-sm font-medium text-white block mb-2">Konten Sintetis</label>
-          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer pt-2">
-            <input type="checkbox" name="youtubeSyntheticContent" id="youtubeSyntheticContent" class="w-4 h-4 rounded">
-            <span>Konten dibuat atau dimodifikasi dengan AI</span>
+        <div class="md:col-span-2 border-t border-gray-700 pt-3 mt-1">
+          <label class="text-sm font-medium text-white block mb-2">Konten Sintetis (AI)</label>
+          <label class="flex items-start gap-3 text-sm text-gray-300 cursor-pointer pt-1">
+            <input type="checkbox" name="youtubeSyntheticContent" id="youtubeSyntheticContent" class="w-4 h-4 mt-0.5 rounded text-primary focus:ring-primary bg-dark-700 border-gray-600">
+            <div class="flex flex-col">
+              <span>Konten dibuat atau dimodifikasi dengan AI</span>
+              <span class="text-xs text-gray-500 mt-1">Sesuai kebijakan YouTube, beritahu penonton jika konten terlihat realistis namun dibuat secara digital.</span>
+            </div>
           </label>
-          <p class="text-xs text-gray-500 mt-1">Centang jika video ini menggunakan teknologi AI untuk pembuatan atau modifikasi konten</p>
         </div>
-      </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-            <input type="checkbox" name="youtubeAutoStart" id="youtubeAutoStart" class="w-4 h-4 rounded">
-            <span>Auto Start Broadcast (via API)</span>
-          </label>
-          <p class="text-xs text-gray-500 mt-1 ml-6">Automatically transition broadcast to "live" when stream starts</p>
-        </div>
-        
-                  <!-- Auto End -->
-                  <div>
-                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                      <input type="checkbox" name="youtubeAutoEnd" id="youtubeAutoEnd" class="w-4 h-4 rounded" checked>
-                      <span>Auto End Broadcast (via API)</span>
-                    </label>
-                    <p class="text-xs text-gray-500 mt-1 ml-6">Automatically complete broadcast when stream ends (Recommended)</p>
-                  </div>
       </div>
     </div>
   </div>
+
+</div> <!-- PENUTUP ID: youtubeApiFields (PENTING!) -->
+
+<!-- 7. Footer Action Buttons (Sesuai Pola Z: Kanan Bawah) -->
+<div class="flex items-center justify-end gap-3 mt-10 pt-6 border-t border-gray-700">
+  <button 
+    type="button" 
+    onclick="closeModal()" 
+    class="px-6 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-dark-600 rounded-lg transition-all">
+    Cancel
+  </button>
+  <button 
+    type="submit" 
+    class="px-10 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2">
+    <i class="ti ti-plus text-lg"></i>
+    Create Stream
+  </button>
 </div>
+
+<!-- End of YouTube API Fields -->

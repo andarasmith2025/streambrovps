@@ -123,37 +123,14 @@ async function scheduleLive(tokensOrUserId, { channelId = null, title, descripti
         privacyStatus: privacyStatus || 'private',
       },
       contentDetails: {
-        enableAutoStart: !!enableAutoStart,
-        enableAutoStop: !!enableAutoStop,
+        enableAutoStart: true,  // ✅ Let YouTube auto-transition when FFmpeg connects
+        enableAutoStop: false,  // ❌ Node.js controls stop manually
+        enableMonitorStream: false, // ❌ Instant go live
       },
     },
   });
   
   console.log(`[YouTubeService.scheduleLive] ✓ NEW broadcast created: ${broadcastRes.data?.id}`);
-  
-  // ⭐ CRITICAL FIX: Update tags separately if they were provided
-  // YouTube API sometimes doesn't apply tags during creation, so we update them separately
-  if (tags && Array.isArray(tags) && tags.length > 0 && broadcastRes.data?.id) {
-    console.log(`[YouTubeService.scheduleLive] 🏷️ Updating tags separately for better reliability...`);
-    try {
-      await yt.liveBroadcasts.update({
-        part: 'snippet',
-        requestBody: {
-          id: broadcastRes.data.id,
-          snippet: {
-            title: snippet.title,
-            description: snippet.description,
-            scheduledStartTime: snippet.scheduledStartTime,
-            tags: tags
-          }
-        }
-      });
-      console.log(`[YouTubeService.scheduleLive] ✅ Tags updated successfully: ${tags.length} tags`);
-    } catch (tagsError) {
-      console.error(`[YouTubeService.scheduleLive] ❌ Failed to update tags:`, tagsError.message);
-      // Don't fail the broadcast creation, just log the error
-    }
-  }
   
   let streamRes = null;
   let streamId = finalStreamId;
@@ -306,33 +283,8 @@ module.exports = {
   },
   
   /**
-   * Find stream ID by stream key
-   * Returns the stream ID for a given stream key
+   * Get video metrics (viewers, likes, comments)
    */
-  async findStreamIdByStreamKey(tokensOrUserId, { streamKey, channelId = null }) {
-    console.log(`[YouTubeService.findStreamIdByStreamKey] Searching for stream ID with key: ${streamKey.substring(0, 8)}... in channel: ${channelId || 'default'}`);
-    
-    try {
-      // ⭐ MULTI-CHANNEL: Pass channelId to listStreams
-      const streams = await module.exports.listStreams(tokensOrUserId, { maxResults: 50, channelId });
-      const matchingStream = streams.find(stream => {
-        const ingestionInfo = stream.cdn?.ingestionInfo;
-        const streamName = ingestionInfo?.streamName;
-        return streamName === streamKey;
-      });
-      
-      if (!matchingStream) {
-        console.log(`[YouTubeService.findStreamIdByStreamKey] ❌ No stream found with key: ${streamKey.substring(0, 8)}... in channel: ${channelId || 'default'}`);
-        return null;
-      }
-      
-      console.log(`[YouTubeService.findStreamIdByStreamKey] ✓ Found stream ID: ${matchingStream.id}`);
-      return matchingStream.id;
-    } catch (error) {
-      console.error(`[YouTubeService.findStreamIdByStreamKey] Error:`, error.message);
-      throw error;
-    }
-  },
   async getVideoMetrics(tokensOrUserId, ids = []) {
     if (!ids || (Array.isArray(ids) && ids.length === 0)) return {};
     const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
@@ -430,8 +382,8 @@ module.exports = {
       requestBody,
     });
   },
-  async transition(tokensOrUserId, { broadcastId, status }) {
-    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId);
+  async transition(tokensOrUserId, { broadcastId, status, channelId = null }) {
+    const yt = await getYouTubeClientFromTokensOrUserId(tokensOrUserId, channelId);
     return yt.liveBroadcasts.transition({
       id: broadcastId,
       part: 'status',
@@ -594,91 +546,112 @@ module.exports = {
    * Transition broadcast with smart retry logic
    * Waits for stream to be active before attempting transition
    */
-  async transitionBroadcastSmart(tokensOrUserId, { broadcastId, streamId, targetStatus = 'live' }) {
-    console.log(`[YouTubeService] Smart transition: ${broadcastId} → ${targetStatus}`);
+  async transitionBroadcastSmart(tokensOrUserId, { broadcastId, streamId, targetStatus = 'live', channelId = null }) {
+    console.log(`[YouTubeService] ========== SMART TRANSITION START ==========`);
+    console.log(`[YouTubeService] Broadcast ID: ${broadcastId}`);
+    console.log(`[YouTubeService] Stream ID: ${streamId || 'NOT PROVIDED'}`);
+    console.log(`[YouTubeService] Target Status: ${targetStatus}`);
+    console.log(`[YouTubeService] Channel ID: ${channelId || 'default'}`);
+    
+    // ⭐ CRITICAL: Verify broadcast is bound to stream BEFORE transition
+    if (streamId) {
+      console.log(`[YouTubeService] Verifying broadcast is bound to stream...`);
+      const broadcast = await module.exports.getBroadcast(tokensOrUserId, broadcastId);
+      
+      if (!broadcast.contentDetails.boundStreamId) {
+        console.error(`[YouTubeService] ❌ Broadcast is NOT bound to any stream!`);
+        console.error(`[YouTubeService] ❌ This will cause "Invalid transition" error`);
+        throw new Error('Broadcast must be bound to a stream before transition');
+      }
+      
+      console.log(`[YouTubeService] ✓ Broadcast is bound to stream: ${broadcast.contentDetails.boundStreamId}`);
+    }
     
     // Step 1: Wait for stream to become active (if streamId provided)
     if (streamId) {
+      console.log(`[YouTubeService] Waiting for stream to become active...`);
       const streamActive = await module.exports.waitForStreamActive(tokensOrUserId, { 
         streamId, 
-        maxRetries: 20, 
-        delayMs: 3000 
+        maxRetries: 40,  // ⭐ INCREASED from 20 to 40 (2 minutes total)
+        delayMs: 3000,
+        channelId
       });
       
       if (!streamActive) {
+        console.error(`[YouTubeService] ❌ Stream did not become active after 2 minutes`);
+        console.error(`[YouTubeService] ❌ This usually means FFmpeg failed to connect to YouTube`);
+        console.error(`[YouTubeService] ❌ Check FFmpeg logs for connection errors`);
         throw new Error('Stream did not become active - cannot transition broadcast');
       }
+      
+      console.log(`[YouTubeService] ✅ Stream is active, proceeding with transition`);
+      
+      // ⭐ NO WAIT HERE - already waited in streamingService.js (10 seconds)
+      // This prevents double waiting which causes transition to fail
+      console.log(`[YouTubeService] Attempting transition immediately (already waited in streamingService)...`);
     } else {
-      // If no streamId, just wait a bit for FFmpeg to connect
-      console.log(`[YouTubeService] No streamId provided, waiting 10 seconds for FFmpeg connection...`);
+      // If no streamId, wait for FFmpeg to connect
+      console.log(`[YouTubeService] ⚠️ No streamId provided, waiting 10 seconds for FFmpeg connection...`);
       await new Promise(resolve => setTimeout(resolve, 10000));
     }
     
-    // Step 2: Try transition with retry logic
-    let retries = 5;
-    let lastError = null;
-    
-    while (retries > 0) {
-      try {
-        // For 'live' status, try testing → live flow first
-        if (targetStatus === 'live') {
-          try {
-            console.log(`[YouTubeService] Attempting testing → live transition...`);
-            await module.exports.transition(tokensOrUserId, {
-              broadcastId,
-              status: 'testing'
-            });
-            console.log(`[YouTubeService] ✓ Transitioned to testing`);
-            
-            // Wait 2 seconds before going live
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            await module.exports.transition(tokensOrUserId, {
-              broadcastId,
-              status: 'live'
-            });
-            console.log(`[YouTubeService] ✅ Transitioned to live`);
-            return true;
-          } catch (testingErr) {
-            // If testing fails, try direct to live
-            if (testingErr.message && testingErr.message.includes('Invalid transition')) {
-              console.log(`[YouTubeService] Testing transition failed, trying direct to live...`);
-              await module.exports.transition(tokensOrUserId, {
-                broadcastId,
-                status: 'live'
-              });
-              console.log(`[YouTubeService] ✅ Transitioned to live (direct)`);
-              return true;
-            }
-            throw testingErr;
-          }
-        } else {
-          // For other statuses, direct transition
+    // Step 2: Try transition (NO RETRY - handled by caller)
+    // Retry logic is now in streamingService.js (5×6 seconds)
+    try {
+      // For 'live' status, try testing → live flow first
+      if (targetStatus === 'live') {
+        try {
+          console.log(`[YouTubeService] Attempting testing → live transition...`);
           await module.exports.transition(tokensOrUserId, {
             broadcastId,
-            status: targetStatus
+            status: 'testing',
+            channelId
           });
-          console.log(`[YouTubeService] ✅ Transitioned to ${targetStatus}`);
+          console.log(`[YouTubeService] ✓ Transitioned to testing`);
+          
+          // Wait 10 seconds before going live
+          console.log(`[YouTubeService] Waiting 10 seconds before going live...`);
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          
+          await module.exports.transition(tokensOrUserId, {
+            broadcastId,
+            status: 'live',
+            channelId
+          });
+          console.log(`[YouTubeService] ✅ Transitioned to live`);
+          console.log(`[YouTubeService] ========== SMART TRANSITION SUCCESS ==========`);
           return true;
-        }
-      } catch (err) {
-        lastError = err;
-        const errorMsg = err.message || '';
-        
-        if (errorMsg.includes('inactive') || errorMsg.includes('Invalid transition')) {
-          retries--;
-          if (retries > 0) {
-            console.log(`[YouTubeService] Transition failed: ${errorMsg}, retrying in 3s... (${retries} retries left)`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+        } catch (testingErr) {
+          // If testing fails, try direct to live
+          if (testingErr.message && testingErr.message.includes('Invalid transition')) {
+            console.log(`[YouTubeService] Testing transition failed, trying direct to live...`);
+            await module.exports.transition(tokensOrUserId, {
+              broadcastId,
+              status: 'live',
+              channelId
+            });
+            console.log(`[YouTubeService] ✅ Transitioned to live (direct)`);
+            console.log(`[YouTubeService] ========== SMART TRANSITION SUCCESS ==========`);
+            return true;
           }
-        } else {
-          // Other error, don't retry
-          throw err;
+          throw testingErr;
         }
+      } else {
+        // For other statuses, direct transition
+        await module.exports.transition(tokensOrUserId, {
+          broadcastId,
+          status: targetStatus,
+          channelId
+        });
+        console.log(`[YouTubeService] ✅ Transitioned to ${targetStatus}`);
+        console.log(`[YouTubeService] ========== SMART TRANSITION SUCCESS ==========`);
+        return true;
       }
+    } catch (err) {
+      console.error(`[YouTubeService] ❌ Transition failed: ${err.message}`);
+      console.error(`[YouTubeService] ========== SMART TRANSITION FAILED ==========`);
+      throw err;
     }
-    
-    throw new Error(`Failed to transition after retries: ${lastError?.message || 'Unknown error'}`);
   },
   
   /**

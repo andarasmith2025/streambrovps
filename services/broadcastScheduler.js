@@ -30,15 +30,19 @@ class BroadcastScheduler {
       return;
     }
 
-    console.log('[BroadcastScheduler] Memulai scheduler broadcast...');
+    console.log('[BroadcastScheduler] ✅ ENABLED - Creating broadcasts 3-5 minutes before schedule');
+    console.log('[BroadcastScheduler] Orphan detection active to prevent duplicates on restart');
     this.isRunning = true;
 
+    // Check immediately on start
     this.checkUpcomingSchedules();
+    
+    // Then check every minute
     this.checkInterval = setInterval(() => {
       this.checkUpcomingSchedules();
     }, 60 * 1000);
 
-    console.log('[BroadcastScheduler] ✅ Scheduler berhasil dijalankan');
+    console.log('[BroadcastScheduler] ✅ Scheduler started successfully');
   }
 
   stop() {
@@ -61,8 +65,11 @@ class BroadcastScheduler {
       const currentMinute = now.getMinutes();
       const currentTimeMinutes = currentHour * 60 + currentMinute;
 
-      const threeMinutesLater = currentTimeMinutes + 3;
-      const fiveMinutesLater = currentTimeMinutes + 5;
+      // ⭐ FIX: Window adalah 3-5 menit SEBELUM jadwal, bukan setelah
+      // Contoh: Jadwal 17:20, sekarang 17:15-17:17 → MATCH
+      // Window: schedule time harus 3-5 menit dari sekarang (ke depan)
+      const windowStart = currentTimeMinutes + 3;  // 3 minutes from now
+      const windowEnd = currentTimeMinutes + 5;    // 5 minutes from now
 
       // ⭐ CRITICAL: Hanya ambil schedule yang BELUM punya broadcast_id
       // Jangan retry yang failed untuk mencegah loop
@@ -73,7 +80,7 @@ class BroadcastScheduler {
           s.youtube_made_for_kids, s.youtube_age_restricted,
           s.youtube_auto_start, s.youtube_auto_end, s.youtube_tags,
           s.youtube_category_id, s.youtube_language, s.video_thumbnail,
-          s.youtube_thumbnail_path, s.user_id
+          s.youtube_thumbnail_path, s.user_id, s.youtube_channel_id
         FROM stream_schedules ss
         JOIN streams s ON ss.stream_id = s.id
         WHERE ss.status = 'pending'
@@ -97,9 +104,11 @@ class BroadcastScheduler {
                 const sDate = new Date(schedule.schedule_time);
                 const sTimeMinutes = sDate.getHours() * 60 + sDate.getMinutes();
                 
-                // Hanya buat jika TEPAT di window 3-5 menit
-                if (sTimeMinutes >= threeMinutesLater && sTimeMinutes <= fiveMinutesLater) {
+                // ⭐ FIX: Cek apakah schedule time ada di window 3-5 menit dari sekarang
+                // Contoh: Sekarang 17:15, schedule 17:20 (5 menit lagi) → MATCH
+                if (sTimeMinutes >= windowStart && sTimeMinutes <= windowEnd) {
                   shouldCreate = true;
+                  console.log(`[BroadcastScheduler] ✓ Recurring schedule matched: ${schedule.id} at ${sTimeMinutes} (window: ${windowStart}-${windowEnd})`);
                 }
               }
             }
@@ -108,13 +117,18 @@ class BroadcastScheduler {
             const sTime = new Date(schedule.schedule_time);
             const diff = (sTime.getTime() - now.getTime()) / (1000 * 60);
             
-            // Window 3-5 menit
+            // Window 3-5 menit ke depan
             if (diff >= 3 && diff <= 5) {
               shouldCreate = true;
+              console.log(`[BroadcastScheduler] ✓ One-time schedule matched: ${schedule.id} in ${diff.toFixed(1)} minutes`);
             }
           }
 
           if (shouldCreate) matchedSchedules.push(schedule);
+        }
+
+        if (matchedSchedules.length > 0) {
+          console.log(`[BroadcastScheduler] Found ${matchedSchedules.length} schedule(s) to create broadcasts`);
         }
 
         // Process dengan delay untuk rate limiting
@@ -166,19 +180,11 @@ class BroadcastScheduler {
       // 4. Tandai database sedang membuat agar tidak diproses double
       await this.updateScheduleBroadcastStatus(schedule.id, 'creating');
 
-      // 5. Resolusi Thumbnail (WAJIB ADA)
+      // 5. Resolusi Thumbnail (Optional - fallback ke video thumbnail)
       const thumbnailPath = await this.resolveThumbnailPath(schedule);
       
-      // ⭐ CRITICAL: Jika tidak ada thumbnail, SKIP untuk save quota
       if (!thumbnailPath) {
-        console.error(`[BroadcastScheduler] ❌ CRITICAL: Thumbnail tidak ditemukan untuk schedule ${schedule.id}`);
-        console.error(`[BroadcastScheduler] ❌ Stream: "${schedule.title}"`);
-        console.error(`[BroadcastScheduler] ❌ SKIPPING broadcast creation to save API quota`);
-        console.error(`[BroadcastScheduler] 💡 Upload thumbnail dulu, broadcast akan dibuat otomatis`);
-        
-        await this.updateScheduleBroadcastStatus(schedule.id, 'failed');
-        await this.logBroadcastError(schedule.id, 'Thumbnail tidak ditemukan - upload thumbnail terlebih dahulu');
-        return null;
+        console.log(`[BroadcastScheduler] ℹ️ No custom thumbnail - YouTube will use video's default thumbnail`);
       }
 
       // 6. Ambil Token dan Data Stream
@@ -204,8 +210,8 @@ class BroadcastScheduler {
         description: schedule.youtube_description || '',
         privacyStatus: schedule.youtube_privacy || 'unlisted',
         scheduledStartTime: startTime.toISOString(),
-        enableAutoStart: !!schedule.youtube_auto_start,
-        enableAutoStop: !!schedule.youtube_auto_end,
+        enableAutoStart: true,  // ✅ ALWAYS true - let YouTube auto-transition
+        enableAutoStop: false,  // ❌ ALWAYS false - Node.js controls stop
         tags: schedule.youtube_tags ? JSON.parse(schedule.youtube_tags) : null,
         category: schedule.youtube_category_id,
         language: schedule.youtube_language,
@@ -318,11 +324,12 @@ class BroadcastScheduler {
 
   /**
    * Helper untuk mencari path thumbnail yang valid secara absolut
+   * FALLBACK: Jika tidak ada custom thumbnail, gunakan video thumbnail
    */
   async resolveThumbnailPath(schedule) {
     let rawPath = schedule.youtube_thumbnail_path || schedule.video_thumbnail;
 
-    // Jika tidak ada di schedule, cari di tabel video
+    // Jika tidak ada di schedule, cari di tabel video (FALLBACK)
     if (!rawPath) {
       const video = await new Promise(res => {
         db.get(
@@ -335,16 +342,31 @@ class BroadcastScheduler {
     }
 
     if (!rawPath) {
-      console.warn(`[BroadcastScheduler] ⚠️ No thumbnail path in database for schedule ${schedule.id}`);
-      return null;
+      console.warn(`[BroadcastScheduler] ⚠️ No thumbnail found for schedule ${schedule.id} - will use video default`);
+      return null; // YouTube will use video's default thumbnail
     }
 
-    // Pastikan path absolut
+    // ⭐ FIX: Pastikan path absolut TANPA duplikasi
     const publicFolder = path.join(__dirname, '..', 'public');
-    const fullPath = rawPath.startsWith('/') 
-      ? path.join(publicFolder, rawPath) 
-      : path.resolve(rawPath);
-
+    
+    // Jika path sudah absolut (dimulai dengan /root atau C:), gunakan langsung
+    if (path.isAbsolute(rawPath)) {
+      const fullPath = rawPath;
+      console.log(`[BroadcastScheduler] 🔍 Checking absolute thumbnail: ${fullPath}`);
+      
+      if (fs.existsSync(fullPath)) {
+        console.log(`[BroadcastScheduler] ✓ Thumbnail found`);
+        return fullPath;
+      } else {
+        console.warn(`[BroadcastScheduler] ⚠️ Thumbnail NOT found at: ${fullPath}`);
+        return null; // Fallback to video default
+      }
+    }
+    
+    // Jika path relatif (dimulai dengan /uploads), gabungkan dengan public folder
+    const fullPath = path.join(publicFolder, rawPath);
+    console.log(`[BroadcastScheduler] 🔍 Checking relative thumbnail: ${fullPath}`);
+    
     // Validasi file exists
     if (fs.existsSync(fullPath)) {
       const stats = fs.statSync(fullPath);
@@ -353,7 +375,7 @@ class BroadcastScheduler {
       return fullPath;
     } else {
       console.warn(`[BroadcastScheduler] ⚠️ Thumbnail NOT found at: ${fullPath}`);
-      return null;
+      return null; // Fallback to video default
     }
   }
 
@@ -372,14 +394,27 @@ class BroadcastScheduler {
 
   updateScheduleBroadcast(scheduleId, broadcastId, status) {
     return new Promise((res) => {
-      // ⭐ PENTING: Jangan ubah status schedule, hanya update broadcast info
+      // ⭐ CRITICAL: Update BOTH schedule AND stream tables
+      // This ensures broadcast_id is accessible from both places
       db.run(
         `UPDATE stream_schedules 
          SET youtube_broadcast_id = ?, 
              broadcast_status = ? 
          WHERE id = ?`,
         [broadcastId, status, scheduleId],
-        () => res()
+        () => {
+          // Also update streams table for easier access
+          db.run(
+            `UPDATE streams 
+             SET youtube_broadcast_id = ? 
+             WHERE id = (SELECT stream_id FROM stream_schedules WHERE id = ?)`,
+            [broadcastId, scheduleId],
+            () => {
+              console.log(`[BroadcastScheduler] ✅ Updated broadcast_id in both tables: ${broadcastId}`);
+              res();
+            }
+          );
+        }
       );
     });
   }

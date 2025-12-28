@@ -355,6 +355,15 @@ async function buildFFmpegArgs(stream) {
  */
 async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
   console.log(`[StreamingService] Creating NEW YouTube broadcast for stream ${streamId}...`);
+  
+  // ⭐ CRITICAL FIX: Check if broadcast already exists (prevent duplication)
+  const currentStream = await Stream.findById(streamId);
+  if (currentStream && currentStream.youtube_broadcast_id) {
+    console.log(`[StreamingService] ⚠️ Broadcast already exists: ${currentStream.youtube_broadcast_id}`);
+    console.log(`[StreamingService] Skipping broadcast creation to prevent duplication`);
+    return; // Exit early - broadcast already created by scheduler
+  }
+  
   console.log(`[StreamingService] Using stream data: title="${stream.title}", description="${stream.youtube_description || stream.description || ''}", privacy="${stream.youtube_privacy}"`);
   
   // ⭐ CRITICAL: Validate thumbnail exists BEFORE creating broadcast
@@ -378,8 +387,16 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
     const path = require('path');
     const fs = require('fs');
     
-    if (thumbnailPath.startsWith('/')) {
+    // Check if path already contains 'public' directory
+    if (thumbnailPath.includes('/public/') && thumbnailPath.startsWith('/')) {
+      // Already absolute path, use as-is
+      thumbnailPath = path.resolve(thumbnailPath);
+    } else if (thumbnailPath.startsWith('/uploads/')) {
+      // Relative path from public directory
       thumbnailPath = path.join(__dirname, '..', 'public', thumbnailPath);
+    } else if (!thumbnailPath.startsWith('/')) {
+      // Relative path, resolve from current directory
+      thumbnailPath = path.resolve(thumbnailPath);
     }
     
     const absolutePath = path.resolve(thumbnailPath);
@@ -395,14 +412,12 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
     }
   }
   
-  // ⭐ CRITICAL: If no thumbnail, THROW ERROR to prevent broadcast creation
+  // ⚠️ If no thumbnail, use video's default thumbnail (will be uploaded to YouTube)
   if (!thumbnailPath) {
-    const error = new Error('❌ THUMBNAIL REQUIRED: Cannot create broadcast without thumbnail to save API quota');
-    error.code = 'THUMBNAIL_REQUIRED';
-    console.error(`[StreamingService] ${error.message}`);
-    console.error(`[StreamingService] Stream: "${stream.title}"`);
-    console.error(`[StreamingService] 💡 Please upload thumbnail first`);
-    throw error;
+    console.warn(`[StreamingService] ⚠️ No custom thumbnail provided`);
+    console.warn(`[StreamingService] Stream: "${stream.title}"`);
+    console.warn(`[StreamingService] 💡 Will use video's default thumbnail`);
+    // Don't throw error, continue with broadcast creation
   }
   
   // ⭐ FIX: For "Stream Now", use past time so YouTube sets status to "ready" not "upcoming"
@@ -417,8 +432,8 @@ async function createNewBroadcast(stream, streamId, tokens, youtubeService) {
     privacyStatus: stream.youtube_privacy || 'unlisted',
     scheduledStartTime: startTime.toISOString(),
     streamKey: stream.stream_key,
-    enableAutoStart: stream.youtube_auto_start === undefined || stream.youtube_auto_start === null ? true : (stream.youtube_auto_start ? true : false),
-    enableAutoStop: stream.youtube_auto_end === undefined || stream.youtube_auto_end === null ? true : (stream.youtube_auto_end ? true : false),
+    enableAutoStart: true,  // ✅ ALWAYS true - let YouTube auto-transition
+    enableAutoStop: false,  // ❌ ALWAYS false - Node.js controls stop
     madeForKids: stream.youtube_made_for_kids ? true : false,
     ageRestricted: stream.youtube_age_restricted ? true : false,
     syntheticContent: stream.youtube_synthetic_content ? true : false,
@@ -496,151 +511,37 @@ async function startStream(streamId, options = {}) {
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     
-    // ⭐ YouTube Broadcast Management
-    // CRITICAL: Check if stream already has broadcast_id (from previous run)
-    // Only create new broadcast if:
-    // 1. Stream doesn't have broadcast_id yet
-    // 2. NOT in recovery mode (to prevent explosion during restart)
-    if (stream.use_youtube_api) {
-      try {
-        const { getTokensForUser } = require('../routes/youtube');
-        const youtubeService = require('./youtubeService');
-        
-        // ⭐ CRITICAL CHECK: Does stream already have broadcast_id?
-        if (stream.youtube_broadcast_id) {
-          console.log(`[StreamingService] ✓ Stream already has broadcast: ${stream.youtube_broadcast_id}`);
-          console.log(`[StreamingService] ✓ Skipping broadcast creation (reusing existing)`);
-          
-          // If recovery mode, just continue with existing broadcast
-          if (isRecovery) {
-            console.log(`[StreamingService] ✓ Recovery mode: Using existing broadcast`);
-          }
-        } else {
-          // Stream doesn't have broadcast_id yet
-          console.log(`[StreamingService] Stream ${streamId} has no broadcast_id yet`);
-          
-          // ⭐ MULTI-CHANNEL: Pass youtube_channel_id to get correct channel tokens
-          console.log(`[StreamingService] Getting tokens for user ${stream.user_id}, channel: ${stream.youtube_channel_id || 'default'}`);
-          const tokens = await getTokensForUser(stream.user_id, stream.youtube_channel_id);
-          
-          if (tokens && tokens.access_token) {
-            // Check if this is a scheduled stream with existing broadcast
-            if (stream.active_schedule_id) {
-              console.log(`[StreamingService] Stream ${streamId} is scheduled (schedule_id: ${stream.active_schedule_id})`);
-              
-              // Get broadcast ID from schedule
-              const scheduleData = await new Promise((resolve, reject) => {
-                db.get(
-                  `SELECT youtube_broadcast_id, broadcast_status FROM stream_schedules WHERE id = ?`,
-                  [stream.active_schedule_id],
-                  (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row);
-                  }
-                );
-              });
-              
-              if (scheduleData && scheduleData.youtube_broadcast_id) {
-                console.log(`[StreamingService] ✓ Using existing broadcast from scheduler: ${scheduleData.youtube_broadcast_id}`);
-                console.log(`[StreamingService] ✓ Broadcast status: ${scheduleData.broadcast_status}`);
-                
-                // Update stream with broadcast ID from schedule
-                await new Promise((resolve, reject) => {
-                  db.run(
-                    `UPDATE streams SET youtube_broadcast_id = ? WHERE id = ?`,
-                    [scheduleData.youtube_broadcast_id, streamId],
-                    (err) => {
-                      if (err) reject(err);
-                      else resolve();
-                    }
-                  );
-                });
-                
-                stream.youtube_broadcast_id = scheduleData.youtube_broadcast_id;
-                console.log(`[StreamingService] ✓ Stream updated with broadcast ID from schedule`);
-              } else if (!isRecovery) {
-                // ⭐ CRITICAL FIX: Only create new broadcast if NOT recovery
-                // During recovery, skip broadcast creation to prevent explosion
-                console.warn(`[StreamingService] ⚠️ Schedule ${stream.active_schedule_id} has no broadcast ID, creating new one...`);
-                await createNewBroadcast(stream, streamId, tokens, youtubeService);
-              } else {
-                // Recovery mode - skip broadcast creation
-                console.warn(`[StreamingService] ⚠️ Recovery mode: Schedule ${stream.active_schedule_id} has no broadcast ID`);
-                console.warn(`[StreamingService] ⚠️ Skipping broadcast creation to prevent explosion`);
-                console.warn(`[StreamingService] 💡 Stream will continue without YouTube broadcast`);
-              }
-            } else if (!isRecovery) {
-              // "Stream Now" mode - only create if NOT recovery
-              console.log(`[StreamingService] Stream ${streamId} is "Stream Now" mode`);
-              console.log(`[StreamingService] Creating new broadcast...`);
-              await createNewBroadcast(stream, streamId, tokens, youtubeService);
-            } else {
-              // Recovery mode without schedule - skip
-              console.warn(`[StreamingService] ⚠️ Recovery mode: No schedule and no broadcast_id`);
-              console.warn(`[StreamingService] ⚠️ Skipping broadcast creation`);
-              console.warn(`[StreamingService] 💡 Stream will continue without YouTube broadcast`);
-            }
-          }
-        }
-      } catch (createErr) {
-        console.error(`[StreamingService] ⚠️ Failed to manage YouTube broadcast:`, createErr.message);
-        // Continue anyway - stream will still work, just won't appear in YouTube Studio
-      }
-    }
-    
-    // Transition YouTube broadcast to live if using YouTube API AND auto start is enabled
-    if (stream.use_youtube_api && stream.youtube_broadcast_id && stream.youtube_auto_start) {
-      console.log(`[StreamingService] Auto Start enabled - will transition broadcast to live`);
-      // Use smart transition with stream status checking
-      setTimeout(async () => {
+    // ⭐ SIMPLIFIED: Only check if broadcast exists, NEVER create
+    // BroadcastScheduler is responsible for creating broadcasts 3-5 minutes before schedule
+    // This prevents duplicate broadcasts and ensures YouTube auto-transition works
+    if (stream.use_youtube_api && !isRecovery) {
+      console.log(`[StreamingService] ========== BROADCAST CHECK ==========`);
+      console.log(`[StreamingService] Checking if broadcast exists...`);
+      
+      setImmediate(async () => {
         try {
-          const { getTokensForUser } = require('../routes/youtube');
-          const youtubeService = require('./youtubeService');
+          const currentStream = await Stream.findById(streamId);
           
-          // ⭐ MULTI-CHANNEL: Pass youtube_channel_id to get correct channel tokens
-          console.log(`[StreamingService] Getting tokens for transition, user ${stream.user_id}, channel: ${stream.youtube_channel_id || 'default'}`);
-          const tokens = await getTokensForUser(stream.user_id, stream.youtube_channel_id);
-          if (tokens && tokens.access_token) {
-            console.log(`[StreamingService] Starting smart transition for broadcast ${stream.youtube_broadcast_id}...`);
-            
-            try {
-              // ⭐ FIX: Get streamId from stream_key instead of using youtube_stream_id
-              // First, get broadcast details to find the bound stream
-              const { google } = require('googleapis');
-              const oauth2Client = new google.auth.OAuth2();
-              oauth2Client.setCredentials(tokens);
-              const yt = google.youtube({ version: 'v3', auth: oauth2Client });
-              
-              const broadcastDetails = await yt.liveBroadcasts.list({
-                part: 'contentDetails',
-                id: stream.youtube_broadcast_id
-              });
-              
-              const boundStreamId = broadcastDetails.data?.items?.[0]?.contentDetails?.boundStreamId;
-              console.log(`[StreamingService] Bound stream ID from broadcast: ${boundStreamId || 'none'}`);
-              
-              // Use the new smart transition function
-              // It will wait for stream to be active before transitioning
-              await youtubeService.transitionBroadcastSmart(tokens, {
-                broadcastId: stream.youtube_broadcast_id,
-                streamId: boundStreamId, // Use the bound stream ID from broadcast
-                targetStatus: 'live'
-              });
-              
-              console.log(`[StreamingService] ✅ YouTube broadcast successfully transitioned to live`);
-            } catch (transitionErr) {
-              console.error(`[StreamingService] ⚠️ Failed to transition broadcast:`, transitionErr.message);
-              console.log(`[StreamingService] Stream will continue, but may need manual activation in YouTube Studio`);
+          if (currentStream && currentStream.youtube_broadcast_id) {
+            console.log(`[StreamingService] ✅ Broadcast exists: ${currentStream.youtube_broadcast_id}`);
+            console.log(`[StreamingService] Created by broadcastScheduler - ready for auto-transition`);
+          } else {
+            console.log(`[StreamingService] ⚠️ No broadcast found!`);
+            if (currentStream.active_schedule_id) {
+              console.log(`[StreamingService] ⚠️ This stream has schedule ${currentStream.active_schedule_id}`);
+              console.log(`[StreamingService] ⚠️ BroadcastScheduler may have failed to create broadcast`);
+              console.log(`[StreamingService] ⚠️ Stream will continue but may not auto-transition to live`);
+            } else {
+              console.log(`[StreamingService] ℹ️ This is a manual stream without schedule`);
+              console.log(`[StreamingService] ℹ️ User needs to manually go live from YouTube Studio`);
             }
           }
-        } catch (ytError) {
-          console.error('[StreamingService] Error in YouTube transition process:', ytError.message || ytError);
-          // Don't fail the stream start, just log the error
+        } catch (error) {
+          console.error(`[StreamingService] Error checking broadcast:`, error.message);
         }
-      }, 5000); // Initial 5 second delay before starting transition process
-    } else if (stream.use_youtube_api && stream.youtube_broadcast_id && !stream.youtube_auto_start) {
-      console.log(`[StreamingService] ⚠️ Auto Start disabled - broadcast created but NOT transitioned to live`);
-      console.log(`[StreamingService] User must manually start broadcast in YouTube Studio`);
+      });
+    } else if (stream.use_youtube_api && isRecovery) {
+      console.log(`[StreamingService] ⚠️ Recovery mode: Skipping broadcast check`);
     }
     
     // Clear manual_stop flag when stream starts
@@ -1124,8 +1025,9 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       const { getTokensForUser } = require('../routes/youtube');
       const youtubeService = require('./youtubeService');
       
-      // ⭐ MULTI-CHANNEL: Get channel ID from stream data
-      const channelId = streamData?.youtube_channel_id || null;
+      // ⭐ Get stream data to get channel ID
+      const stream = await Stream.findById(streamId);
+      const channelId = stream?.youtube_channel_id || null;
       console.log(`[YouTube VOD] Getting tokens for user ${userId}, channel: ${channelId || 'default'}`);
       const tokens = await getTokensForUser(userId, channelId);
       if (!tokens || !tokens.access_token) {
@@ -1167,7 +1069,7 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       console.log(`[YouTube VOD] ✅ Cleared broadcast ID from database`);
       
       // Clear from recurring schedules if needed
-      const stream = await Stream.findById(streamId);
+      // Use the stream variable we already fetched at the top
       if (stream && stream.active_schedule_id) {
         try {
           const schedule = await new Promise((resolve, reject) => {
@@ -1477,6 +1379,132 @@ async function recoverStreamsAfterRestart(liveStreams) {
       if (elapsedMinutes < 1440) { // 24 hours
         console.log(`[Recovery] Recovering stream ${streamInfo.id} (${streamInfo.title}), elapsed: ${elapsedMinutes} minutes`);
         
+        // ⭐ CRITICAL FIX: Find and set active_schedule_id BEFORE starting stream
+        // This prevents auto-stop from using old start_time + duration
+        try {
+          const currentDay = now.getDay();
+          const currentHour = now.getHours();
+          const currentMinute = now.getMinutes();
+          
+          // Find active schedule for this stream
+          const activeSchedule = await new Promise((resolve, reject) => {
+            db.get(
+              `SELECT id, schedule_time, duration, end_time, is_recurring, recurring_days 
+               FROM stream_schedules 
+               WHERE stream_id = ? 
+               AND status = 'pending'
+               ORDER BY 
+                 CASE 
+                   WHEN is_recurring = 1 THEN 1
+                   ELSE 2
+                 END,
+                 schedule_time ASC
+               LIMIT 1`,
+              [streamInfo.id],
+              (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+              }
+            );
+          });
+          
+          if (activeSchedule) {
+            // Check if this schedule should be active now
+            let isActiveNow = false;
+            let scheduleEndTime = null;
+            
+            if (activeSchedule.is_recurring) {
+              // Check if today is in recurring days
+              if (activeSchedule.recurring_days) {
+                const allowedDays = activeSchedule.recurring_days.split(',').map(d => parseInt(d));
+                if (allowedDays.includes(currentDay)) {
+                  // Parse schedule time
+                  const scheduleDate = new Date(activeSchedule.schedule_time);
+                  const scheduleHour = scheduleDate.getHours();
+                  const scheduleMinute = scheduleDate.getMinutes();
+                  const scheduleTimeMinutes = scheduleHour * 60 + scheduleMinute;
+                  const currentTimeMinutes = currentHour * 60 + currentMinute;
+                  
+                  // Check if we're within the schedule window (schedule time to schedule time + duration)
+                  const endTimeMinutes = scheduleTimeMinutes + activeSchedule.duration;
+                  
+                  if (currentTimeMinutes >= scheduleTimeMinutes && currentTimeMinutes < endTimeMinutes) {
+                    isActiveNow = true;
+                    // Calculate end time for today
+                    const todayScheduleTime = new Date(now);
+                    todayScheduleTime.setHours(scheduleHour, scheduleMinute, 0, 0);
+                    scheduleEndTime = new Date(todayScheduleTime.getTime() + activeSchedule.duration * 60 * 1000).toISOString();
+                    console.log(`[Recovery] ✓ Found active recurring schedule ${activeSchedule.id} for stream ${streamInfo.id}`);
+                    console.log(`[Recovery]   Schedule time: ${scheduleHour}:${scheduleMinute}, Duration: ${activeSchedule.duration}m`);
+                    console.log(`[Recovery]   Calculated end time: ${scheduleEndTime}`);
+                  }
+                }
+              }
+            } else {
+              // One-time schedule - check if we're within the time window
+              const scheduleTime = new Date(activeSchedule.schedule_time);
+              const scheduleEndTimeCalc = activeSchedule.end_time 
+                ? new Date(activeSchedule.end_time) 
+                : new Date(scheduleTime.getTime() + activeSchedule.duration * 60 * 1000);
+              
+              if (now >= scheduleTime && now < scheduleEndTimeCalc) {
+                isActiveNow = true;
+                scheduleEndTime = activeSchedule.end_time || scheduleEndTimeCalc.toISOString();
+                console.log(`[Recovery] ✓ Found active one-time schedule ${activeSchedule.id} for stream ${streamInfo.id}`);
+                console.log(`[Recovery]   End time: ${scheduleEndTime}`);
+              }
+            }
+            
+            if (isActiveNow && scheduleEndTime) {
+              // Set active_schedule_id and scheduled_end_time BEFORE starting stream
+              await new Promise((resolve, reject) => {
+                db.run(
+                  `UPDATE streams 
+                   SET active_schedule_id = ?, 
+                       scheduled_end_time = ?,
+                       duration = ?
+                   WHERE id = ?`,
+                  [activeSchedule.id, scheduleEndTime, activeSchedule.duration, streamInfo.id],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+              console.log(`[Recovery] ✅ Set active_schedule_id=${activeSchedule.id}, end_time=${scheduleEndTime} for stream ${streamInfo.id}`);
+            } else {
+              console.log(`[Recovery] ⚠️ Schedule ${activeSchedule.id} found but not active now, clearing schedule info`);
+              // Clear schedule info so stream won't be auto-stopped by old duration
+              await new Promise((resolve) => {
+                db.run(
+                  `UPDATE streams 
+                   SET active_schedule_id = NULL, 
+                       scheduled_end_time = NULL
+                   WHERE id = ?`,
+                  [streamInfo.id],
+                  () => resolve()
+                );
+              });
+            }
+          } else {
+            console.log(`[Recovery] ⚠️ No active schedule found for stream ${streamInfo.id}, clearing schedule info`);
+            // Clear schedule info so stream won't be auto-stopped by old duration
+            await new Promise((resolve) => {
+              db.run(
+                `UPDATE streams 
+                 SET active_schedule_id = NULL, 
+                     scheduled_end_time = NULL
+                 WHERE id = ?`,
+                [streamInfo.id],
+                () => resolve()
+              );
+            });
+          }
+        } catch (scheduleError) {
+          console.error(`[Recovery] ⚠️ Error finding schedule for stream ${streamInfo.id}:`, scheduleError.message);
+          // Continue with recovery anyway
+        }
+        
         const result = await startStream(streamInfo.id, {
           isRecovery: true,
           skipStatusCheck: true
@@ -1484,10 +1512,10 @@ async function recoverStreamsAfterRestart(liveStreams) {
         
         if (result.success) {
           recoveredCount++;
-          console.log(`[Recovery] Γ£ô Successfully recovered stream ${streamInfo.id}`);
+          console.log(`[Recovery] ✅ Successfully recovered stream ${streamInfo.id}`);
         } else {
           failedCount++;
-          console.error(`[Recovery] Γ£ù Failed to recover stream ${streamInfo.id}: ${result.error}`);
+          console.error(`[Recovery] ❌ Failed to recover stream ${streamInfo.id}: ${result.error}`);
         }
       } else {
         console.log(`[Recovery] Stream ${streamInfo.id} too old (${elapsedMinutes} minutes), skipping`);

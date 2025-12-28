@@ -2523,8 +2523,10 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
       streamData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
       streamData.youtube_age_restricted = req.body.youtubeAgeRestricted === 'true' || req.body.youtubeAgeRestricted === true;
       streamData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
-      streamData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
-      streamData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+      
+      // ⭐ HARDCODED: Always enable auto-start (YouTube handles transition), disable auto-end (Node.js handles stop)
+      streamData.youtube_auto_start = true;  // Always true - let YouTube auto-transition when FFmpeg connects
+      streamData.youtube_auto_end = false;   // Always false - Node.js controls stop based on schedule
       
       // Add category and language (with defaults for testing)
       streamData.youtube_category_id = req.body.youtubeCategory || '22'; // Default: People & Blogs
@@ -2690,171 +2692,79 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
             }
           }
           
-          // LAZY CREATION: Only create broadcast immediately for "Stream Now"
-          // Scheduled streams will have broadcasts created by broadcastScheduler 10 minutes before
+          // ⭐ NEW FLOW: Broadcast creation moved to streamingService (after FFmpeg active)
+          // This section only saves thumbnail path for later use
+          // Actual broadcast creation happens in streamingService.js after FFmpeg connects
+          
           if (streamNow && streamData.use_youtube_api) {
-            console.log(`[CREATE STREAM] Stream Now mode - creating broadcast immediately`);
+            console.log(`[CREATE STREAM] ⚠️ Broadcast creation moved to streamingService (after FFmpeg active)`);
+            console.log(`[CREATE STREAM] Stream Now mode - broadcast will be created when FFmpeg connects`);
+            console.log(`[CREATE STREAM] This prevents YouTube API spam and invalid transitions`);
             
-            // Create broadcast via YouTube API
-            // Use existing stream ID (from dropdown) OR manual stream key
-            const broadcastResult = await youtubeService.scheduleLive(tokens, {
-              title: req.body.streamTitle,
-              description: streamData.youtube_description || '',
-              privacyStatus: streamData.youtube_privacy || 'unlisted',
-              scheduledStartTime: scheduledStartTime,
-              streamId: youtubeStreamId, // Use existing stream ID if selected from dropdown
-              streamKey: hasManualStreamKey ? req.body.streamKey.trim() : null, // Use manual stream key if provided
-              enableAutoStart: streamData.youtube_auto_start || false,
-              enableAutoStop: streamData.youtube_auto_end || false,
-              tags: tags,
-              category: streamData.youtube_category_id || null,
-              language: streamData.youtube_language || null
-            });
+            // Save thumbnail path for later use (when broadcast is created by streamingService)
+            let thumbnailForLater = null;
             
-            // Update stream with broadcast ID and stream ID
-            if (broadcastResult && broadcastResult.broadcast && broadcastResult.broadcast.id) {
-              const updateData = {
-                youtube_broadcast_id: broadcastResult.broadcast.id
-              };
-              
-              // ⚠️ REMOVED: youtube_stream_id is no longer saved (unreliable, can become invalid)
-              // We only use stream_key which is more reliable
-              // If new stream was created (manual stream key mode), we don't need to save the stream ID
-              // YouTube will automatically match stream_key to the correct stream
-              
-              await Stream.update(stream.id, updateData);
-              
-              console.log(`[CREATE STREAM] ✓ YouTube broadcast created: ${broadcastResult.broadcast.id}`);
-              stream.youtube_broadcast_id = broadcastResult.broadcast.id;
-              
-              // Set audience settings (Made for Kids, Age Restricted, Synthetic Content)
-              if (typeof streamData.youtube_made_for_kids === 'boolean' || streamData.youtube_age_restricted || streamData.youtube_synthetic_content) {
-                try {
-                  await youtubeService.setAudience(tokens, {
-                    videoId: broadcastResult.broadcast.id,
-                    selfDeclaredMadeForKids: streamData.youtube_made_for_kids,
-                    ageRestricted: streamData.youtube_age_restricted,
-                    syntheticContent: streamData.youtube_synthetic_content
-                  });
-                  console.log(`[CREATE STREAM] ✓ Audience settings applied:`);
-                  console.log(`[CREATE STREAM]   - Made for Kids: ${streamData.youtube_made_for_kids}`);
-                  console.log(`[CREATE STREAM]   - Age Restricted: ${streamData.youtube_age_restricted}`);
-                  console.log(`[CREATE STREAM]   - Synthetic Content: ${streamData.youtube_synthetic_content}`);
-                } catch (audienceError) {
-                  console.error('[CREATE STREAM] Error setting audience:', audienceError);
-                }
-              }
-              
-              // Upload thumbnail if provided (multer stores file in req.file)
-              // OR use video thumbnail as fallback
-              let thumbnailToUpload = null;
-              let thumbnailPath = null;
-              let shouldCleanup = false;
-              
-              if (req.file) {
-                // User uploaded custom thumbnail
-                thumbnailToUpload = req.file.path;
-                thumbnailPath = req.file.path;
-                shouldCleanup = true;
-                console.log(`[CREATE STREAM] Using custom thumbnail: ${req.file.filename}`);
-              } else if (req.body.videoId) {
-                // No custom thumbnail - use video thumbnail as fallback
-                try {
-                  const Video = require('./models/Video');
-                  const video = await Video.findById(req.body.videoId);
-                  
-                  if (video && video.thumbnail_path) {
-                    // Convert relative path to absolute path
-                    const path = require('path');
-                    thumbnailPath = path.join(__dirname, 'public', video.thumbnail_path);
-                    
-                    if (fs.existsSync(thumbnailPath)) {
-                      thumbnailToUpload = thumbnailPath;
-                      shouldCleanup = false; // Don't delete video thumbnail
-                      console.log(`[CREATE STREAM] Using video thumbnail as fallback: ${video.thumbnail_path}`);
-                    } else {
-                      console.warn(`[CREATE STREAM] Video thumbnail not found: ${thumbnailPath}`);
-                    }
-                  }
-                } catch (videoError) {
-                  console.error('[CREATE STREAM] Error getting video thumbnail:', videoError);
-                }
-              }
-              
-              // Upload thumbnail to YouTube if available
-              if (thumbnailToUpload) {
-                try {
-                  console.log(`[CREATE STREAM] Uploading thumbnail to YouTube...`);
-                  
-                  // Determine mime type
+            if (req.file && req.file.path) {
+              thumbnailForLater = req.file.path;
+              console.log(`[CREATE STREAM] ✓ Custom thumbnail path saved: ${req.file.path}`);
+            } else if (req.body.videoId) {
+              try {
+                const Video = require('./models/Video');
+                const video = await Video.findById(req.body.videoId);
+                
+                if (video && video.thumbnail_path) {
                   const path = require('path');
-                  const ext = path.extname(thumbnailToUpload).toLowerCase();
-                  const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+                  thumbnailForLater = path.join(__dirname, 'public', video.thumbnail_path);
                   
-                  await youtubeService.setThumbnail(tokens, {
-                    broadcastId: broadcastResult.broadcast.id,
-                    filePath: thumbnailToUpload,
-                    mimeType: mimeType
-                  });
-                  
-                  console.log(`[CREATE STREAM] ✓ Thumbnail uploaded to YouTube`);
-                  
-                  // Clean up custom thumbnail file after upload (but not video thumbnail)
-                  if (shouldCleanup && fs.existsSync(thumbnailToUpload)) {
-                    fs.unlinkSync(thumbnailToUpload);
-                    console.log(`[CREATE STREAM] ✓ Custom thumbnail file cleaned up`);
-                  }
-                } catch (thumbnailError) {
-                  console.error('[CREATE STREAM] Error uploading thumbnail:', thumbnailError);
-                  // Clean up custom thumbnail file even on error
-                  if (shouldCleanup && thumbnailToUpload && fs.existsSync(thumbnailToUpload)) {
-                    fs.unlinkSync(thumbnailToUpload);
+                  if (fs.existsSync(thumbnailForLater)) {
+                    console.log(`[CREATE STREAM] ✓ Video thumbnail path saved: ${video.thumbnail_path}`);
+                  } else {
+                    thumbnailForLater = null;
                   }
                 }
-              } else {
-                console.log(`[CREATE STREAM] ⚠️ No thumbnail available - YouTube will use auto-generated thumbnail`);
+              } catch (videoError) {
+                console.error('[CREATE STREAM] Error getting video thumbnail:', videoError);
               }
-            } else {
-              // Scheduled stream - broadcast will be created by broadcastScheduler
-              console.log(`[CREATE STREAM] ✅ Scheduled stream - broadcast will be created 10 minutes before schedule`);
-              console.log(`[CREATE STREAM] - Stream Key: ${youtubeStreamId || 'manual input'} (will be reused for all schedules)`);
-              console.log(`[CREATE STREAM] - Schedules: ${schedules.length}`);
-              console.log(`[CREATE STREAM] - BroadcastScheduler will create ${schedules.length} broadcast(s) automatically`);
-              
-              // Save thumbnail path to stream for scheduler to use later
-              let thumbnailForScheduler = null;
-              
-              if (req.file && req.file.path) {
-                // Custom thumbnail uploaded
-                thumbnailForScheduler = req.file.path;
-                console.log(`[CREATE STREAM] ✓ Custom thumbnail path saved for scheduler: ${req.file.path}`);
-              } else if (req.body.videoId) {
-                // Use video thumbnail as fallback
-                try {
-                  const Video = require('./models/Video');
-                  const video = await Video.findById(req.body.videoId);
+            }
+            
+            if (thumbnailForLater) {
+              await Stream.update(stream.id, {
+                youtube_thumbnail_path: thumbnailForLater
+              });
+            }
+          } else if (!streamNow && streamData.use_youtube_api) {
+            // Scheduled stream - save thumbnail for scheduler
+            console.log(`[CREATE STREAM] Scheduled stream - saving thumbnail for later use`);
+            
+            let thumbnailForScheduler = null;
+            
+            if (req.file && req.file.path) {
+              thumbnailForScheduler = req.file.path;
+              console.log(`[CREATE STREAM] ✓ Custom thumbnail path saved for scheduler: ${req.file.path}`);
+            } else if (req.body.videoId) {
+              try {
+                const Video = require('./models/Video');
+                const video = await Video.findById(req.body.videoId);
+                
+                if (video && video.thumbnail_path) {
+                  const path = require('path');
+                  thumbnailForScheduler = path.join(__dirname, 'public', video.thumbnail_path);
                   
-                  if (video && video.thumbnail_path) {
-                    const path = require('path');
-                    thumbnailForScheduler = path.join(__dirname, 'public', video.thumbnail_path);
-                    
-                    if (fs.existsSync(thumbnailForScheduler)) {
-                      console.log(`[CREATE STREAM] ✓ Video thumbnail path saved for scheduler: ${video.thumbnail_path}`);
-                    } else {
-                      thumbnailForScheduler = null;
-                      console.warn(`[CREATE STREAM] Video thumbnail not found: ${thumbnailForScheduler}`);
-                    }
+                  if (fs.existsSync(thumbnailForScheduler)) {
+                    console.log(`[CREATE STREAM] ✓ Video thumbnail path saved for scheduler: ${video.thumbnail_path}`);
+                  } else {
+                    thumbnailForScheduler = null;
                   }
-                } catch (videoError) {
-                  console.error('[CREATE STREAM] Error getting video thumbnail for scheduler:', videoError);
                 }
+              } catch (videoError) {
+                console.error('[CREATE STREAM] Error getting video thumbnail for scheduler:', videoError);
               }
-              
-              if (thumbnailForScheduler) {
-                await Stream.update(stream.id, {
-                  youtube_thumbnail_path: thumbnailForScheduler
-                });
-              }
+            }
+            
+            if (thumbnailForScheduler) {
+              await Stream.update(stream.id, {
+                youtube_thumbnail_path: thumbnailForScheduler
+              });
             }
           }
         } else {
@@ -3033,8 +2943,10 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
       if (req.body.youtubeMadeForKids !== undefined) updateData.youtube_made_for_kids = req.body.youtubeMadeForKids === 'true' || req.body.youtubeMadeForKids === true;
       if (req.body.youtubeAgeRestricted !== undefined) updateData.youtube_age_restricted = req.body.youtubeAgeRestricted === 'true' || req.body.youtubeAgeRestricted === true;
       if (req.body.youtubeSyntheticContent !== undefined) updateData.youtube_synthetic_content = req.body.youtubeSyntheticContent === 'true' || req.body.youtubeSyntheticContent === true;
-      if (req.body.youtubeAutoStart !== undefined) updateData.youtube_auto_start = req.body.youtubeAutoStart === 'true' || req.body.youtubeAutoStart === true;
-      if (req.body.youtubeAutoEnd !== undefined) updateData.youtube_auto_end = req.body.youtubeAutoEnd === 'true' || req.body.youtubeAutoEnd === true;
+      
+      // ⭐ HARDCODED: Always enable auto-start (YouTube handles transition), disable auto-end (Node.js handles stop)
+      updateData.youtube_auto_start = true;  // Always true - let YouTube auto-transition when FFmpeg connects
+      updateData.youtube_auto_end = false;   // Always false - Node.js controls stop based on schedule
       
       // Handle tags (convert array to JSON string for storage)
       if (req.body.youtubeTags !== undefined) {
@@ -3067,8 +2979,26 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('youtubeThum
       console.log('[UPDATE STREAM] Processing schedule:', JSON.stringify(firstSchedule));
       
       try {
-        updateData.schedule_time = parseScheduleTime(firstSchedule.schedule_time);
-        console.log('[UPDATE STREAM] Parsed schedule_time:', firstSchedule.schedule_time, '->', updateData.schedule_time);
+        const newScheduleTime = parseScheduleTime(firstSchedule.schedule_time);
+        console.log('[UPDATE STREAM] Parsed schedule_time:', firstSchedule.schedule_time, '->', newScheduleTime);
+        
+        // ⭐ CRITICAL: Clear broadcast_id ONLY if schedule time changed AND broadcast exists
+        // This ensures old/expired broadcast is not reused
+        if (stream.schedule_time && stream.youtube_broadcast_id) {
+          const oldScheduleTime = new Date(stream.schedule_time).getTime();
+          const newScheduleTimeMs = new Date(newScheduleTime).getTime();
+          
+          if (oldScheduleTime !== newScheduleTimeMs) {
+            updateData.youtube_broadcast_id = null;
+            console.log('[UPDATE STREAM] ⚠️ Schedule time changed - clearing broadcast_id');
+            console.log('[UPDATE STREAM]   Old:', stream.schedule_time);
+            console.log('[UPDATE STREAM]   New:', newScheduleTime);
+          } else {
+            console.log('[UPDATE STREAM] ✓ Schedule time unchanged - keeping broadcast_id');
+          }
+        }
+        
+        updateData.schedule_time = newScheduleTime;
       } catch (parseError) {
         console.error('[UPDATE STREAM] Error parsing schedule_time:', parseError);
         return res.status(400).json({ 
@@ -3876,25 +3806,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.error('Error resetting stream statuses:', error);
   }
   
+  console.log('[Startup] 🔧 About to cleanup orphaned temp files...');
+  
   // Cleanup orphaned temporary files from previous sessions
   try {
     await streamingService.cleanupOrphanedTempFiles();
+    console.log('[Startup] ✅ Cleanup orphaned temp files completed');
   } catch (error) {
     console.error('Failed to cleanup orphaned files:', error);
   }
-  
-  // Initialize scheduler
-  schedulerService.init(streamingService);
-  
-  // Start broadcast scheduler for lazy broadcast creation
-  const broadcastScheduler = require('./services/broadcastScheduler');
-  broadcastScheduler.start();
-  console.log('[Startup] ✅ Broadcast scheduler started');
-  
-  // Start token refresh service for auto-refreshing YouTube OAuth tokens
-  const tokenRefreshService = require('./services/tokenRefreshService');
-  tokenRefreshService.start();
-  console.log('[Startup] ✅ Token refresh service started');
   
   // Sync stream statuses
   try {
@@ -3941,3 +3861,44 @@ const server = app.listen(port, '0.0.0.0', async () => {
 server.timeout = 30 * 60 * 1000;
 server.keepAliveTimeout = 30 * 60 * 1000;
 server.headersTimeout = 30 * 60 * 1000;
+
+// ========================================
+// CRITICAL: Initialize schedulers OUTSIDE server.listen() callback
+// This ensures schedulers are initialized on EVERY app start/restart
+// ========================================
+console.log('[Startup] 🔧 Initializing schedulers (outside server.listen callback)...');
+
+// Initialize scheduler service
+console.log('[Startup] 🔧 Initializing schedulerService...');
+try {
+  schedulerService.init(streamingService);
+  console.log('[Startup] ✅ SchedulerService initialized successfully');
+} catch (error) {
+  console.error('[Startup] ❌ Failed to initialize schedulerService:', error);
+  console.error(error.stack);
+}
+
+// Start broadcast scheduler for lazy broadcast creation
+console.log('[Startup] 🔧 Starting broadcastScheduler...');
+try {
+  const broadcastScheduler = require('./services/broadcastScheduler');
+  broadcastScheduler.start();
+  console.log('[Startup] ✅ BroadcastScheduler started successfully');
+} catch (error) {
+  console.error('[Startup] ❌ Failed to start broadcastScheduler:', error);
+  console.error(error.stack);
+}
+
+// Start token refresh service for auto-refreshing YouTube OAuth tokens
+console.log('[Startup] 🔧 Starting tokenRefreshService...');
+try {
+  const tokenRefreshService = require('./services/tokenRefreshService');
+  tokenRefreshService.start();
+  console.log('[Startup] ✅ TokenRefreshService started successfully');
+} catch (error) {
+  console.error('[Startup] ❌ Failed to start tokenRefreshService:', error);
+  console.error(error.stack);
+}
+
+console.log('[Startup] ✅ All schedulers initialized successfully');
+console.log('========================================');

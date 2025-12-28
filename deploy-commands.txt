@@ -1,0 +1,33 @@
+========================================
+COPY-PASTE COMMANDS TO DEPLOY FIX
+========================================
+
+1. UPLOAD FILE (run from local Windows):
+scp services/streamingService.js root@85.9.195.103:/root/streambrovps/services/
+
+2. RESTART PM2 (run from local Windows):
+ssh root@85.9.195.103 "cd /root/streambrovps && pm2 restart streambro"
+
+3. VERIFY UPLOAD (run from local Windows):
+ssh root@85.9.195.103 "grep -A 3 'CRITICAL FIX: Check if broadcast already exists' /root/streambrovps/services/streamingService.js"
+
+4. CHECK LOGS (run from local Windows):
+ssh root@85.9.195.103 "pm2 logs streambro --lines 50"
+
+========================================
+ALTERNATIVE: ONE-LINE DEPLOY
+========================================
+scp services/streamingService.js root@85.9.195.103:/root/streambrovps/services/ && ssh root@85.9.195.103 "cd /root/streambrovps && pm2 restart streambro && pm2 logs streambro --lines 30"
+
+========================================
+AFTER DEPLOY - CREATE TEST SCHEDULE
+========================================
+1. Buka dashboard: http://85.9.195.103:3000
+2. Buat stream baru dengan YouTube API mode
+3. Set jadwal 5 menit ke depan
+4. Monitor logs untuk melihat:
+   - T-3 min: Broadcast creation by scheduler
+   - T-0 min: "Broadcast already exists" message (FIX WORKING!)
+   - Stream should go live automatically
+
+========================================

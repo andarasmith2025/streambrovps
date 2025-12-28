@@ -3088,21 +3088,47 @@ function populateEditYouTubeAPIFields(stream) {
     
     // Load existing thumbnail if exists
     // Try stream thumbnail first, fallback to video thumbnail
-    const thumbnailPath = stream.youtube_thumbnail_path || stream.video_thumbnail;
+    let thumbnailPath = stream.youtube_thumbnail_path || stream.video_thumbnail;
     
     if (thumbnailPath) {
+      // ⭐ FIX: Convert absolute server path to browser-friendly path
+      // Database might store: /root/streambrovps/public/uploads/thumbnails/xxx.jpg
+      // Browser needs: /uploads/thumbnails/xxx.jpg
+      
+      if (thumbnailPath.includes('/public/')) {
+        // Extract path after /public/
+        thumbnailPath = '/' + thumbnailPath.split('/public/')[1];
+        console.log('[populateEditYouTubeAPIFields] Converted absolute path to relative:', thumbnailPath);
+      } else if (!thumbnailPath.startsWith('/') && !thumbnailPath.startsWith('http')) {
+        // If relative path without leading slash, add it
+        thumbnailPath = '/' + thumbnailPath;
+      }
+      
       const thumbnailPreview = document.getElementById('editYoutubeThumbnailPreview');
       const thumbnailImg = document.getElementById('editYoutubeThumbnailImg');
       const thumbnailInfo = document.getElementById('editYoutubeThumbnailInfo');
       
       if (thumbnailPreview && thumbnailImg) {
+        // Add error handler to show if image fails to load
+        thumbnailImg.onerror = function() {
+          console.error('[populateEditYouTubeAPIFields] Failed to load thumbnail:', thumbnailPath);
+          if (thumbnailInfo) {
+            thumbnailInfo.innerHTML = `<span class="text-red-400">Failed to load thumbnail (file may not exist)</span>`;
+          }
+          thumbnailPreview.classList.add('hidden');
+        };
+        
+        thumbnailImg.onload = function() {
+          console.log('[populateEditYouTubeAPIFields] ✅ Thumbnail loaded successfully:', thumbnailPath);
+        };
+        
         thumbnailImg.src = thumbnailPath;
         thumbnailPreview.classList.remove('hidden');
         if (thumbnailInfo) {
           const source = stream.youtube_thumbnail_path ? 'stream' : 'video';
-          thumbnailInfo.innerHTML = `<span class="text-green-400">Current thumbnail loaded (from ${source})</span>`;
+          thumbnailInfo.innerHTML = `<span class="text-green-400">Current thumbnail (from ${source})</span>`;
         }
-        console.log('[populateEditYouTubeAPIFields] Loaded existing thumbnail:', thumbnailPath);
+        console.log('[populateEditYouTubeAPIFields] Loading thumbnail:', thumbnailPath);
       }
     } else {
       console.log('[populateEditYouTubeAPIFields] No thumbnail available');
