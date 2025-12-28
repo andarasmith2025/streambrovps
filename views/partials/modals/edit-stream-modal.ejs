@@ -166,6 +166,99 @@
               <input type="hidden" id="editYoutubeTags" name="youtubeTags" value="[]" />
             </div>
             
+            <!-- Stream Configuration -->
+            <div>
+              <label class="text-sm font-medium text-white block mb-2">Stream Configuration</label>
+              <div class="space-y-2">
+                <div class="relative">
+                  <input type="text" id="editYoutubeRtmpUrl"
+                    class="w-full pl-10 pr-12 py-2.5 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-white text-sm"
+                    placeholder="RTMP URL">
+                  <i class="ti ti-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <button type="button" id="editYoutubePlatformSelector"
+                    onclick="toggleEditPlatformDropdown()"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-600 transition-colors"
+                    aria-label="Select platform">
+                    <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
+                  </button>
+                  
+                  <!-- Platform Dropdown -->
+                  <div id="editYoutubePlatformDropdown"
+                    class="hidden absolute z-20 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-xl overflow-hidden">
+                    <div class="py-1">
+                      <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://a.rtmp.youtube.com/live2">
+                        <i class="ti ti-brand-youtube text-red-500 text-base mr-2"></i>
+                        <span class="text-sm text-gray-200">YouTube</span>
+                      </button>
+                      <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://b.rtmp.youtube.com/live2?backup=1">
+                        <i class="ti ti-brand-youtube text-red-400 text-base mr-2"></i>
+                        <span class="text-sm text-gray-200">YouTube (Backup)</span>
+                      </button>
+                      <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://live-api-s.facebook.com:443/rtmp">
+                        <i class="ti ti-brand-facebook text-blue-500 text-base mr-2"></i>
+                        <span class="text-sm text-gray-200">Facebook</span>
+                      </button>
+                      <button type="button" class="youtube-platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600 text-left" data-url="rtmps://ingest.global.live.prod.tiktok.com/live">
+                        <i class="ti ti-brand-tiktok text-white text-base mr-2"></i>
+                        <span class="text-sm text-gray-200">TikTok</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Stream Key Section -->
+            <div>
+              <label class="text-sm font-medium text-white block mb-2">Stream Key</label>
+              <div class="flex gap-2">
+                <div class="relative flex-1">
+                  <input type="password" id="editYoutubeStreamKey"
+                    class="w-full px-4 py-2.5 pl-10 pr-12 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary font-mono text-sm text-white"
+                    placeholder="Enter stream key or load from channel">
+                  <input type="hidden" id="editYoutubeStreamId" value="">
+                  <i class="ti ti-key text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <button type="button" onclick="toggleEditYouTubeStreamKeyVisibility()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                    <i class="ti ti-eye" id="editYoutubeStreamKeyToggle"></i>
+                  </button>
+                </div>
+                <button type="button" onclick="toggleEditYouTubeStreamKeysDropdown()"
+                  class="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors whitespace-nowrap">
+                  <i class="ti ti-download text-sm"></i>
+                  <span>Load</span>
+                </button>
+              </div>
+              
+              <!-- Dropdown for Stream Keys -->
+              <div id="editYoutubeStreamKeysDropdown" class="hidden mt-2 bg-dark-700 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
+                <div class="p-2">
+                  <div class="flex items-center justify-between mb-2 px-2 pb-2 border-b border-gray-600">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-medium text-gray-300">Available Stream Keys</span>
+                      <span id="editStreamKeysCount" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button type="button" onclick="refreshEditYouTubeStreamKeys()"
+                        class="p-1 text-gray-400 hover:text-primary transition-colors rounded hover:bg-gray-600">
+                        <i class="ti ti-refresh text-sm"></i>
+                      </button>
+                      <button type="button" onclick="toggleEditYouTubeStreamKeysDropdown()"
+                        class="p-1 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600">
+                        <i class="ti ti-x text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div id="editYoutubeStreamKeysList" class="max-h-64 overflow-y-auto space-y-1">
+                    <div class="text-center py-4 text-gray-400">
+                      <i class="ti ti-loader animate-spin text-xl mb-2"></i>
+                      <p class="text-xs">Fetching stream keys...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <!-- Additional Settings (Collapsible) -->
             <div class="border-t border-gray-700 pt-3">
               <button type="button" onclick="toggleEditYouTubeAdditionalSettings()"
