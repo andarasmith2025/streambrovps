@@ -1467,6 +1467,7 @@ function displayYouTubeStreamKeys(streamKeys) {
     return;
   }
   
+  // ⭐ IMPROVED: Better UI with title, status, and colored buttons (same as Edit Modal)
   container.innerHTML = streamKeys.map(key => `
     <button type="button" onclick="selectYouTubeStreamKey('${key.id}')" 
       class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
@@ -1486,9 +1487,9 @@ function displayYouTubeStreamKeys(streamKeys) {
           title="Copy Stream Key">
           <i class="ti ti-key text-gray-400 hover:text-yellow-400 text-sm"></i>
         </button>
-        <button type="button" onclick="event.stopPropagation(); copyToManualRTMP('${key.id}')" 
+        <button type="button" onclick="event.stopPropagation(); copyStreamKeyToClipboard('${key.id}', 'both')" 
           class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
-          title="Copy to Manual RTMP">
+          title="Copy Both">
           <i class="ti ti-copy text-gray-400 hover:text-green-400 text-sm"></i>
         </button>
         <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
@@ -1525,6 +1526,11 @@ function copyStreamKeyToClipboard(keyId, type) {
   } else if (type === 'key') {
     textToCopy = selectedKey.ingestionInfo?.streamName || '';
     successMessage = 'Stream Key copied to clipboard!';
+  } else if (type === 'both') {
+    const rtmp = selectedKey.ingestionInfo?.rtmpsIngestionAddress || '';
+    const key = selectedKey.ingestionInfo?.streamName || '';
+    textToCopy = `RTMP URL: ${rtmp}\nStream Key: ${key}`;
+    successMessage = 'RTMP URL and Stream Key copied!';
   }
   
   if (!textToCopy) {
@@ -2600,69 +2606,52 @@ function displayEditYouTubeStreamKeys(streamKeys) {
   const container = document.getElementById('editYoutubeStreamKeysList');
   if (!container) return;
   
+  // Update count
+  const countElement = document.getElementById('editStreamKeysCount');
+  if (countElement) {
+    countElement.textContent = `(${streamKeys.length})`;
+  }
+  
   if (!streamKeys || streamKeys.length === 0) {
     container.innerHTML = `
       <div class="text-center py-4 text-gray-400">
-        <i class="ti ti-inbox text-2xl mb-2"></i>
-        <p class="text-xs">No stream keys found</p>
+        <i class="ti ti-alert-circle text-2xl mb-2"></i>
+        <p class="text-sm">No stream keys found</p>
         <p class="text-xs text-gray-500 mt-1">Create a stream in YouTube Studio first</p>
       </div>
     `;
     return;
   }
   
-  container.innerHTML = '';
-  
-  streamKeys.forEach(key => {
-    const keyItem = document.createElement('div');
-    keyItem.className = 'p-2 hover:bg-dark-600 rounded cursor-pointer transition-colors';
-    keyItem.onclick = () => selectEditYouTubeStreamKey(key.id);
-    
-    keyItem.innerHTML = `
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium text-white truncate">${key.title || 'Untitled Stream'}</div>
-          <div class="text-xs text-gray-400 mt-1">
-            <span class="inline-flex items-center gap-1">
-              <i class="ti ti-calendar text-xs"></i>
-              ${key.scheduledStartTime ? new Date(key.scheduledStartTime).toLocaleString() : 'Not scheduled'}
-            </span>
-          </div>
-          <div class="flex items-center gap-2 mt-1">
-            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'rtmp')" 
-              class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-              title="Copy RTMP URL">
-              <i class="ti ti-link text-xs"></i>
-              RTMP
-            </button>
-            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'key')" 
-              class="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
-              title="Copy Stream Key">
-              <i class="ti ti-key text-xs"></i>
-              Key
-            </button>
-            <button onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'all')" 
-              class="text-xs text-green-400 hover:text-green-300 flex items-center gap-1"
-              title="Copy Both">
-              <i class="ti ti-copy text-xs"></i>
-              Both
-            </button>
-          </div>
-        </div>
-        <div class="flex-shrink-0">
-          <span class="inline-flex items-center px-2 py-1 rounded text-xs ${
-            key.status === 'active' ? 'bg-green-500/20 text-green-400' :
-            key.status === 'ready' ? 'bg-blue-500/20 text-blue-400' :
-            'bg-gray-500/20 text-gray-400'
-          }">
-            ${key.status || 'unknown'}
-          </span>
-        </div>
+  // ⭐ FIX: Use same UI as New Stream modal
+  container.innerHTML = streamKeys.map(key => `
+    <button type="button" onclick="selectEditYouTubeStreamKey('${key.id}')" 
+      class="w-full flex items-center gap-2 p-2.5 bg-dark-800 hover:bg-dark-600 border border-gray-600 rounded-lg transition-all text-left group">
+      <i class="ti ti-key text-red-500 text-lg flex-shrink-0"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">${key.title || 'Untitled Stream'}</p>
+        <p class="text-xs text-gray-400 mt-0.5 truncate">${key.ingestionInfo?.rtmpsIngestionAddress || 'N/A'}</p>
       </div>
-    `;
-    
-    container.appendChild(keyItem);
-  });
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button type="button" onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'rtmp')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy RTMP URL">
+          <i class="ti ti-link text-gray-400 hover:text-blue-400 text-sm"></i>
+        </button>
+        <button type="button" onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'key')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy Stream Key">
+          <i class="ti ti-key text-gray-400 hover:text-yellow-400 text-sm"></i>
+        </button>
+        <button type="button" onclick="event.stopPropagation(); copyEditStreamKeyToClipboard('${key.id}', 'both')" 
+          class="p-1.5 hover:bg-gray-600 rounded transition-colors" 
+          title="Copy Both">
+          <i class="ti ti-copy text-gray-400 hover:text-green-400 text-sm"></i>
+        </button>
+        <i class="ti ti-chevron-right text-gray-400 group-hover:text-primary transition-colors text-sm"></i>
+      </div>
+    </button>
+  `).join('');
 }
 
 // Edit Modal - Show Error
