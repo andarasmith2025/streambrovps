@@ -3878,14 +3878,31 @@ try {
   console.error(error.stack);
 }
 
-// Start broadcast scheduler for lazy broadcast creation
-console.log('[Startup] 🔧 Starting broadcastScheduler...');
+// ⭐ ENABLED: BroadcastScheduler for automatic broadcast creation 3-5 minutes before schedule
+// This ensures each schedule gets its own unique broadcast ID
+console.log('[Startup] 🔧 Starting BroadcastScheduler...');
 try {
   const broadcastScheduler = require('./services/broadcastScheduler');
   broadcastScheduler.start();
   console.log('[Startup] ✅ BroadcastScheduler started successfully');
+  
+  // ⭐ HEALTH CHECK: Monitor BroadcastScheduler every 5 minutes
+  setInterval(() => {
+    if (!broadcastScheduler.isRunning) {
+      console.error('[HealthCheck] ❌ BroadcastScheduler NOT RUNNING! Restarting...');
+      try {
+        broadcastScheduler.start();
+        console.log('[HealthCheck] ✅ BroadcastScheduler restarted successfully');
+      } catch (restartError) {
+        console.error('[HealthCheck] ❌ Failed to restart BroadcastScheduler:', restartError);
+      }
+    } else {
+      console.log('[HealthCheck] ✅ BroadcastScheduler is running');
+    }
+  }, 5 * 60 * 1000); // Check every 5 minutes
+  
 } catch (error) {
-  console.error('[Startup] ❌ Failed to start broadcastScheduler:', error);
+  console.error('[Startup] ❌ Failed to start BroadcastScheduler:', error);
   console.error(error.stack);
 }
 

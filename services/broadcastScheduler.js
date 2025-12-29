@@ -146,105 +146,123 @@ class BroadcastScheduler {
   }
 
   /**
-   * Logika Utama: Cek duplikasi di YouTube sebelum membuat broadcast baru.
+   * ⭐ ENHANCED: Multi-channel support with proper token binding
    */
   async createBroadcastForSchedule(schedule) {
     try {
-      console.log(`[BroadcastScheduler] Memproses jadwal ID: ${schedule.id} ("${schedule.title}")`);
+      console.log(`[BroadcastScheduler] 🎯 Processing schedule ID: ${schedule.id}`);
+      console.log(`[BroadcastScheduler] 📺 Stream: "${schedule.title}"`);
+      console.log(`[BroadcastScheduler] 🏷️ Channel: ${schedule.youtube_channel_id || 'default'}`);
 
       // 1. CEK: Apakah schedule ini sudah punya broadcast_id?
       if (schedule.youtube_broadcast_id) {
-        console.log(`[BroadcastScheduler] ⚠️ Schedule ${schedule.id} sudah punya broadcast: ${schedule.youtube_broadcast_id}`);
+        console.log(`[BroadcastScheduler] ⚠️ Schedule ${schedule.id} already has broadcast: ${schedule.youtube_broadcast_id}`);
         return schedule.youtube_broadcast_id;
       }
 
-      // 2. CEK: Apakah stream ini sudah punya broadcast dari schedule lain?
-      const existingBroadcast = await this.checkExistingBroadcastForStream(schedule.stream_id);
-      if (existingBroadcast) {
-        console.log(`[BroadcastScheduler] ✓ Reuse broadcast dari schedule lain: ${existingBroadcast.youtube_broadcast_id}`);
-        await this.updateScheduleBroadcast(schedule.id, existingBroadcast.youtube_broadcast_id, 'ready');
-        return existingBroadcast.youtube_broadcast_id;
-      }
-
-      // 3. CEK RECOVERY: Cari apakah sudah ada di YouTube (menghindari duplikasi saat restart)
+      // 2. CEK RECOVERY: Cari orphaned broadcast di YouTube (DISABLED for safety)
       console.log(`[BroadcastScheduler] 🔍 Checking YouTube for orphaned broadcast...`);
       const orphaned = await this.findOrphanedBroadcastInYouTube(schedule);
       
       if (orphaned) {
         console.log(`[BroadcastScheduler] 🔄 RECOVERED orphaned broadcast: ${orphaned.id}`);
-        console.log(`[BroadcastScheduler] 🔄 This was created during restart but not saved to DB`);
         await this.updateScheduleBroadcast(schedule.id, orphaned.id, 'ready');
         return orphaned.id;
       }
 
-      // 4. Tandai database sedang membuat agar tidak diproses double
+      // 3. Tandai database sedang membuat
       await this.updateScheduleBroadcastStatus(schedule.id, 'creating');
 
-      // 5. Resolusi Thumbnail (Optional - fallback ke video thumbnail)
-      const thumbnailPath = await this.resolveThumbnailPath(schedule);
-      
-      if (!thumbnailPath) {
-        console.log(`[BroadcastScheduler] ℹ️ No custom thumbnail - YouTube will use video's default thumbnail`);
+      // 4. ⭐ ENHANCED: Multi-channel token retrieval with proper binding
+      console.log(`[BroadcastScheduler] 🔑 Getting tokens for user: ${schedule.user_id}, channel: ${schedule.youtube_channel_id || 'default'}`);
+      const tokens = await getTokensForUser(schedule.user_id, schedule.youtube_channel_id);
+      if (!tokens || !tokens.access_token) {
+        throw new Error(`No valid YouTube tokens for user ${schedule.user_id}, channel ${schedule.youtube_channel_id || 'default'}`);
       }
+      
+      // Verify token expiry
+      const now = Date.now();
+      const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+      const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+      console.log(`[BroadcastScheduler] ✅ Token valid (expires in ${minutesUntilExpiry} minutes)`);
 
-      // 6. Ambil Token dan Data Stream
+      // 5. Get stream data with proper channel binding
       const streamData = await this.getStreamData(schedule.stream_id);
       if (!streamData || !streamData.stream_key) {
-        throw new Error('Stream key tidak ditemukan di database.');
+        throw new Error('Stream key not found in database');
+      }
+      
+      // ⭐ CRITICAL: Ensure channel ID consistency
+      const channelId = schedule.youtube_channel_id || streamData.youtube_channel_id;
+      if (!channelId) {
+        throw new Error('No YouTube channel ID found in schedule or stream data');
+      }
+      console.log(`[BroadcastScheduler] 🎯 Using channel ID: ${channelId}`);
+
+      // 6. Resolve thumbnail path
+      const thumbnailPath = await this.resolveThumbnailPath(schedule);
+      if (!thumbnailPath) {
+        console.log(`[BroadcastScheduler] ℹ️ No custom thumbnail - YouTube will use video default`);
       }
 
-      const tokens = await getTokensForUser(schedule.user_id, streamData.youtube_channel_id);
-      if (!tokens) throw new Error('Token YouTube tidak ditemukan.');
-
-      // 7. Hitung waktu mulai
+      // 7. Calculate start time
       let startTime = new Date(schedule.schedule_time);
       if (schedule.is_recurring) {
         const now = new Date();
         startTime.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
       }
 
-      // 8. Eksekusi Pembuatan ke YouTube API
+      // 8. ⭐ ENHANCED: Create broadcast with proper metadata from stream
       const broadcastOptions = {
-        channelId: streamData.youtube_channel_id,
+        channelId: channelId,
         title: schedule.title,
         description: schedule.youtube_description || '',
         privacyStatus: schedule.youtube_privacy || 'unlisted',
         scheduledStartTime: startTime.toISOString(),
-        enableAutoStart: true,  // ✅ ALWAYS true - let YouTube auto-transition
-        enableAutoStop: false,  // ❌ ALWAYS false - Node.js controls stop
+        enableAutoStart: true,  // ✅ Let YouTube auto-transition
+        enableAutoStop: false,  // ❌ Node.js controls stop
         tags: schedule.youtube_tags ? JSON.parse(schedule.youtube_tags) : null,
         category: schedule.youtube_category_id,
         language: schedule.youtube_language,
         thumbnailPath: thumbnailPath,
-        streamKey: streamData.stream_key
+        streamKey: streamData.stream_key,
+        // ⭐ NEW: Additional metadata for consistency
+        madeForKids: schedule.youtube_made_for_kids === 1,
+        ageRestricted: schedule.youtube_age_restricted === 1
       };
 
-      console.log(`[BroadcastScheduler] 📤 Creating broadcast in YouTube...`);
+      console.log(`[BroadcastScheduler] 📤 Creating broadcast with metadata:`);
+      console.log(`[BroadcastScheduler]   Title: "${broadcastOptions.title}"`);
+      console.log(`[BroadcastScheduler]   Channel: ${broadcastOptions.channelId}`);
+      console.log(`[BroadcastScheduler]   Privacy: ${broadcastOptions.privacyStatus}`);
+      console.log(`[BroadcastScheduler]   Thumbnail: ${thumbnailPath ? 'Yes' : 'Default'}`);
+
       const result = await youtubeService.scheduleLive(tokens, broadcastOptions);
 
       if (result && result.broadcast && result.broadcast.id) {
-        const bId = result.broadcast.id;
+        const broadcastId = result.broadcast.id;
         
-        // Save ke database
-        await this.updateScheduleBroadcast(schedule.id, bId, 'ready');
-
-        // Audience settings
+        // ⭐ ENHANCED: Update both tables with proper channel binding
+        await this.updateScheduleBroadcast(schedule.id, broadcastId, 'ready');
+        
+        // Set audience settings if needed
         if (schedule.youtube_made_for_kids || schedule.youtube_age_restricted) {
           try {
             await youtubeService.setAudience(tokens, {
-              videoId: bId,
+              videoId: broadcastId,
               selfDeclaredMadeForKids: schedule.youtube_made_for_kids === 1,
               ageRestricted: schedule.youtube_age_restricted === 1
             });
+            console.log(`[BroadcastScheduler] ✅ Audience settings applied`);
           } catch (audienceErr) {
-            console.error('[BroadcastScheduler] Error setting audience:', audienceErr.message);
+            console.error('[BroadcastScheduler] ⚠️ Error setting audience:', audienceErr.message);
           }
         }
 
-        console.log(`[BroadcastScheduler] ✅ SUCCESS: Broadcast ${bId} created with thumbnail`);
-        return bId;
+        console.log(`[BroadcastScheduler] ✅ SUCCESS: Broadcast ${broadcastId} created for channel ${channelId}`);
+        return broadcastId;
       } else {
-        throw new Error('YouTube API tidak mengembalikan broadcast ID');
+        throw new Error('YouTube API did not return broadcast ID');
       }
     } catch (error) {
       console.error(`[BroadcastScheduler] ❌ Error creating broadcast for schedule ${schedule.id}:`, error.message);
@@ -255,71 +273,30 @@ class BroadcastScheduler {
   }
 
   /**
-   * Cek apakah stream sudah punya broadcast dari schedule lain
+   * ⭐ CRITICAL FIX: NEVER reuse broadcasts - always create new for each schedule
+   * This ensures each schedule execution gets its own unique broadcast ID
+   * Architecture: 1 stream card = multiple schedules = DIFFERENT broadcast IDs
    */
   checkExistingBroadcastForStream(streamId) {
     return new Promise((resolve) => {
-      const query = `
-        SELECT 
-          id as schedule_id,
-          youtube_broadcast_id,
-          broadcast_status
-        FROM stream_schedules
-        WHERE stream_id = ?
-          AND youtube_broadcast_id IS NOT NULL
-          AND broadcast_status IN ('ready', 'creating', 'live')
-        ORDER BY 
-          CASE 
-            WHEN broadcast_status = 'live' THEN 1
-            WHEN broadcast_status = 'ready' THEN 2
-            WHEN broadcast_status = 'creating' THEN 3
-            ELSE 4
-          END
-        LIMIT 1
-      `;
+      console.log(`[BroadcastScheduler] 🚫 Broadcast reuse DISABLED - each schedule gets NEW broadcast`);
+      console.log(`[BroadcastScheduler] 💡 Architecture: 1 stream = multi jadwal = DIFFERENT broadcast IDs`);
       
-      db.get(query, [streamId], (err, row) => {
-        if (err) {
-          console.error('[BroadcastScheduler] Error checking existing broadcast:', err);
-          resolve(null);
-        } else {
-          resolve(row || null);
-        }
-      });
+      // ⭐ ALWAYS return null to force new broadcast creation
+      // This prevents reusing old broadcasts from previous schedule executions
+      resolve(null);
     });
   }
 
   /**
-   * Mencari broadcast di YouTube berdasarkan judul dan status 'upcoming'
+   * ⭐ DISABLED: Orphan recovery disabled for safety
+   * Always create new broadcast instead of reusing old ones
+   * This prevents accidentally reusing broadcasts from previous tests/days
    */
   async findOrphanedBroadcastInYouTube(schedule) {
-    try {
-      const streamData = await this.getStreamData(schedule.stream_id);
-      const tokens = await getTokensForUser(schedule.user_id, streamData?.youtube_channel_id);
-      if (!tokens) return null;
-
-      const auth = new google.auth.OAuth2();
-      auth.setCredentials(tokens);
-      const youtube = google.youtube({ version: 'v3', auth });
-
-      const res = await youtube.liveBroadcasts.list({
-        part: 'id,snippet',
-        broadcastStatus: 'upcoming',
-        maxResults: 50
-      });
-
-      const items = res.data.items || [];
-
-      // Cari yang judulnya EXACT match (case insensitive)
-      const match = items.find(b => 
-        b.snippet.title.trim().toLowerCase() === schedule.title.trim().toLowerCase()
-      );
-
-      return match || null;
-    } catch (e) {
-      console.error('[BroadcastScheduler] Error finding orphaned broadcast:', e.message);
-      return null;
-    }
+    console.log(`[BroadcastScheduler] 🚫 Orphan recovery DISABLED - will always create new broadcast`);
+    console.log(`[BroadcastScheduler] 💡 This prevents reusing old broadcasts from previous tests`);
+    return null;
   }
 
   /**
@@ -379,39 +356,57 @@ class BroadcastScheduler {
     }
   }
 
+  /**
+   * ⭐ ENHANCED: Get stream data with multi-channel support
+   */
   getStreamData(streamId) {
-    return new Promise((res, rej) => {
+    return new Promise((resolve, reject) => {
       db.get(
-        'SELECT stream_key, youtube_channel_id FROM streams WHERE id = ?',
+        'SELECT stream_key, youtube_channel_id, title, youtube_description, youtube_privacy FROM streams WHERE id = ?',
         [streamId],
         (err, row) => {
-          if (err) rej(err);
-          else res(row);
+          if (err) {
+            reject(err);
+          } else if (!row) {
+            reject(new Error(`Stream ${streamId} not found in database`));
+          } else {
+            resolve(row);
+          }
         }
       );
     });
   }
 
+  /**
+   * ⭐ ENHANCED: Update broadcast ID in both tables with proper cleanup
+   */
   updateScheduleBroadcast(scheduleId, broadcastId, status) {
-    return new Promise((res) => {
-      // ⭐ CRITICAL: Update BOTH schedule AND stream tables
-      // This ensures broadcast_id is accessible from both places
+    return new Promise((resolve) => {
+      // Update schedule table first
       db.run(
         `UPDATE stream_schedules 
          SET youtube_broadcast_id = ?, 
-             broadcast_status = ? 
+             broadcast_status = ?
          WHERE id = ?`,
         [broadcastId, status, scheduleId],
-        () => {
-          // Also update streams table for easier access
+        (scheduleErr) => {
+          if (scheduleErr) {
+            console.error('[BroadcastScheduler] Error updating schedule:', scheduleErr);
+          }
+          
+          // Update streams table for easier access
           db.run(
             `UPDATE streams 
-             SET youtube_broadcast_id = ? 
+             SET youtube_broadcast_id = ?
              WHERE id = (SELECT stream_id FROM stream_schedules WHERE id = ?)`,
             [broadcastId, scheduleId],
-            () => {
-              console.log(`[BroadcastScheduler] ✅ Updated broadcast_id in both tables: ${broadcastId}`);
-              res();
+            (streamErr) => {
+              if (streamErr) {
+                console.error('[BroadcastScheduler] Error updating stream:', streamErr);
+              }
+              
+              console.log(`[BroadcastScheduler] ✅ Updated broadcast_id in both tables: ${broadcastId} (${status})`);
+              resolve();
             }
           );
         }

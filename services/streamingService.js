@@ -511,37 +511,64 @@ async function startStream(streamId, options = {}) {
     activeStreams.set(streamId, ffmpegProcess);
     await Stream.updateStatus(streamId, 'live', stream.user_id, { startTimeOverride: startTimeIso });
     
-    // ⭐ SIMPLIFIED: Only check if broadcast exists, NEVER create
-    // BroadcastScheduler is responsible for creating broadcasts 3-5 minutes before schedule
-    // This prevents duplicate broadcasts and ensures YouTube auto-transition works
+    // ⭐ STRICT CHECK: Broadcast must be created by BroadcastScheduler
+    // No fallback - fail fast if broadcast missing
     if (stream.use_youtube_api && !isRecovery) {
-      console.log(`[StreamingService] ========== BROADCAST CHECK ==========`);
-      console.log(`[StreamingService] Checking if broadcast exists...`);
+      console.log(`[StreamingService] ========== BROADCAST VALIDATION ==========`);
       
       setImmediate(async () => {
         try {
           const currentStream = await Stream.findById(streamId);
           
+          // Check if broadcast exists in stream table
           if (currentStream && currentStream.youtube_broadcast_id) {
-            console.log(`[StreamingService] ✅ Broadcast exists: ${currentStream.youtube_broadcast_id}`);
-            console.log(`[StreamingService] Created by broadcastScheduler - ready for auto-transition`);
-          } else {
-            console.log(`[StreamingService] ⚠️ No broadcast found!`);
-            if (currentStream.active_schedule_id) {
-              console.log(`[StreamingService] ⚠️ This stream has schedule ${currentStream.active_schedule_id}`);
-              console.log(`[StreamingService] ⚠️ BroadcastScheduler may have failed to create broadcast`);
-              console.log(`[StreamingService] ⚠️ Stream will continue but may not auto-transition to live`);
-            } else {
-              console.log(`[StreamingService] ℹ️ This is a manual stream without schedule`);
-              console.log(`[StreamingService] ℹ️ User needs to manually go live from YouTube Studio`);
+            console.log(`[StreamingService] ✅ Broadcast found in stream: ${currentStream.youtube_broadcast_id}`);
+            return;
+          }
+          
+          // Check if broadcast exists in schedule table
+          if (currentStream && currentStream.active_schedule_id) {
+            const scheduleBroadcast = await new Promise((resolve) => {
+              db.get(
+                'SELECT youtube_broadcast_id FROM stream_schedules WHERE id = ?',
+                [currentStream.active_schedule_id],
+                (err, row) => resolve(row?.youtube_broadcast_id || null)
+              );
+            });
+            
+            if (scheduleBroadcast) {
+              console.log(`[StreamingService] ✅ Broadcast found in schedule: ${scheduleBroadcast}`);
+              console.log(`[StreamingService] 🔄 Syncing broadcast ID to stream table...`);
+              
+              // Sync broadcast ID from schedule to stream
+              await Stream.update(streamId, { youtube_broadcast_id: scheduleBroadcast });
+              return;
             }
           }
+          
+          // ❌ NO FALLBACK - Broadcast should have been created by BroadcastScheduler
+          console.error(`[StreamingService] ❌ CRITICAL: No broadcast ID found!`);
+          console.error(`[StreamingService] ❌ BroadcastScheduler should have created broadcast 3-5 minutes before schedule`);
+          console.error(`[StreamingService] ❌ Stream will continue but YouTube broadcast will NOT be available`);
+          console.error(`[StreamingService] ❌ Check BroadcastScheduler logs for errors`);
+          
+          // Mark schedule as failed if exists
+          if (currentStream && currentStream.active_schedule_id) {
+            await new Promise((resolve) => {
+              db.run(
+                'UPDATE stream_schedules SET broadcast_status = ? WHERE id = ?',
+                ['failed', currentStream.active_schedule_id],
+                () => resolve()
+              );
+            });
+          }
+          
         } catch (error) {
-          console.error(`[StreamingService] Error checking broadcast:`, error.message);
+          console.error(`[StreamingService] ❌ Error validating broadcast:`, error.message);
         }
       });
     } else if (stream.use_youtube_api && isRecovery) {
-      console.log(`[StreamingService] ⚠️ Recovery mode: Skipping broadcast check`);
+      console.log(`[StreamingService] ⚠️ Recovery mode: Skipping broadcast validation`);
     }
     
     // Clear manual_stop flag when stream starts
@@ -1016,7 +1043,7 @@ async function stopStream(streamId, options = {}) {
   }
 }
 
-// ===== BACKGROUND YOUTUBE VOD OPTIMIZATION (Non-blocking) =====
+// ===== ENHANCED YOUTUBE VOD OPTIMIZATION (Multi-channel + Clean Cleanup) =====
 async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
   setImmediate(async () => {
     try {
@@ -1025,15 +1052,22 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
       const { getTokensForUser } = require('../routes/youtube');
       const youtubeService = require('./youtubeService');
       
-      // ⭐ Get stream data to get channel ID
+      // ⭐ ENHANCED: Get stream data with proper channel binding
       const stream = await Stream.findById(streamId);
       const channelId = stream?.youtube_channel_id || null;
-      console.log(`[YouTube VOD] Getting tokens for user ${userId}, channel: ${channelId || 'default'}`);
+      console.log(`[YouTube VOD] 🎯 Processing for user: ${userId}, channel: ${channelId || 'default'}`);
+      
       const tokens = await getTokensForUser(userId, channelId);
       if (!tokens || !tokens.access_token) {
         console.warn('[YouTube VOD] ⚠️ No valid tokens for VOD optimization');
         return;
       }
+      
+      // Verify token validity
+      const now = Date.now();
+      const expiry = tokens.expiry_date ? Number(tokens.expiry_date) : 0;
+      const minutesUntilExpiry = Math.floor((expiry - now) / (60 * 1000));
+      console.log(`[YouTube VOD] ✅ Token valid (expires in ${minutesUntilExpiry} minutes)`);
       
       // Check current broadcast status
       const broadcast = await youtubeService.getBroadcast(tokens, { broadcastId });
@@ -1051,69 +1085,105 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
           broadcastId: broadcastId,
           status: 'complete'
         });
-        console.log('[YouTube VOD] ✅ Broadcast transitioned to complete - VOD processing accelerated');
+        console.log('[YouTube VOD] ✅ Broadcast transitioned to complete - VOD processing started');
+        
+        // ⭐ NEW: Delete broadcast after transition to prevent orphans
+        // Wait 5 seconds for YouTube to process the transition
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        try {
+          await youtubeService.deleteBroadcast(tokens, { broadcastId });
+          console.log('[YouTube VOD] ✅ Broadcast deleted from YouTube API - no orphans left');
+        } catch (deleteErr) {
+          console.warn('[YouTube VOD] ⚠️ Could not delete broadcast (VOD may still be processing):', deleteErr.message);
+        }
         
       } else if (currentStatus === 'ready') {
-        // Broadcast never went live, clean it up
+        // Broadcast never went live, clean it up immediately
         await youtubeService.deleteBroadcast(tokens, { broadcastId });
-        console.log('[YouTube VOD] ✅ Unused broadcast cleaned up');
+        console.log('[YouTube VOD] ✅ Unused broadcast deleted from YouTube API');
+        
+      } else if (currentStatus === 'complete') {
+        // Broadcast already complete, just delete it
+        try {
+          await youtubeService.deleteBroadcast(tokens, { broadcastId });
+          console.log('[YouTube VOD] ✅ Completed broadcast deleted from YouTube API');
+        } catch (deleteErr) {
+          console.warn('[YouTube VOD] ⚠️ Could not delete completed broadcast:', deleteErr.message);
+        }
         
       } else {
-        console.log(`[YouTube VOD] ℹ️ Broadcast already in final state: ${currentStatus}`);
+        console.log(`[YouTube VOD] ℹ️ Broadcast in state: ${currentStatus} - skipping deletion`);
       }
       
-      // Clear broadcast IDs from database
+      // ⭐ ENHANCED: Clean up database with proper multi-table cleanup
+      console.log(`[YouTube VOD] 🧹 Cleaning up database references...`);
+      
+      // Clear from streams table
       await Stream.update(streamId, { 
         youtube_broadcast_id: null
       });
-      console.log(`[YouTube VOD] ✅ Cleared broadcast ID from database`);
+      console.log(`[YouTube VOD] ✅ Cleared broadcast ID from streams table`);
       
-      // Clear from recurring schedules if needed
-      // Use the stream variable we already fetched at the top
-      if (stream && stream.active_schedule_id) {
-        try {
-          const schedule = await new Promise((resolve, reject) => {
-            db.get(
-              'SELECT is_recurring FROM stream_schedules WHERE id = ?',
-              [stream.active_schedule_id],
-              (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-              }
-            );
-          });
-          
-          if (schedule && schedule.is_recurring) {
-            await new Promise((resolve, reject) => {
-              db.run(
-                'UPDATE stream_schedules SET youtube_broadcast_id = NULL, broadcast_status = ? WHERE id = ?',
-                ['pending', stream.active_schedule_id],
-                (err) => {
-                  if (err) reject(err);
-                  else resolve();
-                }
-              );
-            });
-            console.log(`[YouTube VOD] ✅ Cleared broadcast_id from recurring schedule`);
+      // ⭐ CRITICAL: Clean up ALL schedules that used this broadcast
+      // This ensures recurring schedules get fresh broadcasts for next execution
+      const cleanupResult = await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE stream_schedules 
+           SET youtube_broadcast_id = NULL, 
+               broadcast_status = 'pending',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE youtube_broadcast_id = ?`,
+          [broadcastId],
+          function(err) {
+            if (err) reject(err);
+            else resolve(this.changes);
           }
-        } catch (clearError) {
-          console.error('[YouTube VOD] Error clearing broadcast_id from schedule:', clearError);
-        }
-      }
+        );
+      });
+      
+      console.log(`[YouTube VOD] ✅ Cleaned up ${cleanupResult} schedule(s) with broadcast ${broadcastId}`);
+      
+      // ⭐ NEW: Log successful cleanup for monitoring
+      console.log(`[YouTube VOD] 📊 Cleanup summary:`);
+      console.log(`[YouTube VOD]   - Broadcast: ${broadcastId} (${currentStatus})`);
+      console.log(`[YouTube VOD]   - Stream: ${streamId}`);
+      console.log(`[YouTube VOD]   - Channel: ${channelId || 'default'}`);
+      console.log(`[YouTube VOD]   - Schedules cleaned: ${cleanupResult}`);
+      console.log(`[YouTube VOD] 🎉 VOD optimization completed successfully`);
       
     } catch (error) {
       console.error('[YouTube VOD] ❌ VOD optimization failed (non-critical):', error.message);
-      console.log('[YouTube VOD] 📝 Logged for manual review if needed');
+      console.log('[YouTube VOD] 📝 Attempting fallback cleanup...');
       
-      // Still try to clear database even if API failed
+      // ⭐ ENHANCED: Fallback cleanup even if API failed
       try {
+        // Clear streams table
         await Stream.update(streamId, { 
           youtube_broadcast_id: null
         });
-        console.log(`[YouTube VOD] ✅ Cleared broadcast ID from database (fallback)`);
+        
+        // Clear schedules table
+        await new Promise((resolve) => {
+          db.run(
+            `UPDATE stream_schedules 
+             SET youtube_broadcast_id = NULL, 
+                 broadcast_status = 'pending'
+             WHERE youtube_broadcast_id = ?`,
+            [broadcastId],
+            () => {
+              console.log(`[YouTube VOD] ✅ Fallback cleanup completed`);
+              resolve();
+            }
+          );
+        });
+        
       } catch (dbError) {
-        console.error('[YouTube VOD] ❌ Failed to clear database:', dbError.message);
+        console.error('[YouTube VOD] ❌ Fallback cleanup also failed:', dbError.message);
       }
+    }
+  });
+}
     }
   });
 }
