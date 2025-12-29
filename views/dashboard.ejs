@@ -3811,16 +3811,22 @@
               const searchTerm = this.value.toLowerCase().trim();
               const streamRows = document.querySelectorAll('table tbody tr:not(#empty-state)');
               const streamCards = document.querySelectorAll('.block.md\\:hidden.space-y-4 > div');
+              
+              // ⭐ FIX: Search by title AND channel name
               streamRows.forEach(row => {
                 const streamTitle = row.querySelector('.text-sm.font-medium')?.textContent.toLowerCase() || '';
-                const isMatch = streamTitle.includes(searchTerm);
+                const channelName = row.querySelector('td:nth-child(2) .text-sm.text-gray-300')?.textContent.toLowerCase() || '';
+                const isMatch = streamTitle.includes(searchTerm) || channelName.includes(searchTerm);
                 row.style.display = isMatch ? '' : 'none';
               });
+              
               streamCards.forEach(card => {
                 const streamTitle = card.querySelector('.font-medium')?.textContent.toLowerCase() || '';
-                const isMatch = streamTitle.includes(searchTerm);
+                const channelName = card.querySelector('.text-xs.text-gray-400 span')?.textContent.toLowerCase() || '';
+                const isMatch = streamTitle.includes(searchTerm) || channelName.includes(searchTerm);
                 card.style.display = isMatch ? '' : 'none';
               });
+              
               const visibleRows = [...streamRows].filter(row => row.style.display !== 'none');
               const visibleCards = [...streamCards].filter(card => card.style.display !== 'none');
               const emptyStateRow = document.getElementById('empty-state');

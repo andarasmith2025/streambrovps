@@ -2534,6 +2534,12 @@ function toggleEditYouTubeStreamKeysDropdown() {
 // Edit Modal - Load YouTube Stream Keys
 async function loadEditYouTubeStreamKeys(forceRefresh = false) {
   try {
+    // ⭐ FIX: Read channel ID from edit dropdown
+    const channelSelect = document.getElementById('editYoutubeChannelSelect');
+    const channelIdFromDropdown = channelSelect?.value;
+    
+    console.log('[loadEditYouTubeStreamKeys] Channel from dropdown:', channelIdFromDropdown);
+    
     // Check cache first (unless force refresh)
     const now = Date.now();
     if (!forceRefresh && youtubeStreamKeysCache && youtubeStreamKeysCacheTime) {
@@ -2554,7 +2560,16 @@ async function loadEditYouTubeStreamKeys(forceRefresh = false) {
     
     container.innerHTML = '<div class="text-center py-4 text-gray-400"><i class="ti ti-loader animate-spin text-xl mb-2"></i><p class="text-xs">Loading stream keys...</p></div>';
     
-    const response = await fetch('/oauth2/youtube/stream-keys');
+    // ⭐ FIX: Build URL with channel ID parameter (same as New Stream)
+    let url = '/oauth2/youtube/stream-keys';
+    if (channelIdFromDropdown) {
+      url += `?channelId=${encodeURIComponent(channelIdFromDropdown)}`;
+      console.log('[loadEditYouTubeStreamKeys] Fetching stream keys for channel:', channelIdFromDropdown);
+    } else {
+      console.log('[loadEditYouTubeStreamKeys] No channel selected, fetching default');
+    }
+    
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.success && data.streamKeys) {
