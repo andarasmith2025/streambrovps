@@ -211,9 +211,17 @@
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Schedule
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Start Time
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <div class="flex items-center gap-1.5">
+                    Start Time
+                    <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[9px] font-bold normal-case">WIB</span>
+                  </div>
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">End Time
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <div class="flex items-center gap-1.5">
+                    End Time
+                    <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[9px] font-bold normal-case">WIB</span>
+                  </div>
                 </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions
@@ -2916,11 +2924,17 @@
         <div class="schedule-slot p-3 bg-dark-700/50 rounded-lg border border-gray-600">
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">Start</label>
+              <label class="text-xs text-gray-400 mb-1 block flex items-center gap-1">
+                Start Time 
+                <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[10px] font-semibold">WIB</span>
+              </label>
               <input type="time" class="schedule-time w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
             </div>
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">End</label>
+              <label class="text-xs text-gray-400 mb-1 block flex items-center gap-1">
+                End Time 
+                <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[10px] font-semibold">WIB</span>
+              </label>
               <input type="time" class="schedule-endtime w-full h-[36px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary text-xs [color-scheme:dark]" onchange="calculateDurationFromEndTime(this)">
             </div>
             <div>
@@ -3176,11 +3190,17 @@
         <div class="schedule-slot p-3 bg-dark-700/50 rounded-lg border border-gray-600">
           <div class="flex gap-3 items-start mb-3">
             <div class="flex-1">
-              <label class="text-xs text-gray-400 mb-1.5 block">Start</label>
+              <label class="text-xs text-gray-400 mb-1.5 block flex items-center gap-1">
+                Start Time 
+                <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[10px] font-semibold">WIB</span>
+              </label>
               <input type="time" class="schedule-time w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditFromDuration(this)">
             </div>
             <div class="flex-1">
-              <label class="text-xs text-gray-400 mb-1.5 block">End</label>
+              <label class="text-xs text-gray-400 mb-1.5 block flex items-center gap-1">
+                End Time 
+                <span class="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[10px] font-semibold">WIB</span>
+              </label>
               <input type="time" class="schedule-endtime w-full h-[36px] px-3 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]" onchange="calculateEditDurationFromEndTime(this)">
             </div>
             <div class="flex-1">
@@ -3811,16 +3831,22 @@
               const searchTerm = this.value.toLowerCase().trim();
               const streamRows = document.querySelectorAll('table tbody tr:not(#empty-state)');
               const streamCards = document.querySelectorAll('.block.md\\:hidden.space-y-4 > div');
+              
+              // ⭐ FIX: Search by title AND channel name
               streamRows.forEach(row => {
                 const streamTitle = row.querySelector('.text-sm.font-medium')?.textContent.toLowerCase() || '';
-                const isMatch = streamTitle.includes(searchTerm);
+                const channelName = row.querySelector('td:nth-child(2) .text-sm.text-gray-300')?.textContent.toLowerCase() || '';
+                const isMatch = streamTitle.includes(searchTerm) || channelName.includes(searchTerm);
                 row.style.display = isMatch ? '' : 'none';
               });
+              
               streamCards.forEach(card => {
                 const streamTitle = card.querySelector('.font-medium')?.textContent.toLowerCase() || '';
-                const isMatch = streamTitle.includes(searchTerm);
+                const channelName = card.querySelector('.text-xs.text-gray-400 span')?.textContent.toLowerCase() || '';
+                const isMatch = streamTitle.includes(searchTerm) || channelName.includes(searchTerm);
                 card.style.display = isMatch ? '' : 'none';
               });
+              
               const visibleRows = [...streamRows].filter(row => row.style.display !== 'none');
               const visibleCards = [...streamCards].filter(card => card.style.display !== 'none');
               const emptyStateRow = document.getElementById('empty-state');

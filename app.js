@@ -2608,12 +2608,18 @@ app.post('/api/streams', isAuthenticated, uploadThumbnail.single('youtubeThumbna
           recurring_days: schedule.recurring_days || null
         };
         
-        // Calculate end_time from schedule_time + duration
-        const startTime = new Date(scheduleData.schedule_time);
-        const endTime = new Date(startTime.getTime() + (scheduleData.duration * 60 * 1000));
-        scheduleData.end_time = endTime.toISOString();
-        
-        console.log(`[CREATE STREAM] Schedule ${idx + 1}: ${startTime.toISOString()} -> ${endTime.toISOString()} (${scheduleData.duration} min)`);
+        // ⭐ FIX: Use end_time from frontend if provided, otherwise calculate
+        if (schedule.end_time) {
+          // Frontend already calculated end_time correctly
+          scheduleData.end_time = parseScheduleTime(schedule.end_time);
+          console.log(`[CREATE STREAM] Schedule ${idx + 1}: Using frontend end_time: ${scheduleData.schedule_time} -> ${scheduleData.end_time} (${scheduleData.duration} min)`);
+        } else {
+          // Fallback: Calculate end_time from schedule_time + duration
+          const startTime = new Date(scheduleData.schedule_time);
+          const endTime = new Date(startTime.getTime() + (scheduleData.duration * 60 * 1000));
+          scheduleData.end_time = endTime.toISOString();
+          console.log(`[CREATE STREAM] Schedule ${idx + 1}: Calculated end_time: ${startTime.toISOString()} -> ${endTime.toISOString()} (${scheduleData.duration} min)`);
+        }
         
         await StreamSchedule.create(scheduleData);
         

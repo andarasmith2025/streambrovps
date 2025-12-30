@@ -1184,9 +1184,7 @@ async function optimizeYouTubeVODInBackground(broadcastId, userId, streamId) {
     }
   });
 }
-    }
-  });
-}
+
 async function syncStreamStatuses() {
   try {
     console.log('[StreamingService] Syncing stream statuses...');
